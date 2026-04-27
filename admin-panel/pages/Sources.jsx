@@ -37,7 +37,14 @@ function EditModal({ source, categories, onClose, onSaved }) {
       })
       .eq('id', source.id)
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (error) {
+      if (error.code === '23505') {
+        setError('This RSS feed is already registered.')
+      } else {
+        setError(error.message)
+      }
+      return
+    }
     onSaved()
   }
 

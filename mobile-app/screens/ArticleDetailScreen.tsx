@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   Alert,
   Linking,
@@ -13,6 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { supabase } from '../services/supabase';
+import { saveRecentlyViewed } from '../services/recentlyViewedService';
+import { checkAndNotifyBreakingNews } from '../services/notificationService';
 
 const DEVICE_ID_KEY = 'newsera_device_id';
 
@@ -36,6 +38,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
   const { article } = route.params;
 
+  // Save to recently viewed and check for breaking news on screen mount
+  useEffect(() => {
+    saveRecentlyViewed(article);
+    checkAndNotifyBreakingNews(article);
+  }, [article]);
+
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
@@ -57,6 +65,32 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
           source_id: article.source_id,
           device_id: deviceId,
         });
+
+        // Update user interest score for this article's category
+        if (article.category_id) {
+          const { data: existingInterest } = await supabase
+            .from('user_interests')
+            .select('id, score')
+            .eq('user_id', deviceId)
+            .eq('category_id', article.category_id)
+            .limit(1);
+
+          if (existingInterest && existingInterest.length > 0) {
+            await supabase
+              .from('user_interests')
+              .update({
+                score: existingInterest[0].score + 1,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingInterest[0].id);
+          } else {
+            await supabase.from('user_interests').insert({
+              user_id: deviceId,
+              category_id: article.category_id,
+              score: 1,
+            });
+          }
+        }
       }
     } catch (_) {
       // tracking failure must never block navigation
@@ -68,7 +102,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
     } else {
       Alert.alert('Error', 'Unable to open this URL.');
     }
-  }, [article.id, article.source_id, article.url]);
+  }, [article.id, article.source_id, article.category_id, article.url]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

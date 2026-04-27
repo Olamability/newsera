@@ -12,13 +12,21 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import ArticleCard from '../components/ArticleCard';
 import CategoryFilter from '../components/CategoryFilter';
-import { fetchArticles, fetchCategories, fetchTrendingArticles } from '../services/newsService';
+import {
+  fetchArticles,
+  fetchCategories,
+  fetchTrendingArticles,
+  fetchPersonalizedArticles,
+} from '../services/newsService';
+import { getRecentlyViewed } from '../services/recentlyViewedService';
 import { Category, NewsArticle, RootStackParamList } from '../types';
 import { useCategoryContext } from '../context/CategoryContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 const TRENDING_DISPLAY_COUNT = 5;
+const FOR_YOU_MIN = 5;
+const FOR_YOU_MAX = 10;
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -28,6 +36,8 @@ const HomeScreen: React.FC = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [trendingArticles, setTrendingArticles] = useState<NewsArticle[]>([]);
+  const [personalizedArticles, setPersonalizedArticles] = useState<NewsArticle[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<NewsArticle[]>([]);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,6 +61,24 @@ const HomeScreen: React.FC = () => {
       setTrendingArticles(data.slice(0, TRENDING_DISPLAY_COUNT));
     } catch (_) {
       // trending section is non-critical
+    }
+  }, []);
+
+  const loadPersonalized = useCallback(async () => {
+    try {
+      const data = await fetchPersonalizedArticles();
+      setPersonalizedArticles(data.slice(0, FOR_YOU_MAX));
+    } catch (_) {
+      // personalized section is non-critical
+    }
+  }, []);
+
+  const loadRecentlyViewed = useCallback(async () => {
+    try {
+      const data = await getRecentlyViewed();
+      setRecentlyViewed(data);
+    } catch (_) {
+      // recently viewed section is non-critical
     }
   }, []);
 
@@ -81,7 +109,9 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadCategories();
     loadTrending();
-  }, [loadCategories, loadTrending]);
+    loadPersonalized();
+    loadRecentlyViewed();
+  }, [loadCategories, loadTrending, loadPersonalized, loadRecentlyViewed]);
 
   useEffect(() => {
     setPage(0);
@@ -102,9 +132,11 @@ const HomeScreen: React.FC = () => {
     await Promise.all([
       loadArticles(0, selectedCategory, true),
       loadTrending(),
+      loadPersonalized(),
+      loadRecentlyViewed(),
     ]);
     setRefreshing(false);
-  }, [selectedCategory, loadArticles, loadTrending]);
+  }, [selectedCategory, loadArticles, loadTrending, loadPersonalized, loadRecentlyViewed]);
 
   const handleArticlePress = useCallback(
     (article: NewsArticle) => {
@@ -149,6 +181,46 @@ const HomeScreen: React.FC = () => {
     );
   };
 
+  const renderForYouSection = () => {
+    if (personalizedArticles.length < FOR_YOU_MIN) return null;
+    return (
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>For You ✨</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.trendingList}
+        >
+          {personalizedArticles.map((article) => (
+            <View key={article.id} style={styles.trendingCardWrapper}>
+              <ArticleCard article={article} onPress={handleArticlePress} />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderContinueReadingSection = () => {
+    if (recentlyViewed.length === 0) return null;
+    return (
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Continue Reading 📖</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.trendingList}
+        >
+          {recentlyViewed.map((article) => (
+            <View key={article.id} style={styles.trendingCardWrapper}>
+              <ArticleCard article={article} onPress={handleArticlePress} />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   const keyExtractor = (item: NewsArticle) => item.id;
 
   return (
@@ -165,7 +237,13 @@ const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.list}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        ListHeaderComponent={renderTrendingSection}
+        ListHeaderComponent={() => (
+          <>
+            {renderForYouSection()}
+            {renderContinueReadingSection()}
+            {renderTrendingSection()}
+          </>
+        )}
         ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
@@ -219,6 +297,17 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   trendingTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  sectionContainer: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#1a1a1a',

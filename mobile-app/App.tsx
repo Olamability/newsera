@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -7,10 +7,15 @@ import HomeScreen from './screens/HomeScreen';
 import ArticleDetailScreen from './screens/ArticleDetailScreen';
 import { RootStackParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
+import { registerForPushNotificationsAsync } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <CategoryProvider>

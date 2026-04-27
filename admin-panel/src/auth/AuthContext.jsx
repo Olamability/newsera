@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../../services/supabase'
+import { supabase } from '../services/supabase'
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 

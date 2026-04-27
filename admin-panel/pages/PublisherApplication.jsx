@@ -65,7 +65,11 @@ export default function PublisherApplication() {
     setSubmitting(false)
 
     if (insertError) {
-      setError(insertError.message)
+      if (insertError.code === '23505') {
+        setError('This RSS feed is already registered.')
+      } else {
+        setError(insertError.message)
+      }
       return
     }
 

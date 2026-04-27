@@ -1,0 +1,14 @@
+{
+  "name": "newsera-rss-engine",
+  "version": "1.0.0",
+  "description": "RSS ingestion engine for Newsera",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.4.2",
+    "rss-parser": "^3.13.0"
+  }
+}

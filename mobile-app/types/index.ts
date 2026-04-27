@@ -25,7 +25,20 @@ export interface NewsArticle {
   categories: Category | null;
 }
 
+export interface Bookmark {
+  id: string;
+  user_id: string;
+  article_id: string;
+  created_at: string;
+}
+
 export type RootStackParamList = {
+  Splash: undefined;
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
   Home: undefined;
   ArticleDetail: { article: NewsArticle };
+  Bookmarks: undefined;
+  Profile: undefined;
 };

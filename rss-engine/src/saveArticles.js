@@ -1,5 +1,7 @@
 const supabase = require('../config/supabase');
 
+const BATCH_SIZE = parseInt(process.env.INSERT_BATCH_SIZE || '50', 10);
+
 /**
  * Inserts an array of new articles into the `news` table.
  * Articles are inserted in batches to stay within Supabase limits.
@@ -9,7 +11,6 @@ const supabase = require('../config/supabase');
 async function saveArticles(articles) {
   if (!articles.length) return 0;
 
-  const BATCH_SIZE = 50;
   let inserted = 0;
 
   for (let i = 0; i < articles.length; i += BATCH_SIZE) {

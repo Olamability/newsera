@@ -1,5 +1,8 @@
 const RSSParser = require('rss-parser');
 
+const SNIPPET_MAX_LENGTH = 500;
+const CONTENT_MAX_LENGTH = 1500;
+
 const parser = new RSSParser({
   customFields: {
     item: [
@@ -23,7 +26,7 @@ function extractSnippet(raw) {
   const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
   // Split into sentences / paragraphs and take ~500 chars
-  return text.length > 500 ? text.slice(0, 500).replace(/\s\S*$/, '…') : text;
+  return text.length > SNIPPET_MAX_LENGTH ? text.slice(0, SNIPPET_MAX_LENGTH).replace(/\s\S*$/, '…') : text;
 }
 
 /**
@@ -36,7 +39,7 @@ function extractContent(raw) {
 
   const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
-  return text.length > 1500 ? text.slice(0, 1500).replace(/\s\S*$/, '…') : text;
+  return text.length > CONTENT_MAX_LENGTH ? text.slice(0, CONTENT_MAX_LENGTH).replace(/\s\S*$/, '…') : text;
 }
 
 /**

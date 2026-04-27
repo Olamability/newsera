@@ -1,7 +1,7 @@
 const supabase = require('../config/supabase');
 
 /**
- * Removes articles whose URLs already exist in the `news` table.
+ * Removes articles whose URLs already exist in the `articles` table.
  * @param {Array} articles - Candidate articles to check.
  * @returns {Promise<{ fresh: Array, duplicateCount: number }>}
  */
@@ -13,7 +13,7 @@ async function deduplicateArticles(articles) {
   const urls = articles.map((a) => a.url);
 
   const { data, error } = await supabase
-    .from('news')
+    .from('articles')
     .select('url')
     .in('url', urls);
 

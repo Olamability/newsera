@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   Alert,
   Linking,
@@ -9,32 +9,23 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { supabase } from '../services/supabase';
-
-const DEVICE_ID_KEY = 'newsera_device_id';
-
-/** Returns a persistent device ID, generating and storing one on first call. */
-async function getDeviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    // Simple UUID v4 without an external library
-    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
-}
+import { getDeviceId } from '../services/deviceId';
+import { saveRecentlyViewed } from '../services/recentlyViewedService';
+import { checkAndNotifyBreakingNews } from '../services/notificationService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
 const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
   const { article } = route.params;
+
+  // Save to recently viewed and check for breaking news on screen mount
+  useEffect(() => {
+    saveRecentlyViewed(article);
+    checkAndNotifyBreakingNews(article);
+  }, [article]);
 
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
@@ -57,6 +48,14 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
           source_id: article.source_id,
           device_id: deviceId,
         });
+
+        // Atomically insert or increment the user interest score for this category
+        if (article.category_id) {
+          await supabase.rpc('increment_user_interest', {
+            p_user_id: deviceId,
+            p_category_id: article.category_id,
+          });
+        }
       }
     } catch (_) {
       // tracking failure must never block navigation
@@ -68,7 +67,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
     } else {
       Alert.alert('Error', 'Unable to open this URL.');
     }
-  }, [article.id, article.source_id, article.url]);
+  }, [article.id, article.source_id, article.category_id, article.url]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

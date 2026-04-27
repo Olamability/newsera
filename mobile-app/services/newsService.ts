@@ -1,8 +1,21 @@
 import { supabase } from './supabase';
 import { NewsArticle, Category } from '../types';
+import { getDeviceId } from './deviceId';
 
 const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
+const PERSONALIZED_LIMIT = 20;
+const PERSONALIZED_DISPLAY_COUNT = 10;
+
+interface UserInterestRow {
+  category_id: string;
+  score: number;
+}
+
+interface ClickCountRow {
+  article_id: string;
+  click_count: number;
+}
 
 export async function fetchArticles(
   page: number,
@@ -102,3 +115,132 @@ export async function fetchTrendingArticles(): Promise<NewsArticle[]> {
 
   return articles;
 }
+
+/**
+ * Returns a personalized feed for the current device.
+ *
+ * Ranking weights (applied to the personalized feed only):
+ *   • Trending (click count, last 24h) — 50 %
+ *   • Recency (published_at)           — 30 %
+ *   • User interest (category score)   — 20 %
+ *
+ * Falls back to the most-recent articles when no interest data exists.
+ */
+export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
+  try {
+    const deviceId = await getDeviceId();
+
+    // 1. Fetch this device's category interests (highest score first)
+    const { data: interests } = await supabase
+      .from('user_interests')
+      .select('category_id, score')
+      .eq('user_id', deviceId)
+      .order('score', { ascending: false })
+      .limit(10);
+
+    // Fallback: no interest data → return latest articles
+    if (!interests || interests.length === 0) {
+      const { data, error } = await supabase
+        .from('articles')
+        .select(
+          `id, title, snippet, image_url, published_at, url, source_id, category_id,
+           sources ( id, name, website_url, logo_url ),
+           categories ( id, name, slug )`
+        )
+        .order('published_at', { ascending: false })
+        .limit(PERSONALIZED_DISPLAY_COUNT);
+      if (error) throw error;
+      return (data as unknown as NewsArticle[]) ?? [];
+    }
+
+    const categoryIds = (interests as UserInterestRow[]).map((i) => i.category_id);
+
+    // Build a quick-lookup: category_id → normalised interest score (0–1)
+    const maxScore = Math.max(...(interests as UserInterestRow[]).map((i) => i.score), 1);
+    const interestMap: Record<string, number> = {};
+    (interests as UserInterestRow[]).forEach((i) => {
+      interestMap[i.category_id] = i.score / maxScore;
+    });
+
+    // 2. Fetch articles from preferred categories
+    const { data: catArticles, error: catError } = await supabase
+      .from('articles')
+      .select(
+        `id, title, snippet, image_url, published_at, url, source_id, category_id,
+         sources ( id, name, website_url, logo_url ),
+         categories ( id, name, slug )`
+      )
+      .in('category_id', categoryIds)
+      .order('published_at', { ascending: false })
+      .limit(PERSONALIZED_LIMIT);
+
+    if (catError) throw catError;
+
+    const articles = (catArticles as unknown as NewsArticle[]) ?? [];
+    if (articles.length === 0) {
+      // All preferred categories are empty → latest fallback
+      const { data, error } = await supabase
+        .from('articles')
+        .select(
+          `id, title, snippet, image_url, published_at, url, source_id, category_id,
+           sources ( id, name, website_url, logo_url ),
+           categories ( id, name, slug )`
+        )
+        .order('published_at', { ascending: false })
+        .limit(PERSONALIZED_DISPLAY_COUNT);
+      if (error) throw error;
+      return (data as unknown as NewsArticle[]) ?? [];
+    }
+
+    // 3. Fetch trending click counts for these articles
+    const articleIds = articles.map((a) => a.id);
+    const { data: clickData } = await supabase
+      .from('article_click_counts')
+      .select('article_id, click_count')
+      .in('article_id', articleIds);
+
+    const maxClicks = Math.max(
+      ...((clickData ?? []) as ClickCountRow[]).map((r) => r.click_count),
+      1
+    );
+    const clickMap: Record<string, number> = {};
+    ((clickData ?? []) as ClickCountRow[]).forEach((r) => {
+      clickMap[r.article_id] = r.click_count / maxClicks;
+    });
+
+    // 4. Compute recency score: normalise published_at within the fetched set
+    const timestamps = articles
+      .map((a) => (a.published_at ? new Date(a.published_at).getTime() : 0));
+    const minTs = Math.min(...timestamps);
+    const maxTs = Math.max(...timestamps);
+    const tsRange = maxTs - minTs || 1;
+
+    // 5. Apply weighted ranking
+    const TRENDING_WEIGHT = 0.5;
+    const RECENCY_WEIGHT = 0.3;
+    const INTEREST_WEIGHT = 0.2;
+
+    const scored = articles.map((a) => {
+      const trendingScore = clickMap[a.id] ?? 0;
+      const recencyScore = a.published_at
+        ? (new Date(a.published_at).getTime() - minTs) / tsRange
+        : 0;
+      const interestScore = a.category_id ? (interestMap[a.category_id] ?? 0) : 0;
+
+      const finalScore =
+        TRENDING_WEIGHT * trendingScore +
+        RECENCY_WEIGHT * recencyScore +
+        INTEREST_WEIGHT * interestScore;
+
+      return { article: a, score: finalScore };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, PERSONALIZED_DISPLAY_COUNT).map((s) => s.article);
+  } catch (err) {
+    console.warn('[Personalized] fetchPersonalizedArticles failed:', err);
+    return [];
+  }
+}
+

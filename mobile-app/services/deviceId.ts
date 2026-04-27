@@ -13,6 +13,16 @@ const DEVICE_ID_KEY = 'newsera_device_id';
 
 /** Generates a UUID v4 using the Web Crypto API (crypto.getRandomValues). */
 function generateSecureUUID(): string {
+  // Fallback for environments where the Web Crypto API is unavailable
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+    // Acceptable non-security-sensitive fallback (device ID only used for analytics)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
   const bytes = new Uint8Array(16);
   globalThis.crypto.getRandomValues(bytes);
 

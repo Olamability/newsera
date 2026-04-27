@@ -49,30 +49,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
           device_id: deviceId,
         });
 
-        // Update user interest score for this article's category
+        // Atomically insert or increment the user interest score for this category
         if (article.category_id) {
-          const { data: existingInterest } = await supabase
-            .from('user_interests')
-            .select('id, score')
-            .eq('user_id', deviceId)
-            .eq('category_id', article.category_id)
-            .limit(1);
-
-          if (existingInterest && existingInterest.length > 0) {
-            await supabase
-              .from('user_interests')
-              .update({
-                score: existingInterest[0].score + 1,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existingInterest[0].id);
-          } else {
-            await supabase.from('user_interests').insert({
-              user_id: deviceId,
-              category_id: article.category_id,
-              score: 1,
-            });
-          }
+          await supabase.rpc('increment_user_interest', {
+            p_user_id: deviceId,
+            p_category_id: article.category_id,
+          });
         }
       }
     } catch (_) {

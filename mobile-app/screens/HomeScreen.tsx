@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,11 +12,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import ArticleCard from '../components/ArticleCard';
 import CategoryFilter from '../components/CategoryFilter';
-import { fetchArticles, fetchCategories } from '../services/newsService';
+import { fetchArticles, fetchCategories, fetchTrendingArticles } from '../services/newsService';
 import { Category, NewsArticle, RootStackParamList } from '../types';
 import { useCategoryContext } from '../context/CategoryContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+
+const TRENDING_DISPLAY_COUNT = 5;
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -24,6 +27,7 @@ const HomeScreen: React.FC = () => {
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [trendingArticles, setTrendingArticles] = useState<NewsArticle[]>([]);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +42,15 @@ const HomeScreen: React.FC = () => {
       setCategories(cats);
     } catch (_) {
       // categories are non-critical
+    }
+  }, []);
+
+  const loadTrending = useCallback(async () => {
+    try {
+      const data = await fetchTrendingArticles();
+      setTrendingArticles(data.slice(0, TRENDING_DISPLAY_COUNT));
+    } catch (_) {
+      // trending section is non-critical
     }
   }, []);
 
@@ -67,7 +80,8 @@ const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     loadCategories();
-  }, [loadCategories]);
+    loadTrending();
+  }, [loadCategories, loadTrending]);
 
   useEffect(() => {
     setPage(0);
@@ -85,9 +99,12 @@ const HomeScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     setHasMore(true);
-    await loadArticles(0, selectedCategory, true);
+    await Promise.all([
+      loadArticles(0, selectedCategory, true),
+      loadTrending(),
+    ]);
     setRefreshing(false);
-  }, [selectedCategory, loadArticles]);
+  }, [selectedCategory, loadArticles, loadTrending]);
 
   const handleArticlePress = useCallback(
     (article: NewsArticle) => {
@@ -112,6 +129,26 @@ const HomeScreen: React.FC = () => {
     );
   };
 
+  const renderTrendingSection = () => {
+    if (trendingArticles.length === 0) return null;
+    return (
+      <View style={styles.trendingSection}>
+        <Text style={styles.trendingTitle}>Trending Now 🔥</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.trendingList}
+        >
+          {trendingArticles.map((article) => (
+            <View key={article.id} style={styles.trendingCardWrapper}>
+              <ArticleCard article={article} onPress={handleArticlePress} />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   const keyExtractor = (item: NewsArticle) => item.id;
 
   return (
@@ -128,6 +165,7 @@ const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.list}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
+        ListHeaderComponent={renderTrendingSection}
         ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
@@ -175,6 +213,24 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  trendingSection: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  trendingTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  trendingList: {
+    paddingHorizontal: 6,
+  },
+  trendingCardWrapper: {
+    width: 280,
+    marginHorizontal: 6,
   },
 });
 

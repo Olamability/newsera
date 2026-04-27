@@ -11,6 +11,7 @@ import {
 import { Image } from 'expo-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { supabase } from '../services/supabase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
@@ -18,13 +19,23 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
   const { article } = route.params;
 
   const handleReadFull = useCallback(async () => {
+    // Track click — non-blocking; link opens regardless of tracking result
+    try {
+      await supabase.from('article_clicks').insert({
+        article_id: article.id,
+        source_id: article.source_id,
+      });
+    } catch (_) {
+      // tracking failure must never block navigation
+    }
+
     const supported = await Linking.canOpenURL(article.url);
     if (supported) {
       await Linking.openURL(article.url);
     } else {
       Alert.alert('Error', 'Unable to open this URL.');
     }
-  }, [article.url]);
+  }, [article.id, article.source_id, article.url]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

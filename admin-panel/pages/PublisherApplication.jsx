@@ -48,7 +48,7 @@ export default function PublisherApplication() {
     }
 
     if (existing) {
-      setError('This RSS URL is already registered. Please use a unique RSS feed URL.')
+      setError('This RSS URL is already registered.')
       setSubmitting(false)
       return
     }

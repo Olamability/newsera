@@ -11,7 +11,7 @@ export async function fetchArticles(
   const to = from + PAGE_SIZE - 1;
 
   let query = supabase
-    .from('news')
+    .from('articles')
     .select(
       `id, title, snippet, image_url, published_at, url, source_id, category_id,
        sources ( id, name, website_url, logo_url ),

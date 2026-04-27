@@ -17,7 +17,7 @@ Tables required:
 - status (text default 'pending')
 - created_at (timestamp default now())
 
-3. news
+3. articles
 - id (uuid primary key)
 - title (text)
 - content (text)
@@ -31,7 +31,7 @@ Tables required:
 4. bookmarks
 - id (uuid primary key)
 - user_id (uuid references auth.users)
-- news_id (uuid references news.id)
+- article_id (uuid references articles.id)
 - created_at (timestamp default now())
 
 Requirements:

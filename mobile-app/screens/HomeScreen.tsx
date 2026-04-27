@@ -13,15 +13,17 @@ import ArticleCard from '../components/ArticleCard';
 import CategoryFilter from '../components/CategoryFilter';
 import { fetchArticles, fetchCategories } from '../services/newsService';
 import { Category, NewsArticle, RootStackParamList } from '../types';
+import { useCategoryContext } from '../context/CategoryContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const { selectedCategoryId: selectedCategory, setSelectedCategoryId: setSelectedCategory } =
+    useCategoryContext();
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

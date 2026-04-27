@@ -32,9 +32,9 @@ CREATE INDEX idx_sources_category_id ON sources (category_id);
 CREATE INDEX idx_sources_status       ON sources (status);
 
 -- ============================================================
--- TABLE: news
+-- TABLE: articles
 -- ============================================================
-CREATE TABLE news (
+CREATE TABLE articles (
     id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     title        text NOT NULL,
     content      text,
@@ -44,15 +44,15 @@ CREATE TABLE news (
     published_at timestamptz,
     url          text NOT NULL,
     category_id  uuid REFERENCES categories (id) ON DELETE SET NULL,
-    CONSTRAINT news_url_unique UNIQUE (url)
+    CONSTRAINT articles_url_unique UNIQUE (url)
 );
 
 -- Indexes optimised for the most common query patterns:
 --   • sort / filter by publication date
 --   • combined category + date queries (also covers category-only queries)
-CREATE INDEX idx_news_published_at   ON news (published_at DESC);
-CREATE INDEX idx_news_category_date  ON news (category_id, published_at DESC);
-CREATE INDEX idx_news_source_id      ON news (source_id);
+CREATE INDEX idx_articles_published_at   ON articles (published_at DESC);
+CREATE INDEX idx_articles_category_date  ON articles (category_id, published_at DESC);
+CREATE INDEX idx_articles_source_id      ON articles (source_id);
 
 -- ============================================================
 -- TABLE: bookmarks
@@ -60,14 +60,14 @@ CREATE INDEX idx_news_source_id      ON news (source_id);
 CREATE TABLE bookmarks (
     id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id    uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-    news_id    uuid NOT NULL REFERENCES news (id)       ON DELETE CASCADE,
+    article_id uuid NOT NULL REFERENCES articles (id)  ON DELETE CASCADE,
     created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT bookmarks_user_news_unique UNIQUE (user_id, news_id)
+    CONSTRAINT bookmarks_user_article_unique UNIQUE (user_id, article_id)
 );
 
 -- Indexes for fetching a user's bookmarks and for reverse-lookup
-CREATE INDEX idx_bookmarks_user_id ON bookmarks (user_id);
-CREATE INDEX idx_bookmarks_news_id ON bookmarks (news_id);
+CREATE INDEX idx_bookmarks_user_id    ON bookmarks (user_id);
+CREATE INDEX idx_bookmarks_article_id ON bookmarks (article_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY
@@ -83,9 +83,9 @@ ALTER TABLE sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "sources_select_all" ON sources
     FOR SELECT USING (true);
 
--- news: publicly readable, only service-role can write
-ALTER TABLE news ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "news_select_all" ON news
+-- articles: publicly readable, only service-role can write
+ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "articles_select_all" ON articles
     FOR SELECT USING (true);
 
 -- bookmarks: users can only read/write their own bookmarks

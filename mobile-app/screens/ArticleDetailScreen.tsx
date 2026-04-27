@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -15,11 +15,17 @@ import { supabase } from '../services/supabase';
 import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
+import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
+import { useAuth } from '../context/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
-const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
+const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
+  const { user } = useAuth();
+
+  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
@@ -27,18 +33,52 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
     checkAndNotifyBreakingNews(article);
   }, [article]);
 
+  // Load bookmark state for authenticated users
+  useEffect(() => {
+    if (!user) return;
+    isBookmarked(article.id, user.id)
+      .then(setBookmarked)
+      .catch(() => {});
+  }, [article.id, user]);
+
+  const handleBookmark = useCallback(async () => {
+    if (!user) {
+      Alert.alert(
+        'Sign in required',
+        'Please sign in to bookmark articles.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+
+    setBookmarkLoading(true);
+    try {
+      const next = await toggleBookmark(article.id, user.id);
+      setBookmarked(next);
+    } catch (err) {
+      console.error('[Bookmark] Toggle failed:', err);
+      Alert.alert('Error', 'Failed to update bookmark. Please try again.');
+    } finally {
+      setBookmarkLoading(false);
+    }
+  }, [user, article.id, navigation]);
+
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
-      const deviceId = await getDeviceId();
+      // Prefer authenticated user ID; fall back to device ID for guest users
+      const trackingId = user?.id ?? (await getDeviceId());
 
-      // Dedup: skip insert if this device already clicked this article in the last 30 seconds
+      // Dedup: skip insert if this user/device already clicked this article in the last 30 seconds
       const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
       const { data: recent } = await supabase
         .from('article_clicks')
         .select('id')
         .eq('article_id', article.id)
-        .eq('device_id', deviceId)
+        .eq('device_id', trackingId)
         .gte('clicked_at', thirtySecsAgo)
         .limit(1);
 
@@ -46,13 +86,13 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
         await supabase.from('article_clicks').insert({
           article_id: article.id,
           source_id: article.source_id,
-          device_id: deviceId,
+          device_id: trackingId,
         });
 
         // Atomically insert or increment the user interest score for this category
         if (article.category_id) {
           await supabase.rpc('increment_user_interest', {
-            p_user_id: deviceId,
+            p_user_id: trackingId,
             p_category_id: article.category_id,
           });
         }
@@ -67,7 +107,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
     } else {
       Alert.alert('Error', 'Unable to open this URL.');
     }
-  }, [article.id, article.source_id, article.category_id, article.url]);
+  }, [user, article.id, article.source_id, article.category_id, article.url]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -106,9 +146,30 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
           <Text style={styles.snippet}>{article.snippet}</Text>
         ) : null}
 
-        <TouchableOpacity style={styles.button} onPress={handleReadFull} activeOpacity={0.85}>
-          <Text style={styles.buttonText}>Read Full Article</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleReadFull}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.buttonText}>Read Full Article</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.bookmarkBtn,
+              bookmarked && styles.bookmarkBtnActive,
+              bookmarkLoading && styles.bookmarkBtnDisabled,
+            ]}
+            onPress={handleBookmark}
+            disabled={bookmarkLoading}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
+              {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -163,6 +224,9 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginBottom: 24,
   },
+  actions: {
+    gap: 12,
+  },
   button: {
     backgroundColor: '#e63946',
     borderRadius: 10,
@@ -173,6 +237,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  bookmarkBtn: {
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e63946',
+    backgroundColor: '#fff',
+  },
+  bookmarkBtnActive: {
+    backgroundColor: '#fff5f6',
+  },
+  bookmarkBtnDisabled: {
+    opacity: 0.6,
+  },
+  bookmarkText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#e63946',
+  },
+  bookmarkTextActive: {
+    color: '#e63946',
   },
 });
 

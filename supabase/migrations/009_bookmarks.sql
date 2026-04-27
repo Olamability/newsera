@@ -1,0 +1,8 @@
+-- ============================================================
+-- MIGRATION 009: Bookmarks table correction guard
+--
+-- The initial schema (001) has been corrected to use the
+-- 'articles' table name with 'article_id' (not 'news'/'news_id').
+-- This migration is a no-op guard retained for migration history
+-- continuity. No schema changes are needed here.
+-- ============================================================

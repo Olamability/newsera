@@ -7,6 +7,7 @@ import Dashboard from '../pages/Dashboard'
 import Sources from '../pages/Sources'
 import PublisherApplication from '../pages/PublisherApplication'
 import Categories from '../pages/Categories'
+import Analytics from '../pages/Analytics'
 
 function Unauthorized() {
   return (
@@ -65,6 +66,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <Categories />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Analytics />
                 </Layout>
               </ProtectedRoute>
             }

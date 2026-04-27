@@ -21,15 +21,15 @@ CREATE TABLE sources (
     website_url text,
     rss_url     text,
     logo_url    text,
-    category    text,
+    category_id uuid REFERENCES categories (id) ON DELETE SET NULL,
     status      text NOT NULL DEFAULT 'pending',
     created_at  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT sources_status_check CHECK (status IN ('pending', 'active', 'inactive'))
 );
 
 -- Index for filtering sources by category and status
-CREATE INDEX idx_sources_category ON sources (category);
-CREATE INDEX idx_sources_status   ON sources (status);
+CREATE INDEX idx_sources_category_id ON sources (category_id);
+CREATE INDEX idx_sources_status       ON sources (status);
 
 -- ============================================================
 -- TABLE: news
@@ -39,21 +39,20 @@ CREATE TABLE news (
     title        text NOT NULL,
     content      text,
     snippet      text,
-    source       text,
+    source_id    uuid REFERENCES sources (id) ON DELETE SET NULL,
     image_url    text,
     published_at timestamptz,
     url          text NOT NULL,
-    category     text,
+    category_id  uuid REFERENCES categories (id) ON DELETE SET NULL,
     CONSTRAINT news_url_unique UNIQUE (url)
 );
 
 -- Indexes optimised for the most common query patterns:
---   • browse by category
 --   • sort / filter by publication date
---   • combined category + date queries
-CREATE INDEX idx_news_category     ON news (category);
-CREATE INDEX idx_news_published_at ON news (published_at DESC);
-CREATE INDEX idx_news_category_date ON news (category, published_at DESC);
+--   • combined category + date queries (also covers category-only queries)
+CREATE INDEX idx_news_published_at   ON news (published_at DESC);
+CREATE INDEX idx_news_category_date  ON news (category_id, published_at DESC);
+CREATE INDEX idx_news_source_id      ON news (source_id);
 
 -- ============================================================
 -- TABLE: bookmarks

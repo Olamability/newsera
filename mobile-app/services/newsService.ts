@@ -1,26 +1,20 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { NewsArticle, Category } from '../types';
-
-const DEVICE_ID_KEY = 'newsera_device_id';
+import { getDeviceId } from './deviceId';
 
 const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
-/** Returns the persistent device ID (mirrors the helper in ArticleDetailScreen). */
-async function getDeviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
+interface UserInterestRow {
+  category_id: string;
+  score: number;
+}
+
+interface ClickCountRow {
+  article_id: string;
+  click_count: number;
 }
 
 export async function fetchArticles(
@@ -159,12 +153,12 @@ export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
       return (data as unknown as NewsArticle[]) ?? [];
     }
 
-    const categoryIds = interests.map((i: { category_id: string }) => i.category_id);
+    const categoryIds = (interests as UserInterestRow[]).map((i) => i.category_id);
 
     // Build a quick-lookup: category_id → normalised interest score (0–1)
-    const maxScore = Math.max(...interests.map((i: { score: number }) => i.score), 1);
+    const maxScore = Math.max(...(interests as UserInterestRow[]).map((i) => i.score), 1);
     const interestMap: Record<string, number> = {};
-    interests.forEach((i: { category_id: string; score: number }) => {
+    (interests as UserInterestRow[]).forEach((i) => {
       interestMap[i.category_id] = i.score / maxScore;
     });
 
@@ -206,13 +200,11 @@ export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
       .in('article_id', articleIds);
 
     const maxClicks = Math.max(
-      ...((clickData ?? []) as { article_id: string; click_count: number }[]).map(
-        (r) => r.click_count
-      ),
+      ...((clickData ?? []) as ClickCountRow[]).map((r) => r.click_count),
       1
     );
     const clickMap: Record<string, number> = {};
-    ((clickData ?? []) as { article_id: string; click_count: number }[]).forEach((r) => {
+    ((clickData ?? []) as ClickCountRow[]).forEach((r) => {
       clickMap[r.article_id] = r.click_count / maxClicks;
     });
 

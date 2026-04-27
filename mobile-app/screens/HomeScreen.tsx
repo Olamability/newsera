@@ -164,8 +164,8 @@ const HomeScreen: React.FC = () => {
   const renderTrendingSection = () => {
     if (trendingArticles.length === 0) return null;
     return (
-      <View style={styles.trendingSection}>
-        <Text style={styles.trendingTitle}>Trending Now 🔥</Text>
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Trending Now 🔥</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -291,17 +291,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
-  },
-  trendingSection: {
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  trendingTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    paddingHorizontal: 12,
-    marginBottom: 8,
   },
   sectionContainer: {
     paddingTop: 12,

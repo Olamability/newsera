@@ -8,25 +8,11 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
+import { getDeviceId } from './deviceId';
 import { NewsArticle } from '../types';
 
-const DEVICE_ID_KEY = 'newsera_device_id';
-
-/** Returns the persistent device ID (same helper used by ArticleDetailScreen). */
-async function getDeviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
-}
+const HIGH_VELOCITY_THRESHOLD = 10;
 
 /**
  * Requests push-notification permission, obtains the Expo push token, and
@@ -101,7 +87,7 @@ export async function checkAndNotifyBreakingNews(article: NewsArticle): Promise<
       .eq('article_id', article.id)
       .gte('clicked_at', tenMinutesAgo.toISOString());
 
-    if ((count ?? 0) >= 10) {
+    if ((count ?? 0) >= HIGH_VELOCITY_THRESHOLD) {
       isHighVelocity = true;
     }
 

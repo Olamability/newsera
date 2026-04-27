@@ -9,29 +9,12 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { supabase } from '../services/supabase';
+import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
-
-const DEVICE_ID_KEY = 'newsera_device_id';
-
-/** Returns a persistent device ID, generating and storing one on first call. */
-async function getDeviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    // Simple UUID v4 without an external library
-    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
-}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 

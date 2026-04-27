@@ -14,7 +14,7 @@ CREATE TABLE user_interests (
 );
 
 -- Index for fast look-up of a device's ranked interests
-CREATE INDEX idx_user_interests_user_id ON user_interests (user_id, category_id);
+CREATE INDEX idx_user_interests_user_category ON user_interests (user_id, category_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY

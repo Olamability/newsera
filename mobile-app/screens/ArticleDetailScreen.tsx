@@ -9,9 +9,27 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { supabase } from '../services/supabase';
+
+const DEVICE_ID_KEY = 'newsera_device_id';
+
+/** Returns a persistent device ID, generating and storing one on first call. */
+async function getDeviceId(): Promise<string> {
+  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    // Simple UUID v4 without an external library
+    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
@@ -21,10 +39,25 @@ const ArticleDetailScreen: React.FC<Props> = ({ route }) => {
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
-      await supabase.from('article_clicks').insert({
-        article_id: article.id,
-        source_id: article.source_id,
-      });
+      const deviceId = await getDeviceId();
+
+      // Dedup: skip insert if this device already clicked this article in the last 30 seconds
+      const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
+      const { data: recent } = await supabase
+        .from('article_clicks')
+        .select('id')
+        .eq('article_id', article.id)
+        .eq('device_id', deviceId)
+        .gte('clicked_at', thirtySecsAgo)
+        .limit(1);
+
+      if (!recent || recent.length === 0) {
+        await supabase.from('article_clicks').insert({
+          article_id: article.id,
+          source_id: article.source_id,
+          device_id: deviceId,
+        });
+      }
     } catch (_) {
       // tracking failure must never block navigation
     }

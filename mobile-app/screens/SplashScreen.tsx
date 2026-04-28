@@ -8,7 +8,6 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
-import { supabase } from '../services/supabase';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Splash'>;
 
@@ -20,18 +19,11 @@ const SplashScreen: React.FC = () => {
 
     const checkSession = async () => {
       // Show splash for at least 2 seconds for branding
-      const [, { data }] = await Promise.all([
-        new Promise((resolve) => setTimeout(resolve, 2000)),
-        supabase.auth.getSession(),
-      ]);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       if (cancelled) return;
 
-      if (data.session) {
-        navigation.replace('Home');
-      } else {
-        navigation.replace('Login');
-      }
+      navigation.replace('Home');
     };
 
     checkSession();

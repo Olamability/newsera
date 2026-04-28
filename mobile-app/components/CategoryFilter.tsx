@@ -7,11 +7,12 @@ import {
   View,
 } from 'react-native';
 import { Category } from '../types';
+import { CATEGORY_ALL } from '../services/newsService';
 
 interface Props {
   categories: Category[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedId: string;
+  onSelect: (id: string) => void;
 }
 
 const CategoryFilter: React.FC<Props> = ({ categories, selectedId, onSelect }) => {
@@ -23,10 +24,10 @@ const CategoryFilter: React.FC<Props> = ({ categories, selectedId, onSelect }) =
         contentContainerStyle={styles.container}
       >
         <TouchableOpacity
-          style={[styles.chip, selectedId === null && styles.chipActive]}
-          onPress={() => onSelect(null)}
+          style={[styles.chip, selectedId === CATEGORY_ALL && styles.chipActive]}
+          onPress={() => onSelect(CATEGORY_ALL)}
         >
-          <Text style={[styles.chipText, selectedId === null && styles.chipTextActive]}>
+          <Text style={[styles.chipText, selectedId === CATEGORY_ALL && styles.chipTextActive]}>
             All
           </Text>
         </TouchableOpacity>

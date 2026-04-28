@@ -6,12 +6,12 @@ const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
-const ARTICLE_SELECT = 'articles.*, sources(name, website_url), categories(name)';
+const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
 
 function mapArticle(row: any): NewsArticle {
   return {
     ...row,
-    source_name: row.sources?.name ?? null,
+    source_name: row.sources?.name ?? "Unknown source",
     category_name: row.categories?.name ?? null,
   };
 }

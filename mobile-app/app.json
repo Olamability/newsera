@@ -3,8 +3,8 @@
     "name": "NewsEra",
     "slug": "newsera",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
     "orientation": "portrait",
+    "newArchEnabled": true,
 
     "icon": "./assets/icon.png",
 

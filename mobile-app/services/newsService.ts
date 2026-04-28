@@ -3,6 +3,9 @@ import { NewsArticle, Category } from '../types';
 import { getDeviceId } from './deviceId';
 
 const PAGE_SIZE = 20;
+const MAX_PER_SOURCE = 2;
+// Fetch a larger pool so that after balancing we still have PAGE_SIZE articles
+const FETCH_MULTIPLIER = 4;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
@@ -43,14 +46,47 @@ function mapArticle(row: ArticleRow): NewsArticle {
 }
 
 /**
+ * Balance articles so no single source dominates.
+ * Groups by source_id, takes at most MAX_PER_SOURCE per source,
+ * then re-sorts by published_at DESC and returns up to PAGE_SIZE items.
+ */
+function balanceBySource(articles: NewsArticle[]): NewsArticle[] {
+  const countBySource: Record<string, number> = {};
+  const balanced: NewsArticle[] = [];
+
+  for (const article of articles) {
+    const key = article.source_id ?? '__unknown__';
+    const count = countBySource[key] ?? 0;
+    if (count < MAX_PER_SOURCE) {
+      balanced.push(article);
+      countBySource[key] = count + 1;
+    }
+  }
+
+  balanced.sort((a, b) => {
+    const ta = a.published_at ? new Date(a.published_at).getTime() : 0;
+    const tb = b.published_at ? new Date(b.published_at).getTime() : 0;
+    return tb - ta;
+  });
+
+  return balanced.slice(0, PAGE_SIZE);
+}
+
+/**
  * SAFE ARTICLES FETCH (NO FRAGILE JOINS)
+ * For the "all" feed (no categoryId) a larger pool is fetched so that
+ * source-balancing still yields PAGE_SIZE results.
  */
 export async function fetchArticles(
   page: number,
   categoryId?: string | null
 ): Promise<NewsArticle[]> {
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  // For the balanced feed each "page" consumes a pool of poolSize raw DB rows.
+  // Articles beyond the first MAX_PER_SOURCE per source within that pool are
+  // intentionally skipped to ensure source diversity — this is not a data gap.
+  const poolSize = categoryId ? PAGE_SIZE : PAGE_SIZE * FETCH_MULTIPLIER;
+  const from = page * poolSize;
+  const to = from + poolSize - 1;
 
   let query = supabase
     .from('articles')
@@ -69,7 +105,10 @@ export async function fetchArticles(
 
   if (error) throw error;
 
-  return ((data as ArticleRow[]) ?? []).map(mapArticle);
+  const mapped = ((data as ArticleRow[]) ?? []).map(mapArticle);
+
+  // Apply source-balancing only for the general feed
+  return categoryId ? mapped : balanceBySource(mapped);
 }
 
 const VIRTUAL_CATEGORIES: Category[] = [

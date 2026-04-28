@@ -196,15 +196,15 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       ) : null}
 
       <View style={styles.body}>
-        {article.categories?.name ? (
-          <Text style={styles.category}>{article.categories.name}</Text>
+        {(article.category_name ?? article.categories?.name) ? (
+          <Text style={styles.category}>{article.category_name ?? article.categories?.name}</Text>
         ) : null}
 
         <Text style={styles.title}>{article.title}</Text>
 
         <View style={styles.metaRow}>
           <Text style={styles.source}>
-            {article.sources?.name ?? 'Unknown Source'}
+            {article.source_name ?? article.sources?.name ?? 'Unknown Source'}
           </Text>
           {article.published_at ? (
             <Text style={styles.date}>

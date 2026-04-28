@@ -6,6 +6,16 @@ const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
+const ARTICLE_SELECT = 'articles.*, sources(name, website_url), categories(name)';
+
+function mapArticle(row: any): NewsArticle {
+  return {
+    ...row,
+    source_name: row.sources?.name ?? null,
+    category_name: row.categories?.name ?? null,
+  };
+}
+
 /**
  * SAFE ARTICLES FETCH (NO FRAGILE JOINS)
  */
@@ -18,7 +28,7 @@ export async function fetchArticles(
 
   let query = supabase
     .from('articles')
-    .select('*') // 🔥 IMPORTANT: remove joins for now
+    .select(ARTICLE_SELECT)
     .order('published_at', { ascending: false })
     .range(from, to);
 
@@ -33,7 +43,7 @@ export async function fetchArticles(
 
   if (error) throw error;
 
-  return (data as NewsArticle[]) ?? [];
+  return ((data as any[]) ?? []).map(mapArticle);
 }
 
 /**
@@ -59,7 +69,7 @@ export async function fetchCategories(): Promise<Category[]> {
 export async function fetchTrendingArticles(): Promise<NewsArticle[]> {
   const { data, error } = await supabase
     .from('articles')
-    .select('*')
+    .select(ARTICLE_SELECT)
     .order('published_at', { ascending: false })
     .limit(TRENDING_LIMIT);
 
@@ -68,7 +78,7 @@ export async function fetchTrendingArticles(): Promise<NewsArticle[]> {
 
   if (error) throw error;
 
-  return (data as NewsArticle[]) ?? [];
+  return ((data as any[]) ?? []).map(mapArticle);
 }
 
 /**
@@ -78,7 +88,7 @@ export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
   try {
     const { data, error } = await supabase
       .from('articles')
-      .select('*')
+      .select(ARTICLE_SELECT)
       .order('published_at', { ascending: false })
       .limit(PERSONALIZED_DISPLAY_COUNT);
 
@@ -87,7 +97,7 @@ export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
 
     if (error) throw error;
 
-    return (data as NewsArticle[]) ?? [];
+    return ((data as any[]) ?? []).map(mapArticle);
   } catch (err) {
     console.warn('Personalized fetch failed:', err);
     return [];

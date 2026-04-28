@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,6 +19,8 @@ import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
+import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
+import { fetchComments, addComment, ArticleComment } from '../services/commentService';
 import { useAuth } from '../context/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
@@ -26,6 +31,14 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likeLoading, setLikeLoading] = useState(false);
+
+  const [comments, setComments] = useState<ArticleComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
@@ -40,6 +53,61 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .then(setBookmarked)
       .catch(() => {});
   }, [article.id, user]);
+
+  // Load like state and count (works for both authenticated and guest users)
+  useEffect(() => {
+    getLikeCount(article.id)
+      .then(setLikeCount)
+      .catch(() => {});
+
+    (async () => {
+      try {
+        const userId = user?.id ?? (await getDeviceId());
+        const liked = await isLiked(article.id, userId);
+        setLiked(liked);
+      } catch (_) {}
+    })();
+  }, [article.id, user]);
+
+  // Load comments
+  useEffect(() => {
+    fetchComments(article.id)
+      .then(setComments)
+      .catch(() => {});
+  }, [article.id]);
+
+  const handleLike = useCallback(async () => {
+    setLikeLoading(true);
+    try {
+      const userId = user?.id ?? (await getDeviceId());
+      const next = await toggleLike(article.id, userId);
+      setLiked(next);
+      setLikeCount((c) => (next ? c + 1 : Math.max(0, c - 1)));
+    } catch (err) {
+      console.error('[Like] Toggle failed:', err);
+    } finally {
+      setLikeLoading(false);
+    }
+  }, [user, article.id]);
+
+  const handleAddComment = useCallback(async () => {
+    const text = commentText.trim();
+    if (!text) return;
+
+    setCommentSubmitting(true);
+    try {
+      const userId = user?.id ?? (await getDeviceId());
+      await addComment(article.id, userId, text);
+      setCommentText('');
+      const updated = await fetchComments(article.id);
+      setComments(updated);
+    } catch (err) {
+      console.error('[Comment] Submit failed:', err);
+      Alert.alert('Error', 'Failed to post comment. Please try again.');
+    } finally {
+      setCommentSubmitting(false);
+    }
+  }, [user, article.id, commentText]);
 
   const handleBookmark = useCallback(async () => {
     if (!user) {
@@ -110,6 +178,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [user, article.id, article.source_id, article.category_id, article.url]);
 
   return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {article.image_url ? (
         <Image
@@ -155,27 +228,98 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.buttonText}>Read Full Article</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.bookmarkBtn,
-              bookmarked && styles.bookmarkBtnActive,
-              bookmarkLoading && styles.bookmarkBtnDisabled,
-            ]}
-            onPress={handleBookmark}
-            disabled={bookmarkLoading}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
-              {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={[
+                styles.bookmarkBtn,
+                bookmarked && styles.bookmarkBtnActive,
+                bookmarkLoading && styles.bookmarkBtnDisabled,
+              ]}
+              onPress={handleBookmark}
+              disabled={bookmarkLoading}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
+                {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.likeBtn,
+                liked && styles.likeBtnActive,
+                likeLoading && styles.likeBtnDisabled,
+              ]}
+              onPress={handleLike}
+              disabled={likeLoading}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.likeText, liked && styles.likeTextActive]}>
+                {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Comments Section */}
+        <View style={styles.commentsSection}>
+          <Text style={styles.commentsTitle}>
+            Comments{comments.length > 0 ? ` (${comments.length})` : ''}
+          </Text>
+
+          {comments.length === 0 ? (
+            <Text style={styles.noComments}>No comments yet. Be the first!</Text>
+          ) : (
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.commentItem}>
+                <View style={styles.commentHeader}>
+                  <Text style={styles.commentUser}>Guest</Text>
+                  <Text style={styles.commentDate}>
+                    {new Date(comment.created_at).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <Text style={styles.commentContent}>{comment.content}</Text>
+              </View>
+            ))
+          )}
+
+          <View style={styles.commentInputRow}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Write a comment…"
+              placeholderTextColor="#aaa"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              maxLength={500}
+              editable={!commentSubmitting}
+            />
+            <TouchableOpacity
+              style={[
+                styles.commentSubmitBtn,
+                (!commentText.trim() || commentSubmitting) && styles.commentSubmitBtnDisabled,
+              ]}
+              onPress={handleAddComment}
+              disabled={!commentText.trim() || commentSubmitting}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.commentSubmitText}>Post</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -238,7 +382,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   bookmarkBtn: {
+    flex: 1,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -259,6 +408,107 @@ const styles = StyleSheet.create({
   },
   bookmarkTextActive: {
     color: '#e63946',
+  },
+  likeBtn: {
+    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e63946',
+    backgroundColor: '#fff',
+  },
+  likeBtnActive: {
+    backgroundColor: '#fff5f6',
+  },
+  likeBtnDisabled: {
+    opacity: 0.6,
+  },
+  likeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#e63946',
+  },
+  likeTextActive: {
+    color: '#e63946',
+  },
+  // Comments
+  commentsSection: {
+    marginTop: 28,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 20,
+  },
+  commentsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 14,
+  },
+  noComments: {
+    fontSize: 14,
+    color: '#aaa',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  commentItem: {
+    marginBottom: 14,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    padding: 12,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  commentUser: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555',
+  },
+  commentDate: {
+    fontSize: 12,
+    color: '#aaa',
+  },
+  commentContent: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 21,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    marginTop: 12,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1a1a1a',
+    maxHeight: 100,
+    backgroundColor: '#fafafa',
+  },
+  commentSubmitBtn: {
+    backgroundColor: '#e63946',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentSubmitBtnDisabled: {
+    opacity: 0.5,
+  },
+  commentSubmitText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

@@ -48,20 +48,40 @@ function extractContent(raw) {
  * @returns {string|null}
  */
 function extractImage(item) {
-  if (item.mediaContent && item.mediaContent.$) {
-    return item.mediaContent.$.url || null;
+  // 1. media:content (WordPress preferred)
+  if (item?.mediaContent?.$?.url) {
+    return item.mediaContent.$.url;
   }
-  if (item.mediaThumbnail && item.mediaThumbnail.$) {
-    return item.mediaThumbnail.$.url || null;
+
+  // 2. media:thumbnail
+  if (item?.mediaThumbnail?.$?.url) {
+    return item.mediaThumbnail.$.url;
   }
-  if (item.enclosure && item.enclosure.url) {
-    const mime = item.enclosure.type || '';
-    if (mime.startsWith('image/')) return item.enclosure.url;
+
+  // 3. enclosure
+  if (item?.enclosure?.url && item.enclosure.type?.startsWith('image/')) {
+    return item.enclosure.url;
   }
-  // Try to extract first <img> src from content
-  const contentRaw = item['content:encoded'] || item.content || item.summary || '';
-  const match = contentRaw.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (match) return match[1];
+
+  // 4. OpenGraph-style images inside content
+  const contentRaw =
+    item['content:encoded'] ||
+    item.content ||
+    item.summary ||
+    item.description ||
+    '';
+
+  // Try multiple image patterns
+  const patterns = [
+    /<img[^>]+src=["']([^"']+)["']/i,
+    /<image[^>]+src=["']([^"']+)["']/i,
+    /https?:\/\/[^"' >]+\.(jpg|jpeg|png|webp)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = contentRaw.match(pattern);
+    if (match) return match[1];
+  }
 
   return null;
 }

@@ -100,13 +100,6 @@ const LoginScreen: React.FC = () => {
             <Text style={styles.link}>Sign Up</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={styles.guestBtn}
-          onPress={() => navigation.replace('Home')}
-        >
-          <Text style={styles.guestText}>Browse as Guest</Text>
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -184,15 +177,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#e63946',
     fontWeight: '700',
-  },
-  guestBtn: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  guestText: {
-    fontSize: 15,
-    color: '#888',
-    textDecorationLine: 'underline',
   },
 });
 

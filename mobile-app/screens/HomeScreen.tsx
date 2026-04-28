@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
   // Prevent duplicate concurrent fetches
@@ -49,12 +49,15 @@ export default function HomeScreen() {
       if (categoryId === CATEGORY_FOR_YOU) {
         data = await fetchPersonalizedArticles();
         setHasMore(false);
+        console.log(`✨ For You — items: ${data.length}, hasMore: false`);
       } else if (categoryId === CATEGORY_TRENDING) {
         data = await fetchTrendingArticles();
         setHasMore(false);
+        console.log(`🔥 Trending — items: ${data.length}, hasMore: false`);
       } else {
-        data = await fetchArticles(pageNum, categoryId === CATEGORY_ALL ? null : categoryId);
-        setHasMore(data.length > 0);
+        const result = await fetchArticles(pageNum, categoryId === CATEGORY_ALL ? null : categoryId);
+        data = result.articles;
+        setHasMore(result.hasMore);
       }
 
       setArticles(prev => append ? [...prev, ...data] : data);
@@ -75,22 +78,23 @@ export default function HomeScreen() {
   // Reset and reload when category changes
   useEffect(() => {
     setLoading(true);
-    setPage(0);
+    setPage(1);
     setHasMore(true);
     setArticles([]);
-    loadArticles(selectedCategory, 0, false).finally(() => setLoading(false));
+    loadArticles(selectedCategory, 1, false).finally(() => setLoading(false));
   }, [selectedCategory, loadArticles]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setPage(0);
+    setPage(1);
     setHasMore(true);
-    await loadArticles(selectedCategory, 0, false);
+    await loadArticles(selectedCategory, 1, false);
     setRefreshing(false);
   };
 
   const onEndReached = useCallback(async () => {
-    if (!hasMore || loadingMore || isFetchingRef.current) return;
+    // Guard: skip if already loading or no more pages
+    if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
     // For virtual categories (For You / Trending) there's no pagination
     if (selectedCategory === CATEGORY_FOR_YOU || selectedCategory === CATEGORY_TRENDING) return;
 
@@ -102,7 +106,7 @@ export default function HomeScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, page, selectedCategory, loadArticles]);
+  }, [loading, hasMore, loadingMore, page, selectedCategory, loadArticles]);
 
   const openArticle = (article: NewsArticle) => {
     navigation.navigate('ArticleDetail', { article });
@@ -154,7 +158,7 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         onEndReached={onEndReached}
-        onEndReachedThreshold={0.3}
+        onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingBottom: 40 }}
       />

@@ -76,17 +76,21 @@ function balanceBySource(articles: NewsArticle[]): NewsArticle[] {
  * SAFE ARTICLES FETCH (NO FRAGILE JOINS)
  * For the "all" feed (no categoryId) a larger pool is fetched so that
  * source-balancing still yields PAGE_SIZE results.
+ *
+ * @param page 1-indexed page number
+ * @param categoryId optional category filter
+ * @returns articles for the page and a hasMore flag
  */
 export async function fetchArticles(
   page: number,
   categoryId?: string | null
-): Promise<NewsArticle[]> {
+): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
   // For the balanced feed each "page" consumes a pool of poolSize raw DB rows.
   // Articles beyond the first MAX_PER_SOURCE per source within that pool are
   // intentionally skipped to ensure source diversity — this is not a data gap.
   const poolSize = categoryId ? PAGE_SIZE : PAGE_SIZE * FETCH_MULTIPLIER;
-  const from = page * poolSize;
-  const to = from + poolSize - 1;
+  const from = (page - 1) * poolSize;
+  const to = page * poolSize - 1;
 
   let query = supabase
     .from('articles')
@@ -100,15 +104,24 @@ export async function fetchArticles(
 
   const { data, error } = await query;
 
-  console.log('📦 fetchArticles DATA:', data);
-  console.log('❌ fetchArticles ERROR:', error);
+  if (error) {
+    console.log('❌ fetchArticles ERROR:', error);
+    throw error;
+  }
 
-  if (error) throw error;
-
+  const rawCount = (data ?? []).length;
   const mapped = ((data as ArticleRow[]) ?? []).map(mapArticle);
 
   // Apply source-balancing only for the general feed
-  return categoryId ? mapped : balanceBySource(mapped);
+  const articles = categoryId ? mapped : balanceBySource(mapped);
+
+  // hasMore is based on whether the DB returned a full pool.
+  // If it returned fewer rows than requested, we've reached the end.
+  const hasMore = rawCount >= poolSize;
+
+  console.log(`📄 fetchArticles — page: ${page}, raw rows: ${rawCount}, returned: ${articles.length}, hasMore: ${hasMore}`);
+
+  return { articles, hasMore };
 }
 
 const VIRTUAL_CATEGORIES: Category[] = [

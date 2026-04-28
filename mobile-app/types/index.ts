@@ -23,6 +23,11 @@ export interface NewsArticle {
   category_id: string | null;
   sources: Source | null;
   categories: Category | null;
+  // Mapped fields populated after fetch
+  source_name?: string | null;
+  category_name?: string | null;
+  like_count?: number | null;
+  comment_count?: number | null;
 }
 
 export interface Bookmark {

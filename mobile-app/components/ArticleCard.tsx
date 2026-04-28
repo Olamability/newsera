@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { NewsArticle } from '../types';
 
 interface Props {
@@ -7,26 +7,54 @@ interface Props {
   onPress: (article: NewsArticle) => void;
 }
 
+const PLACEHOLDER_COLOR = '#e8e8e8';
+
 export default function ArticleCard({ article, onPress }: Props) {
+  const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
+  const likeCount = article.like_count ?? 0;
+  const commentCount = article.comment_count ?? 0;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(article)}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPress(article)}
+      activeOpacity={0.85}
+    >
+      {/* Left: Image */}
       {article.image_url ? (
-        <Image source={{ uri: article.image_url }} style={styles.image} />
+        <Image
+          source={{ uri: article.image_url }}
+          style={styles.image}
+          resizeMode="cover"
+        />
       ) : (
-        <View style={styles.placeholder} />
+        <View style={[styles.image, styles.placeholder]} />
       )}
 
+      {/* Right: Content */}
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
+        {/* Title */}
+        <Text style={styles.title} numberOfLines={3} ellipsizeMode="tail">
           {article.title}
         </Text>
 
-        <Text style={styles.meta}>
-          {article.sources?.name ?? 'News'} •{' '}
-          {article.published_at
-            ? new Date(article.published_at).toLocaleDateString()
-            : ''}
-        </Text>
+        {/* Bottom row: source + icons */}
+        <View style={styles.bottomRow}>
+          <Text style={styles.sourceName} numberOfLines={1}>
+            {sourceName}
+          </Text>
+
+          <View style={styles.iconsRow}>
+            <View style={styles.iconItem}>
+              <Text style={styles.iconEmoji}>❤️</Text>
+              <Text style={styles.iconCount}>{likeCount}</Text>
+            </View>
+            <View style={styles.iconItem}>
+              <Text style={styles.iconEmoji}>💬</Text>
+              <Text style={styles.iconCount}>{commentCount}</Text>
+            </View>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -34,32 +62,74 @@ export default function ArticleCard({ article, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     marginHorizontal: 12,
-    marginVertical: 8,
-    overflow: 'hidden',
-    elevation: 2,
+    marginVertical: 6,
+    padding: 12,
+    alignItems: 'flex-start',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   image: {
-    width: '100%',
-    height: 200,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
   },
   placeholder: {
-    height: 200,
-    backgroundColor: '#eee',
+    backgroundColor: PLACEHOLDER_COLOR,
   },
   content: {
-    padding: 12,
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+    minHeight: 100,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111',
+    lineHeight: 21,
+    flexShrink: 1,
   },
-  meta: {
-    marginTop: 6,
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sourceName: {
+    flex: 1,
     fontSize: 12,
     color: '#888',
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  iconsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  iconItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  iconEmoji: {
+    fontSize: 13,
+  },
+  iconCount: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
   },
 });

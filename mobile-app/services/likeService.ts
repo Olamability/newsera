@@ -30,24 +30,30 @@ export async function getLikeCount(articleId: string): Promise<number> {
 
 /**
  * Toggle a like — inserts if absent, removes if present.
+ * Uses insert-first to avoid a race condition window between check and write.
  * Returns the new liked state.
  */
 export async function toggleLike(articleId: string, userId: string): Promise<boolean> {
-  const liked = await isLiked(articleId, userId);
+  // Attempt to insert first; if the unique constraint fires, the user already
+  // liked the article → remove the like instead.
+  const { error: insertError } = await supabase
+    .from('article_likes')
+    .insert({ article_id: articleId, user_id: userId });
 
-  if (liked) {
-    const { error } = await supabase
+  if (!insertError) {
+    return true; // Like added
+  }
+
+  // Postgres unique-constraint violation code
+  if (insertError.code === '23505') {
+    const { error: deleteError } = await supabase
       .from('article_likes')
       .delete()
       .eq('article_id', articleId)
       .eq('user_id', userId);
-    if (error) throw error;
-    return false;
-  } else {
-    const { error } = await supabase
-      .from('article_likes')
-      .insert({ article_id: articleId, user_id: userId });
-    if (error) throw error;
-    return true;
+    if (deleteError) throw deleteError;
+    return false; // Like removed
   }
+
+  throw insertError;
 }

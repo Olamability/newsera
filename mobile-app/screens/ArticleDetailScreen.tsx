@@ -82,7 +82,9 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const userId = user?.id ?? (await getDeviceId());
       const next = await toggleLike(article.id, userId);
       setLiked(next);
-      setLikeCount((c) => (next ? c + 1 : Math.max(0, c - 1)));
+      // Refetch the authoritative count to stay in sync across devices
+      const count = await getLikeCount(article.id);
+      setLikeCount(count);
     } catch (err) {
       console.error('[Like] Toggle failed:', err);
     } finally {

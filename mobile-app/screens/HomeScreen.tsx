@@ -28,6 +28,19 @@ const SKELETON_COUNT = 6;
 // Stable data array for the skeleton FlatList - avoids re-creating on every render
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 
+// DEBUG — remove this component once touch events are confirmed working
+function DebugTouchButton() {
+  return (
+    <TouchableOpacity
+      style={styles.testButton}
+      onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
 
@@ -146,14 +159,7 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        {/* DEBUG — remove once touch events are confirmed working */}
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
-        </TouchableOpacity>
+        <DebugTouchButton />
         <CategoryFilter
           categories={categories}
           selectedId={selectedCategory}
@@ -173,14 +179,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* DEBUG — remove once touch events are confirmed working */}
-      <TouchableOpacity
-        style={styles.testButton}
-        onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
-      </TouchableOpacity>
+      <DebugTouchButton />
       <CategoryFilter
         categories={categories}
         selectedId={selectedCategory}

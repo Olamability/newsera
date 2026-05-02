@@ -147,42 +147,63 @@ export async function fetchCategories(): Promise<Category[]> {
 }
 
 /**
- * TRENDING (SAFE VERSION)
+ * TRENDING — paginated
  */
-export async function fetchTrendingArticles(): Promise<NewsArticle[]> {
+export async function fetchTrendingArticles(
+  page: number = 1,
+  limit: number = TRENDING_LIMIT
+): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
+  const from = (page - 1) * limit;
+  const to = page * limit - 1;
+
   const { data, error } = await supabase
     .from('articles')
     .select(ARTICLE_SELECT)
     .order('published_at', { ascending: false })
-    .limit(TRENDING_LIMIT);
+    .range(from, to);
 
-  console.log('🔥 trending:', data);
-  console.log('❌ trending error:', error);
+  if (error) {
+    console.log('❌ fetchTrendingArticles ERROR:', error);
+    throw error;
+  }
 
-  if (error) throw error;
+  const rawCount = (data ?? []).length;
+  const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
+  const hasMore = rawCount >= limit;
 
-  return ((data as ArticleRow[]) ?? []).map(mapArticle);
+  console.log(`🔥 Trending — page: ${page}, items: ${rawCount}, hasMore: ${hasMore}`);
+
+  return { articles, hasMore };
 }
 
 /**
- * PERSONALIZED (SAFE FALLBACK VERSION)
+ * PERSONALIZED — paginated, safe fallback
  */
-export async function fetchPersonalizedArticles(): Promise<NewsArticle[]> {
+export async function fetchPersonalizedArticles(
+  page: number = 1,
+  limit: number = PERSONALIZED_DISPLAY_COUNT
+): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
   try {
+    const from = (page - 1) * limit;
+    const to = page * limit - 1;
+
     const { data, error } = await supabase
       .from('articles')
       .select(ARTICLE_SELECT)
       .order('published_at', { ascending: false })
-      .limit(PERSONALIZED_DISPLAY_COUNT);
-
-    console.log('✨ personalized:', data);
-    console.log('❌ personalized error:', error);
+      .range(from, to);
 
     if (error) throw error;
 
-    return ((data as ArticleRow[]) ?? []).map(mapArticle);
+    const rawCount = (data ?? []).length;
+    const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
+    const hasMore = rawCount >= limit;
+
+    console.log(`✨ For You — page: ${page}, items: ${rawCount}, hasMore: ${hasMore}`);
+
+    return { articles, hasMore };
   } catch (err) {
     console.warn('Personalized fetch failed:', err);
-    return [];
+    return { articles: [], hasMore: false };
   }
 }

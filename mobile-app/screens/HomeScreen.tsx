@@ -37,32 +37,45 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Prevent duplicate concurrent fetches
+  // Prevents duplicate concurrent fetches within the same feed/page.
   const isFetchingRef = useRef(false);
+  // Incremented whenever the category changes or a refresh is triggered so that
+  // any in-flight fetch from the previous feed is silently discarded.
+  const fetchGenerationRef = useRef(0);
 
   const loadArticles = useCallback(async (categoryId: string, pageNum: number, append: boolean) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
+    const generation = fetchGenerationRef.current;
 
     try {
       let data: NewsArticle[];
+      let moreAvailable: boolean;
+
       if (categoryId === CATEGORY_FOR_YOU) {
-        data = await fetchPersonalizedArticles();
-        setHasMore(false);
-        console.log(`✨ For You — items: ${data.length}, hasMore: false`);
+        const result = await fetchPersonalizedArticles(pageNum);
+        data = result.articles;
+        moreAvailable = result.hasMore;
       } else if (categoryId === CATEGORY_TRENDING) {
-        data = await fetchTrendingArticles();
-        setHasMore(false);
-        console.log(`🔥 Trending — items: ${data.length}, hasMore: false`);
+        const result = await fetchTrendingArticles(pageNum);
+        data = result.articles;
+        moreAvailable = result.hasMore;
       } else {
         const result = await fetchArticles(pageNum, categoryId === CATEGORY_ALL ? null : categoryId);
         data = result.articles;
-        setHasMore(result.hasMore);
+        moreAvailable = result.hasMore;
       }
 
+      // Discard stale results if the category changed or a refresh fired mid-flight.
+      if (fetchGenerationRef.current !== generation) return;
+
+      setHasMore(moreAvailable);
       setArticles(prev => append ? [...prev, ...data] : data);
     } finally {
-      isFetchingRef.current = false;
+      // Only release the lock when it still belongs to this fetch.
+      if (fetchGenerationRef.current === generation) {
+        isFetchingRef.current = false;
+      }
     }
   }, []);
 
@@ -77,6 +90,11 @@ export default function HomeScreen() {
 
   // Reset and reload when category changes
   useEffect(() => {
+    // Invalidate any in-flight fetch from the previous feed and release the lock
+    // so the fresh fetch below is never blocked.
+    fetchGenerationRef.current += 1;
+    isFetchingRef.current = false;
+
     setLoading(true);
     setPage(1);
     setHasMore(true);
@@ -85,6 +103,9 @@ export default function HomeScreen() {
   }, [selectedCategory, loadArticles]);
 
   const onRefresh = async () => {
+    fetchGenerationRef.current += 1;
+    isFetchingRef.current = false;
+
     setRefreshing(true);
     setPage(1);
     setHasMore(true);
@@ -95,8 +116,6 @@ export default function HomeScreen() {
   const onEndReached = useCallback(async () => {
     // Guard: skip if already loading or no more pages
     if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
-    // For virtual categories (For You / Trending) there's no pagination
-    if (selectedCategory === CATEGORY_FOR_YOU || selectedCategory === CATEGORY_TRENDING) return;
 
     const nextPage = page + 1;
     setLoadingMore(true);

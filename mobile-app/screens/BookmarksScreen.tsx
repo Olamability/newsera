@@ -111,6 +111,7 @@ const BookmarksScreen: React.FC = () => {
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       contentContainerStyle={styles.list}
+      keyboardShouldPersistTaps="handled"
     />
   );
 };

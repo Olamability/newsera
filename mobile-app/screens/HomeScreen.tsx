@@ -5,6 +5,9 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
+  Text,
+  Alert,
 } from 'react-native';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
@@ -143,6 +146,14 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
+        {/* DEBUG — remove once touch events are confirmed working */}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
+        </TouchableOpacity>
         <CategoryFilter
           categories={categories}
           selectedId={selectedCategory}
@@ -153,6 +164,7 @@ export default function HomeScreen() {
           keyExtractor={(item) => `skeleton-${item}`}
           renderItem={() => <SkeletonCard />}
           contentContainerStyle={{ paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
           scrollEnabled={false}
         />
       </View>
@@ -161,6 +173,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* DEBUG — remove once touch events are confirmed working */}
+      <TouchableOpacity
+        style={styles.testButton}
+        onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
+      </TouchableOpacity>
       <CategoryFilter
         categories={categories}
         selectedId={selectedCategory}
@@ -180,6 +200,7 @@ export default function HomeScreen() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
       />
     </View>
   );
@@ -193,5 +214,17 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  // DEBUG — remove after touch events are confirmed working
+  testButton: {
+    backgroundColor: '#ff9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

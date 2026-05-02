@@ -12,7 +12,7 @@ export default function CategoryFilter({
     onSelect: (id: string | null) => void;
 }) {
     return (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.container}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.container} keyboardShouldPersistTaps="handled">
             <TouchableOpacity onPress={() => onSelect(null)}>
                 <Text style={[styles.item, !selectedId && styles.active]}>All</Text>
             </TouchableOpacity>

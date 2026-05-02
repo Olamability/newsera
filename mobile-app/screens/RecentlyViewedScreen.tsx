@@ -60,6 +60,7 @@ const RecentlyViewedScreen: React.FC = () => {
         <ArticleCard article={item} onPress={openArticle} />
       )}
       contentContainerStyle={styles.list}
+      keyboardShouldPersistTaps="handled"
     />
   );
 };

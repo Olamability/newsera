@@ -92,6 +92,7 @@ const NotificationsScreen: React.FC = () => {
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
       contentContainerStyle={styles.list}
+      keyboardShouldPersistTaps="handled"
     />
   );
 };

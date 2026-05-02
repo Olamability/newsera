@@ -22,6 +22,7 @@ const CategoryFilter: React.FC<Props> = ({ categories, selectedId, onSelect }) =
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity
           style={[styles.chip, selectedId === CATEGORY_ALL && styles.chipActive]}

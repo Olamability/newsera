@@ -116,6 +116,7 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
       />
     </View>
   );

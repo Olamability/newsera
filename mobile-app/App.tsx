@@ -32,119 +32,123 @@ function AppNavigator() {
   }, []);
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          headerStyle: { backgroundColor: '#e63946' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: '700' },
-        }}
-      >
-        {/* Splash / onboarding */}
-        <Stack.Screen
-          name="Splash"
-          component={SplashScreen}
-          options={{ headerShown: false }}
-        />
+    <>
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="Splash"
+          screenOptions={{
+            headerStyle: { backgroundColor: '#e63946' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: '700' },
+          }}
+        >
+          {/* Splash / onboarding */}
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ headerShown: false }}
+          />
 
-        {/* Auth screens */}
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ title: 'Create Account' }}
-        />
-        <Stack.Screen
-          name="ForgotPassword"
-          component={ForgotPasswordScreen}
-          options={{ title: 'Reset Password' }}
-        />
+          {/* Auth screens */}
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Register"
+            component={RegisterScreen}
+            options={{ title: 'Create Account' }}
+          />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+            options={{ title: 'Reset Password' }}
+          />
 
-        {/* Main app screens — publicly accessible */}
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={({ navigation }) => ({
-            title: 'NewsEra',
-            headerRight: () => (
-              <>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Search')}
-                  style={{ marginRight: 8 }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 22 }}>🔍</Text>
-                </TouchableOpacity>
-                {user ? (
+          {/* Main app screens — publicly accessible */}
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={({ navigation }) => ({
+              title: 'NewsEra',
+              headerRight: () => (
+                <>
                   <TouchableOpacity
-                    onPress={() => navigation.navigate('Profile')}
-                    style={{ marginRight: 4 }}
+                    onPress={() => navigation.navigate('Search')}
+                    style={{ marginRight: 8 }}
                   >
-                    <Text style={{ color: '#fff', fontSize: 24 }}>👤</Text>
+                    <Text style={{ color: '#fff', fontSize: 22 }}>🔍</Text>
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('Login')}
-                    style={{ marginRight: 4 }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
-                      Sign In
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            ),
-          })}
-        />
-        <Stack.Screen
-          name="ArticleDetail"
-          component={ArticleDetailScreen}
-          options={{ title: 'Article' }}
-        />
-        <Stack.Screen
-          name="Search"
-          component={SearchScreen}
-          options={{ title: 'Search' }}
-        />
-        <Stack.Screen
-          name="CategoryDetail"
-          component={CategoryDetailScreen}
-          options={({ route }) => ({ title: route.params.categoryName })}
-        />
+                  {user ? (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Profile')}
+                      style={{ marginRight: 4 }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 24 }}>👤</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Login')}
+                      style={{ marginRight: 4 }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
+                        Sign In
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ),
+            })}
+          />
+          <Stack.Screen
+            name="ArticleDetail"
+            component={ArticleDetailScreen}
+            options={{ title: 'Article' }}
+          />
+          <Stack.Screen
+            name="Search"
+            component={SearchScreen}
+            options={{ title: 'Search' }}
+          />
+          <Stack.Screen
+            name="CategoryDetail"
+            component={CategoryDetailScreen}
+            options={({ route }) => ({ title: route.params.categoryName })}
+          />
 
-        {/* Auth-protected screens */}
-        <Stack.Screen
-          name="Bookmarks"
-          component={BookmarksScreen}
-          options={{ title: 'My Bookmarks' }}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ title: 'Profile' }}
-        />
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{ title: 'Settings' }}
-        />
-        <Stack.Screen
-          name="Notifications"
-          component={NotificationsScreen}
-          options={{ title: 'Notifications' }}
-        />
-        <Stack.Screen
-          name="RecentlyViewed"
-          component={RecentlyViewedScreen}
-          options={{ title: 'Recently Viewed' }}
-        />
-      </Stack.Navigator>
+          {/* Auth-protected screens */}
+          <Stack.Screen
+            name="Bookmarks"
+            component={BookmarksScreen}
+            options={{ title: 'My Bookmarks' }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: 'Profile' }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ title: 'Settings' }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ title: 'Notifications' }}
+          />
+          <Stack.Screen
+            name="RecentlyViewed"
+            component={RecentlyViewedScreen}
+            options={{ title: 'Recently Viewed' }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+      {/* StatusBar must live outside NavigationContainer so it cannot be
+          accidentally layered above interactive screens */}
       <StatusBar style="light" />
-    </NavigationContainer>
+    </>
   );
 }
 

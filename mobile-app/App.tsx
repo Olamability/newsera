@@ -12,6 +12,11 @@ import RegisterScreen from './screens/RegisterScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import BookmarksScreen from './screens/BookmarksScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import SearchScreen from './screens/SearchScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
+import CategoryDetailScreen from './screens/CategoryDetailScreen';
+import RecentlyViewedScreen from './screens/RecentlyViewedScreen';
 import { RootStackParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -66,30 +71,49 @@ function AppNavigator() {
           component={HomeScreen}
           options={({ navigation }) => ({
             title: 'NewsEra',
-            headerRight: () =>
-              user ? (
+            headerRight: () => (
+              <>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('Profile')}
-                  style={{ marginRight: 4 }}
+                  onPress={() => navigation.navigate('Search')}
+                  style={{ marginRight: 8 }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 24 }}>👤</Text>
+                  <Text style={{ color: '#fff', fontSize: 22 }}>🔍</Text>
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Login')}
-                  style={{ marginRight: 4 }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
-                    Sign In
-                  </Text>
-                </TouchableOpacity>
-              ),
+                {user ? (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Profile')}
+                    style={{ marginRight: 4 }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 24 }}>👤</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Login')}
+                    style={{ marginRight: 4 }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
+                      Sign In
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ),
           })}
         />
         <Stack.Screen
           name="ArticleDetail"
           component={ArticleDetailScreen}
           options={{ title: 'Article' }}
+        />
+        <Stack.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{ title: 'Search' }}
+        />
+        <Stack.Screen
+          name="CategoryDetail"
+          component={CategoryDetailScreen}
+          options={({ route }) => ({ title: route.params.categoryName })}
         />
 
         {/* Auth-protected screens */}
@@ -102,6 +126,21 @@ function AppNavigator() {
           name="Profile"
           component={ProfileScreen}
           options={{ title: 'Profile' }}
+        />
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ title: 'Settings' }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: 'Notifications' }}
+        />
+        <Stack.Screen
+          name="RecentlyViewed"
+          component={RecentlyViewedScreen}
+          options={{ title: 'Recently Viewed' }}
         />
       </Stack.Navigator>
       <StatusBar style="light" />

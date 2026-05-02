@@ -5,6 +5,7 @@ import {
   Linking,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -136,6 +137,18 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [user, article.id, navigation]);
 
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        title: article.title,
+        message: `${article.title}\n${article.url}`,
+        url: article.url,
+      });
+    } catch (err) {
+      console.warn('[Share] Failed:', err);
+    }
+  }, [article.title, article.url]);
+
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
@@ -197,7 +210,21 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
       <View style={styles.body}>
         {(article.category_name ?? article.categories?.name) ? (
-          <Text style={styles.category}>{article.category_name ?? article.categories?.name}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              const catId = article.category_id ?? article.categories?.id;
+              const catName = article.category_name ?? article.categories?.name ?? '';
+              if (catId) {
+                navigation.navigate('CategoryDetail', {
+                  categoryId: catId,
+                  categoryName: catName,
+                });
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.category}>{article.category_name ?? article.categories?.name}</Text>
+          </TouchableOpacity>
         ) : null}
 
         <Text style={styles.title}>{article.title}</Text>
@@ -259,6 +286,14 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={[styles.likeText, liked && styles.likeTextActive]}>
                 {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shareBtn}
+              onPress={handleShare}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.shareText}>↗ Share</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -432,6 +467,20 @@ const styles = StyleSheet.create({
     color: '#e63946',
   },
   likeTextActive: {
+    color: '#e63946',
+  },
+  shareBtn: {
+    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e63946',
+    backgroundColor: '#fff',
+  },
+  shareText: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#e63946',
   },
   // Comments

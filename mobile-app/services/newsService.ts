@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { NewsArticle, Category } from '../types';
 import { getDeviceId } from './deviceId';
+import { ArticleRow, mapArticle } from './articleUtils';
 
 const PAGE_SIZE = 20;
 const MAX_PER_SOURCE = 2;
@@ -14,36 +15,6 @@ const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
 export const CATEGORY_ALL = 'all';
 export const CATEGORY_FOR_YOU = 'foryou';
 export const CATEGORY_TRENDING = 'trending';
-
-interface ArticleRow {
-  image_url?: string | null;
-  image?: string | null;
-  content?: string | null;
-  sources?: { name?: string | null; website_url?: string | null } | null;
-  categories?: { name?: string | null } | null;
-  [key: string]: unknown;
-}
-
-function extractFirstImageFromContent(content: string | null | undefined): string | null {
-  if (!content) return null;
-  const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return match ? match[1] : null;
-}
-
-function resolveImageUrl(row: ArticleRow): string | null {
-  if (row.image_url) return row.image_url;
-  if (row.image) return row.image;
-  return extractFirstImageFromContent(row.content);
-}
-
-function mapArticle(row: ArticleRow): NewsArticle {
-  return {
-    ...(row as unknown as NewsArticle),
-    image_url: resolveImageUrl(row),
-    source_name: row.sources?.name ?? 'Unknown source',
-    category_name: row.categories?.name ?? null,
-  };
-}
 
 /**
  * Balance articles so no single source dominates.

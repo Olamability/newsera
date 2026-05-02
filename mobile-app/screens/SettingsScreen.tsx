@@ -6,6 +6,8 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { version: APP_VERSION } = require('../package.json') as { version: string };
 
 const SETTINGS_KEY = 'newsera_settings';
 
@@ -108,7 +110,7 @@ const SettingsScreen: React.FC = () => {
         </View>
       </View>
 
-      <Text style={styles.version}>NewsEra v1.0.0</Text>
+      <Text style={styles.version}>NewsEra v{APP_VERSION}</Text>
     </View>
   );
 };

@@ -11,39 +11,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import { supabase } from '../services/supabase';
+import { ArticleRow, mapArticle } from '../services/articleUtils';
 import { NewsArticle, RootStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Search'>;
 
 const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
-
-interface ArticleRow {
-  image_url?: string | null;
-  image?: string | null;
-  content?: string | null;
-  sources?: { name?: string | null } | null;
-  categories?: { name?: string | null } | null;
-  [key: string]: unknown;
-}
-
-function extractFirstImage(content: string | null | undefined): string | null {
-  if (!content) return null;
-  const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return match ? match[1] : null;
-}
-
-function mapArticle(row: ArticleRow): NewsArticle {
-  const imageUrl =
-    (row.image_url as string | null) ??
-    (row.image as string | null) ??
-    extractFirstImage(row.content as string | null);
-  return {
-    ...(row as unknown as NewsArticle),
-    image_url: imageUrl,
-    source_name: row.sources?.name ?? 'Unknown source',
-    category_name: row.categories?.name ?? null,
-  };
-}
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();

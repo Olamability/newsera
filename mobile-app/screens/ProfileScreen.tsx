@@ -41,15 +41,36 @@ const ProfileScreen: React.FC = () => {
     ]);
   };
 
+  // Not logged in — show sign-in prompt
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>?</Text>
+          </View>
+          <Text style={styles.email}>Not signed in</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.signInBtn}
+          onPress={() => navigation.navigate('Login')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.signInText}>Sign In</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.avatarContainer}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {user?.email?.[0]?.toUpperCase() ?? '?'}
+            {user.email?.[0]?.toUpperCase() ?? '?'}
           </Text>
         </View>
-        <Text style={styles.email}>{user?.email}</Text>
+        <Text style={styles.email}>{user.email}</Text>
       </View>
 
       <View style={styles.section}>
@@ -60,6 +81,42 @@ const ProfileScreen: React.FC = () => {
         >
           <Text style={styles.menuIcon}>🔖</Text>
           <Text style={styles.menuLabel}>My Bookmarks</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('RecentlyViewed')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>🕑</Text>
+          <Text style={styles.menuLabel}>Recently Viewed</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Notifications')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>🔔</Text>
+          <Text style={styles.menuLabel}>Notifications</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Settings')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>⚙️</Text>
+          <Text style={styles.menuLabel}>Settings</Text>
           <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
       </View>
@@ -113,7 +170,6 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#fff',
-    marginHorizontal: 0,
     marginBottom: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -137,6 +193,24 @@ const styles = StyleSheet.create({
   menuArrow: {
     fontSize: 20,
     color: '#ccc',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginLeft: 54,
+  },
+  signInBtn: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 15,
+    borderRadius: 10,
+    backgroundColor: '#e63946',
+    alignItems: 'center',
+  },
+  signInText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
   signOutBtn: {
     marginHorizontal: 20,

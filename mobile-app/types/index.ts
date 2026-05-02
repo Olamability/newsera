@@ -46,4 +46,9 @@ export type RootStackParamList = {
   ArticleDetail: { article: NewsArticle };
   Bookmarks: undefined;
   Profile: undefined;
+  Settings: undefined;
+  Search: undefined;
+  Notifications: undefined;
+  CategoryDetail: { categoryId: string; categoryName: string };
+  RecentlyViewed: undefined;
 };

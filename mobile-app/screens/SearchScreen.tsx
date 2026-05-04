@@ -7,14 +7,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import { supabase } from '../services/supabase';
 import { ArticleRow, mapArticle } from '../services/articleUtils';
-import { NewsArticle, RootStackParamList } from '../types';
+import { NewsArticle, RootStackParamList, MainTabParamList } from '../types';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Search'>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Search'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
 
@@ -89,7 +94,6 @@ const SearchScreen: React.FC = () => {
           placeholderTextColor="#aaa"
           value={query}
           onChangeText={setQuery}
-          autoFocus
           returnKeyType="search"
           clearButtonMode="while-editing"
         />

@@ -6,16 +6,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   getStoredNotifications,
   removeStoredNotification,
   StoredNotification,
 } from '../services/notificationService';
-import { RootStackParamList } from '../types';
+import { RootStackParamList, MainTabParamList } from '../types';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Notifications'>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Notifications'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();

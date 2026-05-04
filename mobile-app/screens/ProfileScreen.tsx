@@ -7,12 +7,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
-import { RootStackParamList } from '../types';
+import { RootStackParamList, MainTabParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Me'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();

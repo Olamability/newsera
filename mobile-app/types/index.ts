@@ -37,18 +37,23 @@ export interface Bookmark {
   created_at: string;
 }
 
+export type MainTabParamList = {
+  Home: undefined;
+  Trending: undefined;
+  Search: undefined;
+  Notifications: undefined;
+  Me: undefined;
+};
+
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
-  Home: undefined;
+  MainTabs: undefined;
   ArticleDetail: { article: NewsArticle };
   Bookmarks: undefined;
-  Profile: undefined;
   Settings: undefined;
-  Search: undefined;
-  Notifications: undefined;
   CategoryDetail: { categoryId: string; categoryName: string };
   RecentlyViewed: undefined;
 };

@@ -23,7 +23,7 @@ const SplashScreen: React.FC = () => {
 
       if (cancelled) return;
 
-      navigation.replace('Home');
+      navigation.replace('MainTabs');
     };
 
     checkSession();

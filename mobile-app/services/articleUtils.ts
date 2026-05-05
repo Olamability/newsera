@@ -12,8 +12,8 @@ export interface ArticleRow {
   image_url?: string | null;
   image?: string | null;
   content?: string | null;
-  sources?: { name?: string | null; website_url?: string | null } | null;
-  categories?: { name?: string | null } | null;
+  sources?: { id?: string | null; name?: string | null; website_url?: string | null; logo_url?: string | null } | null;
+  categories?: { id?: string | null; name?: string | null; slug?: string | null } | null;
   [key: string]: unknown;
 }
 

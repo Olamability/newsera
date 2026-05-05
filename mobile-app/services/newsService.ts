@@ -10,7 +10,7 @@ const FETCH_MULTIPLIER = 4;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
-const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
+const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 
 export const CATEGORY_ALL = 'all';
 export const CATEGORY_FOR_YOU = 'foryou';

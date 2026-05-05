@@ -46,7 +46,7 @@ const RegisterScreen: React.FC = () => {
       // Auto-login after successful registration
       try {
         await signIn(email.trim(), password);
-        navigation.replace('Home');
+        navigation.replace('MainTabs');
       } catch {
         // Sign-up succeeded but auto-login failed (e.g. email confirmation required)
         Alert.alert(

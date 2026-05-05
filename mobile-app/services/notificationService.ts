@@ -10,6 +10,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
@@ -18,6 +19,10 @@ import { NewsArticle } from '../types';
 
 const STORED_NOTIFICATIONS_KEY = 'newsera_notifications';
 const MAX_STORED_NOTIFICATIONS = 50;
+
+// Push notifications and local notification scheduling are not supported in
+// Expo Go (appOwnership === 'expo'). Use this constant to guard those paths.
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 export interface StoredNotification {
   id: string;
@@ -104,6 +109,14 @@ export async function registerForPushNotificationsAsync(): Promise<void> {
       return;
     }
 
+    // Push token registration is only available in standalone/production builds.
+    // In Expo Go (appOwnership === 'expo') getExpoPushTokenAsync() throws without
+    // a valid projectId, so we skip it here.
+    if (IS_EXPO_GO) {
+      console.log('[Notifications] Expo Go detected — skipping push token registration.');
+      return;
+    }
+
     const tokenData = await Notifications.getExpoPushTokenAsync();
     const pushToken = tokenData.data;
     const deviceId = await getDeviceId();
@@ -158,15 +171,18 @@ export async function checkAndNotifyBreakingNews(article: NewsArticle): Promise<
 
     const message = `Breaking: ${article.title}`;
 
-    // Schedule a local notification (visible even without a push server)
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'NewsEra Breaking News',
-        body: message,
-        data: { articleId: article.id },
-      },
-      trigger: null, // deliver immediately
-    });
+    // Schedule a local notification only in standalone/production builds.
+    // expo-notifications scheduling is unreliable in Expo Go.
+    if (!IS_EXPO_GO) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'NewsEra Breaking News',
+          body: message,
+          data: { articleId: article.id },
+        },
+        trigger: null, // deliver immediately
+      });
+    }
 
     // Persist to AsyncStorage so NotificationsScreen can display it
     await storeNotification(article, message);

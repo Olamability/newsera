@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -11,8 +15,12 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList, MainTabParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
+
+const SETTINGS_KEY = 'newsera_settings';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Me'>,
@@ -23,6 +31,43 @@ const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Load persisted dark mode state
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          setDarkMode(parsed.darkMode === true);
+        } catch {
+          // corrupted data — ignore and keep default
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleDarkMode = useCallback(async (value: boolean) => {
+    setDarkMode(value);
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+      let current: Record<string, unknown> = {};
+      if (raw) {
+        try {
+          current = JSON.parse(raw);
+        } catch {
+          // corrupted — start fresh
+        }
+      }
+      await AsyncStorage.setItem(
+        SETTINGS_KEY,
+        JSON.stringify({ ...current, darkMode: value })
+      );
+    } catch {
+      // non-fatal
+    }
+  }, []);
 
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -46,29 +91,95 @@ const ProfileScreen: React.FC = () => {
     ]);
   };
 
-  // Not logged in — show sign-in prompt
+  const handleRateUs = useCallback(async () => {
+    const url =
+      Platform.OS === 'android'
+        ? 'market://details?id=com.newsera.app'
+        : 'https://apps.apple.com/app/newsera';
+    const supported = await Linking.canOpenURL(url).catch(() => false);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert('Rate Us', 'Thank you for your support! ⭐');
+    }
+  }, []);
+
+  const ArrowIcon = () => (
+    <Ionicons name="chevron-forward" size={18} color="#ccc" />
+  );
+
+  // ─── Section Renderer ─────────────────────────────────────────────────────
+
+  const renderMenuItem = (
+    iconName: React.ComponentProps<typeof Ionicons>['name'],
+    label: string,
+    onPress: () => void,
+    rightElement?: React.ReactNode,
+    last = false
+  ) => (
+    <React.Fragment key={label}>
+      <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+        <View style={styles.menuIconWrap}>
+          <Ionicons name={iconName} size={20} color="#e63946" />
+        </View>
+        <Text style={styles.menuLabel}>{label}</Text>
+        {rightElement ?? <ArrowIcon />}
+      </TouchableOpacity>
+      {!last && <View style={styles.divider} />}
+    </React.Fragment>
+  );
+
+  // ─── Not Logged In ─────────────────────────────────────────────────────────
+
   if (!user) {
     return (
-      <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        {/* Guest header */}
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>?</Text>
+            <Ionicons name="person" size={36} color="#fff" />
           </View>
-          <Text style={styles.email}>Not signed in</Text>
+          <Text style={styles.guestText}>Not signed in</Text>
+          <Text style={styles.guestSub}>Sign in to access all features</Text>
         </View>
+
         <TouchableOpacity
           style={styles.signInBtn}
           onPress={() => navigation.navigate('Login')}
           activeOpacity={0.85}
         >
-          <Text style={styles.signInText}>Sign In</Text>
+          <Text style={styles.signInText}>Sign In / Create Account</Text>
         </TouchableOpacity>
-      </View>
+
+        {/* Limited access section */}
+        <Text style={styles.sectionHeader}>DISCOVER</Text>
+        <View style={styles.section}>
+          {renderMenuItem('grid-outline', 'Widget', () => navigation.navigate('Widget'))}
+          {renderMenuItem('globe-outline', 'Country & Language', () => navigation.navigate('CountryLanguage'))}
+          {renderMenuItem('moon-outline', 'Dark Mode', () => {}, (
+            <Switch
+              value={darkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: '#ccc', true: '#e63946' }}
+              thumbColor="#fff"
+            />
+          ), true)}
+        </View>
+
+        <Text style={styles.sectionHeader}>SUPPORT</Text>
+        <View style={styles.section}>
+          {renderMenuItem('star-outline', 'Rate Us', handleRateUs)}
+          {renderMenuItem('chatbubble-outline', 'Suggestions & Feedback', () => navigation.navigate('Feedback'), undefined, true)}
+        </View>
+      </ScrollView>
     );
   }
 
+  // ─── Logged In ─────────────────────────────────────────────────────────────
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* User header */}
       <View style={styles.avatarContainer}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -76,56 +187,51 @@ const ProfileScreen: React.FC = () => {
           </Text>
         </View>
         <Text style={styles.email}>{user.email}</Text>
+        <Text style={styles.guestSub}>Member</Text>
       </View>
 
+      {/* My Content */}
+      <Text style={styles.sectionHeader}>MY CONTENT</Text>
       <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('Bookmarks')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIcon}>🔖</Text>
-          <Text style={styles.menuLabel}>My Bookmarks</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('RecentlyViewed')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIcon}>🕑</Text>
-          <Text style={styles.menuLabel}>Recently Viewed</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('Notifications')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIcon}>🔔</Text>
-          <Text style={styles.menuLabel}>Notifications</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('Settings')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIcon}>⚙️</Text>
-          <Text style={styles.menuLabel}>Settings</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
+        {renderMenuItem('bookmark-outline', 'Favorites', () => navigation.navigate('Bookmarks'))}
+        {renderMenuItem('time-outline', 'Recently Viewed', () => navigation.navigate('RecentlyViewed'))}
+        {renderMenuItem('download-outline', 'Offline Reading', () => navigation.navigate('OfflineReading'))}
+        {renderMenuItem('bookmarks-outline', 'Read Later', () => navigation.navigate('ReadLater'), undefined, true)}
       </View>
 
+      {/* Tools */}
+      <Text style={styles.sectionHeader}>TOOLS</Text>
+      <View style={styles.section}>
+        {renderMenuItem('grid-outline', 'Widget', () => navigation.navigate('Widget'))}
+        {renderMenuItem('mail-outline', 'Inbox', () => navigation.navigate('Inbox'))}
+        {renderMenuItem('notifications-outline', 'Notifications', () => navigation.navigate('Notifications'))}
+        {renderMenuItem('gift-outline', 'Rewards', () => navigation.navigate('Rewards'), undefined, true)}
+      </View>
+
+      {/* Settings */}
+      <Text style={styles.sectionHeader}>SETTINGS</Text>
+      <View style={styles.section}>
+        {renderMenuItem('globe-outline', 'Country & Language', () => navigation.navigate('CountryLanguage'))}
+        {renderMenuItem('settings-outline', 'App Settings', () => navigation.navigate('Settings'))}
+        {renderMenuItem('ban-outline', 'Blocked Users', () => navigation.navigate('BlockedUsers'))}
+        {renderMenuItem('moon-outline', 'Dark Mode', () => {}, (
+          <Switch
+            value={darkMode}
+            onValueChange={toggleDarkMode}
+            trackColor={{ false: '#ccc', true: '#e63946' }}
+            thumbColor="#fff"
+          />
+        ), true)}
+      </View>
+
+      {/* Support */}
+      <Text style={styles.sectionHeader}>SUPPORT</Text>
+      <View style={styles.section}>
+        {renderMenuItem('star-outline', 'Rate Us', handleRateUs)}
+        {renderMenuItem('chatbubble-outline', 'Suggestions & Feedback', () => navigation.navigate('Feedback'), undefined, true)}
+      </View>
+
+      {/* Sign Out */}
       <TouchableOpacity
         style={[styles.signOutBtn, loading && styles.signOutBtnDisabled]}
         onPress={handleSignOut}
@@ -138,7 +244,9 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.signOutText}>Sign Out</Text>
         )}
       </TouchableOpacity>
-    </View>
+
+      <View style={styles.bottomPad} />
+    </ScrollView>
   );
 };
 
@@ -146,13 +254,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    paddingTop: 24,
+  },
+  scrollContent: {
+    paddingTop: 0,
+    paddingBottom: 32,
   },
   avatarContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 28,
     backgroundColor: '#fff',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatar: {
     width: 80,
@@ -170,43 +281,62 @@ const styles = StyleSheet.create({
   },
   email: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    color: '#1a1a1a',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  guestText: {
+    fontSize: 18,
+    color: '#1a1a1a',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  guestSub: {
+    fontSize: 13,
+    color: '#888',
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
   },
   section: {
     backgroundColor: '#fff',
-    marginBottom: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#eee',
+    marginBottom: 20,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 15,
   },
-  menuIcon: {
-    fontSize: 20,
-    marginRight: 14,
+  menuIconWrap: {
+    width: 32,
+    alignItems: 'center',
+    marginRight: 12,
   },
   menuLabel: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#1a1a1a',
-  },
-  menuArrow: {
-    fontSize: 20,
-    color: '#ccc',
+    fontWeight: '500',
   },
   divider: {
     height: 1,
     backgroundColor: '#f0f0f0',
-    marginLeft: 54,
+    marginLeft: 64,
   },
   signInBtn: {
     marginHorizontal: 20,
-    marginTop: 8,
+    marginBottom: 24,
     paddingVertical: 15,
     borderRadius: 10,
     backgroundColor: '#e63946',
@@ -219,7 +349,7 @@ const styles = StyleSheet.create({
   },
   signOutBtn: {
     marginHorizontal: 20,
-    marginTop: 8,
+    marginTop: 4,
     paddingVertical: 15,
     borderRadius: 10,
     borderWidth: 2,
@@ -233,6 +363,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#e63946',
+  },
+  bottomPad: {
+    height: 16,
   },
 });
 

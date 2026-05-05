@@ -13,7 +13,10 @@ export async function isBookmarked(articleId: string, userId: string): Promise<b
     .eq('article_id', articleId)
     .limit(1);
 
-  if (error) throw error;
+  if (error) {
+    console.error('[Bookmark] isBookmarked error for article:', articleId, error);
+    throw error;
+  }
   return (data?.length ?? 0) > 0;
 }
 
@@ -24,7 +27,10 @@ export async function addBookmark(articleId: string, userId: string): Promise<vo
   const { error } = await supabase
     .from('bookmarks')
     .insert({ user_id: userId, article_id: articleId });
-  if (error) throw error;
+  if (error) {
+    console.error('[Bookmark] addBookmark error for user:', userId, 'article:', articleId, error);
+    throw error;
+  }
 }
 
 /**
@@ -36,7 +42,10 @@ export async function removeBookmark(articleId: string, userId: string): Promise
     .delete()
     .eq('user_id', userId)
     .eq('article_id', articleId);
-  if (error) throw error;
+  if (error) {
+    console.error('[Bookmark] removeBookmark error for user:', userId, 'article:', articleId, error);
+    throw error;
+  }
 }
 
 /**

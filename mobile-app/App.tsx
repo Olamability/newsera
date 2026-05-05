@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
 import TrendingScreen from './screens/TrendingScreen';
@@ -19,6 +19,7 @@ import BookmarksScreen from './screens/BookmarksScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import CategoryDetailScreen from './screens/CategoryDetailScreen';
 import RecentlyViewedScreen from './screens/RecentlyViewedScreen';
+import PlaceholderScreen from './screens/PlaceholderScreen';
 import { RootStackParamList, MainTabParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
 import { AuthProvider } from './context/AuthContext';
@@ -31,6 +32,10 @@ const ACTIVE_COLOR = '#e63946';
 const INACTIVE_COLOR = '#9e9e9e';
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+  const tabBarPaddingBottom = Math.max(insets.bottom, 10);
+  const tabBarHeight = 56 + tabBarPaddingBottom;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -55,9 +60,9 @@ function MainTabs() {
           backgroundColor: '#fff',
           borderTopWidth: 1,
           borderTopColor: '#efefef',
-          paddingBottom: 4,
+          paddingBottom: tabBarPaddingBottom,
           paddingTop: 4,
-          height: 60,
+          height: tabBarHeight,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -172,6 +177,48 @@ function AppNavigator() {
             name="RecentlyViewed"
             component={RecentlyViewedScreen}
             options={{ title: 'Recently Viewed' }}
+          />
+
+          {/* Placeholder screens for Me hub features */}
+          <Stack.Screen
+            name="Widget"
+            component={PlaceholderScreen}
+            options={{ title: 'Widget' }}
+          />
+          <Stack.Screen
+            name="Inbox"
+            component={PlaceholderScreen}
+            options={{ title: 'Inbox' }}
+          />
+          <Stack.Screen
+            name="OfflineReading"
+            component={PlaceholderScreen}
+            options={{ title: 'Offline Reading' }}
+          />
+          <Stack.Screen
+            name="ReadLater"
+            component={PlaceholderScreen}
+            options={{ title: 'Read Later' }}
+          />
+          <Stack.Screen
+            name="BlockedUsers"
+            component={PlaceholderScreen}
+            options={{ title: 'Blocked Users' }}
+          />
+          <Stack.Screen
+            name="CountryLanguage"
+            component={PlaceholderScreen}
+            options={{ title: 'Country & Language' }}
+          />
+          <Stack.Screen
+            name="Rewards"
+            component={PlaceholderScreen}
+            options={{ title: 'Rewards' }}
+          />
+          <Stack.Screen
+            name="Feedback"
+            component={PlaceholderScreen}
+            options={{ title: 'Suggestions & Feedback' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

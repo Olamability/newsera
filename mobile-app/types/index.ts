@@ -56,4 +56,12 @@ export type RootStackParamList = {
   Settings: undefined;
   CategoryDetail: { categoryId: string; categoryName: string };
   RecentlyViewed: undefined;
+  Widget: undefined;
+  Inbox: undefined;
+  OfflineReading: undefined;
+  ReadLater: undefined;
+  BlockedUsers: undefined;
+  CountryLanguage: undefined;
+  Rewards: undefined;
+  Feedback: undefined;
 };

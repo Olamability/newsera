@@ -1,32 +1,104 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
+import TrendingScreen from './screens/TrendingScreen';
+import SearchScreen from './screens/SearchScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
+import ProfileScreen from './screens/ProfileScreen';
 import ArticleDetailScreen from './screens/ArticleDetailScreen';
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import BookmarksScreen from './screens/BookmarksScreen';
-import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import SearchScreen from './screens/SearchScreen';
-import NotificationsScreen from './screens/NotificationsScreen';
 import CategoryDetailScreen from './screens/CategoryDetailScreen';
 import RecentlyViewedScreen from './screens/RecentlyViewedScreen';
-import { RootStackParamList } from './types';
+import { RootStackParamList, MainTabParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { registerForPushNotificationsAsync } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+
+const ACTIVE_COLOR = '#e63946';
+const INACTIVE_COLOR = '#9e9e9e';
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color, size }) => {
+          let iconName: React.ComponentProps<typeof Ionicons>['name'];
+          if (route.name === 'Home') {
+            iconName = 'home';
+          } else if (route.name === 'Trending') {
+            iconName = 'flame';
+          } else if (route.name === 'Search') {
+            iconName = 'search';
+          } else if (route.name === 'Notifications') {
+            iconName = 'notifications';
+          } else {
+            iconName = 'person';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: ACTIVE_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#efefef',
+          paddingBottom: 4,
+          paddingTop: 4,
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginBottom: 2,
+        },
+        headerStyle: { backgroundColor: '#e63946' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700' },
+      })}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: 'NewsEra', tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name="Trending"
+        component={TrendingScreen}
+        options={{ title: 'Trending 🔥', tabBarLabel: 'Trending' }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ title: 'Search', tabBarLabel: 'Search' }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notifications', tabBarLabel: 'Notifications' }}
+      />
+      <Tab.Screen
+        name="Me"
+        component={ProfileScreen}
+        options={{ title: 'My Profile', tabBarLabel: 'Me' }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 function AppNavigator() {
-  const { user } = useAuth();
-
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
@@ -66,50 +138,18 @@ function AppNavigator() {
             options={{ title: 'Reset Password' }}
           />
 
-          {/* Main app screens — publicly accessible */}
+          {/* Main app — bottom tabs */}
           <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={({ navigation }) => ({
-              title: 'NewsEra',
-              headerRight: () => (
-                <>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('Search')}
-                    style={{ marginRight: 8 }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 22 }}>🔍</Text>
-                  </TouchableOpacity>
-                  {user ? (
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate('Profile')}
-                      style={{ marginRight: 4 }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 24 }}>👤</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate('Login')}
-                      style={{ marginRight: 4 }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
-                        Sign In
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              ),
-            })}
+            name="MainTabs"
+            component={MainTabs}
+            options={{ headerShown: false }}
           />
+
+          {/* Detail screens that open above the tab bar */}
           <Stack.Screen
             name="ArticleDetail"
             component={ArticleDetailScreen}
             options={{ title: 'Article' }}
-          />
-          <Stack.Screen
-            name="Search"
-            component={SearchScreen}
-            options={{ title: 'Search' }}
           />
           <Stack.Screen
             name="CategoryDetail"
@@ -117,26 +157,16 @@ function AppNavigator() {
             options={({ route }) => ({ title: route.params.categoryName })}
           />
 
-          {/* Auth-protected screens */}
+          {/* Secondary screens */}
           <Stack.Screen
             name="Bookmarks"
             component={BookmarksScreen}
             options={{ title: 'My Bookmarks' }}
           />
           <Stack.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ title: 'Profile' }}
-          />
-          <Stack.Screen
             name="Settings"
             component={SettingsScreen}
             options={{ title: 'Settings' }}
-          />
-          <Stack.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{ title: 'Notifications' }}
           />
           <Stack.Screen
             name="RecentlyViewed"
@@ -145,8 +175,6 @@ function AppNavigator() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-      {/* StatusBar must live outside NavigationContainer so it cannot be
-          accidentally layered above interactive screens */}
       <StatusBar style="light" />
     </>
   );
@@ -163,3 +191,4 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+

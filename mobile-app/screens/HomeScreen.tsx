@@ -5,9 +5,6 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
-  TouchableOpacity,
-  Text,
-  Alert,
 } from 'react-native';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
@@ -25,21 +22,7 @@ import { NewsArticle, Category } from '../types';
 import { useNavigation } from '@react-navigation/native';
 
 const SKELETON_COUNT = 6;
-// Stable data array for the skeleton FlatList - avoids re-creating on every render
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
-
-// DEBUG — remove this component once touch events are confirmed working
-function DebugTouchButton() {
-  return (
-    <TouchableOpacity
-      style={styles.testButton}
-      onPress={() => Alert.alert('Touch works ✅', 'Touch events are firing correctly.')}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.testButtonText}>🛠 DEBUG: Test Touch</Text>
-    </TouchableOpacity>
-  );
-}
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
@@ -159,7 +142,6 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <DebugTouchButton />
         <CategoryFilter
           categories={categories}
           selectedId={selectedCategory}
@@ -179,7 +161,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <DebugTouchButton />
       <CategoryFilter
         categories={categories}
         selectedId={selectedCategory}
@@ -213,17 +194,5 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 16,
     alignItems: 'center',
-  },
-  // DEBUG — remove after touch events are confirmed working
-  testButton: {
-    backgroundColor: '#ff9800',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  testButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
   },
 });

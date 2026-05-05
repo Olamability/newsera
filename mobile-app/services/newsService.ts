@@ -5,8 +5,6 @@ import { ArticleRow, mapArticle } from './articleUtils';
 
 const PAGE_SIZE = 20;
 const MAX_PER_SOURCE = 2;
-// Fetch a larger pool so that after balancing we still have PAGE_SIZE articles
-const FETCH_MULTIPLIER = 4;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
@@ -44,9 +42,10 @@ function balanceBySource(articles: NewsArticle[]): NewsArticle[] {
 }
 
 /**
- * SAFE ARTICLES FETCH (NO FRAGILE JOINS)
- * For the "all" feed (no categoryId) a larger pool is fetched so that
- * source-balancing still yields PAGE_SIZE results.
+ * ARTICLES FETCH
+ * Fetches a page of articles with consistent PAGE_SIZE pagination.
+ * When no categoryId is provided (the "All" feed), source-balancing is applied
+ * so no single source dominates the page.
  *
  * @param page 1-indexed page number
  * @param categoryId optional category filter
@@ -56,12 +55,8 @@ export async function fetchArticles(
   page: number,
   categoryId?: string | null
 ): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
-  // For the balanced feed each "page" consumes a pool of poolSize raw DB rows.
-  // Articles beyond the first MAX_PER_SOURCE per source within that pool are
-  // intentionally skipped to ensure source diversity — this is not a data gap.
-  const poolSize = categoryId ? PAGE_SIZE : PAGE_SIZE * FETCH_MULTIPLIER;
-  const from = (page - 1) * poolSize;
-  const to = page * poolSize - 1;
+  const from = (page - 1) * PAGE_SIZE;
+  const to = page * PAGE_SIZE - 1;
 
   let query = supabase
     .from('articles')
@@ -88,7 +83,7 @@ export async function fetchArticles(
 
   // hasMore is based on whether the DB returned a full pool.
   // If it returned fewer rows than requested, we've reached the end.
-  const hasMore = rawCount >= poolSize;
+  const hasMore = rawCount >= PAGE_SIZE;
 
   console.log(`📄 fetchArticles — page: ${page}, raw rows: ${rawCount}, returned: ${articles.length}, hasMore: ${hasMore}`);
 

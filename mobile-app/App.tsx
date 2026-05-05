@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
-import TrendingScreen from './screens/TrendingScreen';
 import SearchScreen from './screens/SearchScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -43,8 +42,6 @@ function MainTabs() {
           let iconName: React.ComponentProps<typeof Ionicons>['name'];
           if (route.name === 'Home') {
             iconName = 'home';
-          } else if (route.name === 'Trending') {
-            iconName = 'flame';
           } else if (route.name === 'Search') {
             iconName = 'search';
           } else if (route.name === 'Notifications') {
@@ -78,11 +75,6 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{ title: 'NewsEra', tabBarLabel: 'Home' }}
-      />
-      <Tab.Screen
-        name="Trending"
-        component={TrendingScreen}
-        options={{ title: 'Trending 🔥', tabBarLabel: 'Trending' }}
       />
       <Tab.Screen
         name="Search"

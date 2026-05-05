@@ -39,7 +39,6 @@ export interface Bookmark {
 
 export type MainTabParamList = {
   Home: undefined;
-  Trending: undefined;
   Search: undefined;
   Notifications: undefined;
   Me: undefined;

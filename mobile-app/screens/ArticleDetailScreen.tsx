@@ -36,6 +36,10 @@ import { buildArticleShareContent, resolveArticleSourceName } from '../services/
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 const MAX_PREVIEW_CHARS = 1400;
 const MAX_HTML_STRIP_ITERATIONS = 1000;
+const MENU_CLOSE_ANIMATION_DELAY = 250;
+const MIN_BOTTOM_PADDING = 40;
+const BASE_BOTTOM_PADDING = 24;
+const MENU_SHEET_TRANSLATE_Y = 300;
 
 const stripTagBlocks = (value: string, tagName: string): string => {
   let current = value;
@@ -154,7 +158,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     Animated.spring(menuAnim, {
       toValue: 1,
       useNativeDriver: true,
-      bounciness: 4,
+      damping: 12,
+      stiffness: 150,
     }).start();
   }, [menuAnim]);
 
@@ -168,7 +173,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleMenuFavourite = useCallback(() => {
     closeMenu();
-    setTimeout(() => handleBookmark(), 250);
+    setTimeout(() => handleBookmark(), MENU_CLOSE_ANIMATION_DELAY);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closeMenu]);
 
@@ -185,12 +190,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           { text: 'Cancel', style: 'cancel' },
         ]
       );
-    }, 250);
+    }, MENU_CLOSE_ANIMATION_DELAY);
   }, [closeMenu]);
 
   const handleMenuShare = useCallback(() => {
     closeMenu();
-    setTimeout(() => handleShare(), 250);
+    setTimeout(() => handleShare(), MENU_CLOSE_ANIMATION_DELAY);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closeMenu]);
 
@@ -350,7 +355,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const menuTranslateY = menuAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [300, 0],
+    outputRange: [MENU_SHEET_TRANSLATE_Y, 0],
   });
 
   return (
@@ -394,7 +399,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       >
         <ScrollView
           style={styles.container}
-          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 24, 40) }]}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING) }]}
         >
           <View style={styles.body}>
             <Text style={styles.title}>{article.title}</Text>
@@ -591,7 +596,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <Animated.View
           style={[
             styles.menuSheet,
-            { paddingBottom: Math.max(insets.bottom + 8, 16), transform: [{ translateY: menuTranslateY }] },
+            { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING), transform: [{ translateY: menuTranslateY }] },
           ]}
         >
           <View style={styles.menuHandle} />

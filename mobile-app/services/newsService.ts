@@ -143,6 +143,88 @@ export async function fetchTrendingArticles(
 }
 
 /**
+ * SIMILAR ARTICLES — for "Read More Like This" section.
+ * Priority: same category → same source → latest trending fallback.
+ *
+ * @param articleId  The current article to exclude
+ * @param categoryId Category of the current article (nullable)
+ * @param sourceId   Source of the current article (nullable)
+ * @param limit      Max recommendations to return (default 5)
+ */
+export async function fetchSimilarArticles(
+  articleId: string,
+  categoryId: string | null,
+  sourceId: string | null,
+  limit: number = 5
+): Promise<NewsArticle[]> {
+  const collected: NewsArticle[] = [];
+  const seenIds = new Set<string>([articleId]);
+
+  // 1. Same category
+  if (categoryId && collected.length < limit) {
+    const { data } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .eq('category_id', categoryId)
+      .neq('id', articleId)
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= limit) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  // 2. Same source
+  if (sourceId && collected.length < limit) {
+    const needed = limit - collected.length;
+    const { data } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .eq('source_id', sourceId)
+      .neq('id', articleId)
+      .order('published_at', { ascending: false })
+      .limit(needed * 2);
+
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= limit) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  // 3. Latest trending fallback
+  if (collected.length < limit) {
+    const needed = limit - collected.length;
+    const { data } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .neq('id', articleId)
+      .order('published_at', { ascending: false })
+      .limit(needed * 3);
+
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= limit) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  return collected;
+}
+
+/**
  * PERSONALIZED — paginated, safe fallback
  */
 export async function fetchPersonalizedArticles(

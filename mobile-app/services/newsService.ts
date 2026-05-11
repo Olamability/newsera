@@ -4,7 +4,6 @@ import { getDeviceId } from './deviceId';
 import { ArticleRow, mapArticle } from './articleUtils';
 
 const PAGE_SIZE = 20;
-const MAX_PER_SOURCE = 2;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 
@@ -15,37 +14,8 @@ export const CATEGORY_FOR_YOU = 'foryou';
 export const CATEGORY_TRENDING = 'trending';
 
 /**
- * Balance articles so no single source dominates.
- * Groups by source_id, takes at most MAX_PER_SOURCE per source,
- * then re-sorts by published_at DESC and returns up to PAGE_SIZE items.
- */
-function balanceBySource(articles: NewsArticle[]): NewsArticle[] {
-  const countBySource: Record<string, number> = {};
-  const balanced: NewsArticle[] = [];
-
-  for (const article of articles) {
-    const key = article.source_id ?? '__unknown__';
-    const count = countBySource[key] ?? 0;
-    if (count < MAX_PER_SOURCE) {
-      balanced.push(article);
-      countBySource[key] = count + 1;
-    }
-  }
-
-  balanced.sort((a, b) => {
-    const ta = a.published_at ? new Date(a.published_at).getTime() : 0;
-    const tb = b.published_at ? new Date(b.published_at).getTime() : 0;
-    return tb - ta;
-  });
-
-  return balanced.slice(0, PAGE_SIZE);
-}
-
-/**
  * ARTICLES FETCH
  * Fetches a page of articles with consistent PAGE_SIZE pagination.
- * When no categoryId is provided (the "All" feed), source-balancing is applied
- * so no single source dominates the page.
  *
  * @param page 1-indexed page number
  * @param categoryId optional category filter
@@ -75,17 +45,10 @@ export async function fetchArticles(
     throw error;
   }
 
-  const rawCount = (data ?? []).length;
-  const mapped = ((data as ArticleRow[]) ?? []).map(mapArticle);
+  const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
+  const hasMore = articles.length >= PAGE_SIZE;
 
-  // Apply source-balancing only for the general feed
-  const articles = categoryId ? mapped : balanceBySource(mapped);
-
-  // hasMore is based on whether the DB returned a full pool.
-  // If it returned fewer rows than requested, we've reached the end.
-  const hasMore = rawCount >= PAGE_SIZE;
-
-  console.log(`📄 fetchArticles — page: ${page}, raw rows: ${rawCount}, returned: ${articles.length}, hasMore: ${hasMore}`);
+  console.log(`📄 fetchArticles — page: ${page}, returned: ${articles.length}, hasMore: ${hasMore}`);
 
   return { articles, hasMore };
 }

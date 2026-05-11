@@ -25,6 +25,7 @@ import { toggleBookmark } from '../services/bookmarkService';
 import { NewsArticle, Category } from '../types';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { buildArticleShareContent } from '../services/shareService';
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
@@ -175,11 +176,7 @@ export default function HomeScreen() {
 
   const handleSwipeRight = useCallback(async (article: NewsArticle) => {
     try {
-      await Share.share({
-        title: article.title,
-        message: `${article.title}\n${article.url}`,
-        url: article.url,
-      });
+      await Share.share(buildArticleShareContent(article));
     } catch (err) {
       console.warn('[HomeScreen] Share swipe failed:', err);
     }

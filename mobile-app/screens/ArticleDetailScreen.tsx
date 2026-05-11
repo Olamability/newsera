@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -27,12 +27,39 @@ import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
 import { fetchComments, addComment, ArticleComment } from '../services/commentService';
 import { fetchSimilarArticles } from '../services/newsService';
 import { useAuth } from '../context/AuthContext';
+import { buildArticleShareContent } from '../services/shareService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
+
+const stripHtml = (value: string): string =>
+  value
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
+  const cleanedSnippet = snippet?.trim();
+  if (cleanedSnippet) return cleanedSnippet;
+
+  if (!content) return null;
+  const plainText = stripHtml(content);
+  if (!plainText) return null;
+
+  return plainText.length > 1400 ? `${plainText.slice(0, 1400).trimEnd()}…` : plainText;
+};
 
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
+  const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
+  const sourceLogo = article.sources?.logo_url ?? null;
+  const sourceWebsite = article.sources?.website_url ?? null;
+  const sourceVerified = !!article.sources?.is_verified;
+  const categoryName = article.category_name ?? article.categories?.name ?? null;
+  const previewText = useMemo(() => buildArticlePreview(article.snippet, article.content), [article.content, article.snippet]);
 
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -152,15 +179,19 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({
-        title: article.title,
-        message: `${article.title}\n${article.url}`,
-        url: article.url,
-      });
+      await Share.share(buildArticleShareContent(article));
     } catch (err) {
       console.warn('[Share] Failed:', err);
     }
-  }, [article.title, article.url]);
+  }, [article]);
+
+  const handleOpenPublisherWebsite = useCallback(async () => {
+    if (!sourceWebsite) return;
+    const supported = await Linking.canOpenURL(sourceWebsite);
+    if (supported) {
+      await Linking.openURL(sourceWebsite);
+    }
+  }, [sourceWebsite]);
 
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
@@ -224,11 +255,42 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       ) : null}
 
       <View style={styles.body}>
-        {(article.category_name ?? article.categories?.name) ? (
+        <View style={styles.publisherCard}>
+          {sourceLogo ? (
+            <Image
+              source={{ uri: sourceLogo }}
+              style={styles.sourceLogo}
+              contentFit="contain"
+              transition={200}
+            />
+          ) : (
+            <View style={styles.sourceLogoPlaceholder}>
+              <Text style={styles.sourceLogoPlaceholderText}>
+                {sourceName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={styles.publisherTextWrap}>
+            <View style={styles.publisherNameRow}>
+              <Text style={styles.source}>{sourceName}</Text>
+              {sourceVerified ? <Text style={styles.verifiedBadge}>✓ Verified</Text> : null}
+            </View>
+            {sourceWebsite ? (
+              <TouchableOpacity onPress={handleOpenPublisherWebsite} activeOpacity={0.7}>
+                <Text style={styles.sourceWebsite} numberOfLines={1}>
+                  {sourceWebsite}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        {categoryName ? (
           <TouchableOpacity
+            style={styles.categoryBadge}
             onPress={() => {
               const catId = article.category_id ?? article.categories?.id;
-              const catName = article.category_name ?? article.categories?.name ?? '';
+              const catName = categoryName ?? '';
               if (catId) {
                 navigation.navigate('CategoryDetail', {
                   categoryId: catId,
@@ -238,29 +300,28 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             }}
             activeOpacity={0.7}
           >
-            <Text style={styles.category}>{article.category_name ?? article.categories?.name}</Text>
+            <Text style={styles.category}>{categoryName}</Text>
           </TouchableOpacity>
         ) : null}
 
         <Text style={styles.title}>{article.title}</Text>
 
-        <View style={styles.metaRow}>
-          <Text style={styles.source}>
-            {article.source_name ?? article.sources?.name ?? 'Unknown Source'}
+        {article.published_at ? (
+          <Text style={styles.date}>
+            Published{' '}
+            {new Date(article.published_at).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
           </Text>
-          {article.published_at ? (
-            <Text style={styles.date}>
-              {new Date(article.published_at).toLocaleDateString(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
 
-        {article.snippet ? (
-          <Text style={styles.snippet}>{article.snippet}</Text>
+        {previewText ? (
+          <View style={styles.previewBlock}>
+            <Text style={styles.previewLabel}>Preview</Text>
+            <Text style={styles.snippet}>{previewText}</Text>
+          </View>
         ) : null}
 
         <View style={styles.actions}>
@@ -269,7 +330,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             onPress={handleReadFull}
             activeOpacity={0.85}
           >
-            <Text style={styles.buttonText}>Read Full Article</Text>
+            <Text style={styles.buttonText}>Read on Source Website</Text>
           </TouchableOpacity>
 
           <View style={styles.actionsRow}>
@@ -316,7 +377,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Read More Like This */}
         {similarArticles.length > 0 ? (
           <View style={styles.similarSection}>
-            <Text style={styles.similarTitle}>Read More Like This</Text>
+            <Text style={styles.similarTitle}>More Like This</Text>
             <FlatList
               data={similarArticles}
               keyExtractor={(item) => item.id}
@@ -429,12 +490,55 @@ const styles = StyleSheet.create({
   body: {
     padding: 16,
   },
+  publisherCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  sourceLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f2f2f2',
+  },
+  sourceLogoPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f2f2f2',
+  },
+  sourceLogoPlaceholderText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '700',
+  },
+  publisherTextWrap: {
+    flex: 1,
+  },
+  publisherNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff5f6',
+    borderColor: '#ffd7dc',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 8,
+  },
   category: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#e63946',
     textTransform: 'uppercase',
-    marginBottom: 8,
   },
   title: {
     fontSize: 22,
@@ -443,25 +547,49 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     marginBottom: 12,
   },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
   source: {
-    fontSize: 13,
-    color: '#888',
-    fontWeight: '600',
+    fontSize: 14,
+    color: '#222',
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  verifiedBadge: {
+    fontSize: 11,
+    color: '#fff',
+    backgroundColor: '#0b8f3c',
+    fontWeight: '700',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  sourceWebsite: {
+    fontSize: 12,
+    color: '#5c6f90',
   },
   date: {
     fontSize: 13,
-    color: '#aaa',
+    color: '#888',
+    marginBottom: 14,
+  },
+  previewBlock: {
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 24,
+  },
+  previewLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    color: '#888',
+    fontWeight: '700',
+    marginBottom: 8,
   },
   snippet: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#333',
-    lineHeight: 26,
-    marginBottom: 24,
+    lineHeight: 24,
   },
   actions: {
     gap: 12,

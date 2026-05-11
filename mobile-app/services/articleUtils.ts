@@ -12,8 +12,20 @@ export interface ArticleRow {
   image_url?: string | null;
   image?: string | null;
   content?: string | null;
-  sources?: { id?: string | null; name?: string | null; website_url?: string | null; logo_url?: string | null } | null;
+  sources?: {
+    id?: string | null;
+    name?: string | null;
+    website_url?: string | null;
+    logo_url?: string | null;
+    is_verified?: boolean | null;
+    promotion_tier?: 'organic' | 'promoted' | null;
+  } | null;
   categories?: { id?: string | null; name?: string | null; slug?: string | null } | null;
+  is_sponsored?: boolean | null;
+  sponsor_name?: string | null;
+  campaign_id?: string | null;
+  distribution_channel?: 'organic' | 'promoted' | 'sponsored' | null;
+  analytics_label?: string | null;
   [key: string]: unknown;
 }
 

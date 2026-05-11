@@ -167,19 +167,50 @@ export async function fetchSimilarArticles(
   // 3. Latest trending fallback
   if (collected.length < limit) {
     const needed = limit - collected.length;
-    const { data } = await supabase
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .neq('id', articleId)
-      .order('published_at', { ascending: false })
-      .limit(needed * 3);
+    const { data: trendingRows } = await supabase
+      .from('article_click_counts')
+      .select('article_id')
+      .order('click_count', { ascending: false })
+      .limit(needed * 6);
 
-    for (const row of (data ?? []) as ArticleRow[]) {
-      if (collected.length >= limit) break;
-      const mapped = mapArticle(row);
-      if (!seenIds.has(mapped.id)) {
-        seenIds.add(mapped.id);
-        collected.push(mapped);
+    const trendingIds = (trendingRows ?? [])
+      .map((row: { article_id?: string }) => row.article_id)
+      .filter((id): id is string => !!id && !seenIds.has(id))
+      .slice(0, needed * 3);
+
+    if (trendingIds.length > 0) {
+      const { data } = await supabase
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .in('id', trendingIds)
+        .order('published_at', { ascending: false });
+
+      for (const row of (data ?? []) as ArticleRow[]) {
+        if (collected.length >= limit) break;
+        const mapped = mapArticle(row);
+        if (!seenIds.has(mapped.id)) {
+          seenIds.add(mapped.id);
+          collected.push(mapped);
+        }
+      }
+    }
+
+    // Final fallback: latest articles if trending signal is unavailable.
+    if (collected.length < limit) {
+      const { data } = await supabase
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .neq('id', articleId)
+        .order('published_at', { ascending: false })
+        .limit(needed * 3);
+
+      for (const row of (data ?? []) as ArticleRow[]) {
+        if (collected.length >= limit) break;
+        const mapped = mapArticle(row);
+        if (!seenIds.has(mapped.id)) {
+          seenIds.add(mapped.id);
+          collected.push(mapped);
+        }
       }
     }
   }

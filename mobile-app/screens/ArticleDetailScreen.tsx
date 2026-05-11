@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -16,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
+import { RootStackParamList, NewsArticle } from '../types';
 import { supabase } from '../services/supabase';
 import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
@@ -24,6 +25,7 @@ import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
 import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
 import { fetchComments, addComment, ArticleComment } from '../services/commentService';
+import { fetchSimilarArticles } from '../services/newsService';
 import { useAuth } from '../context/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
@@ -42,6 +44,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [comments, setComments] = useState<ArticleComment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+
+  const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
@@ -78,6 +82,13 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .then(setComments)
       .catch(() => {});
   }, [article.id]);
+
+  // Load "Read More Like This" recommendations
+  useEffect(() => {
+    fetchSimilarArticles(article.id, article.category_id, article.source_id)
+      .then(setSimilarArticles)
+      .catch(() => {});
+  }, [article.id, article.category_id, article.source_id]);
 
   const handleLike = useCallback(async () => {
     setLikeLoading(true);
@@ -302,6 +313,44 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
 
+        {/* Read More Like This */}
+        {similarArticles.length > 0 ? (
+          <View style={styles.similarSection}>
+            <Text style={styles.similarTitle}>Read More Like This</Text>
+            <FlatList
+              data={similarArticles}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.similarList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.similarCard}
+                  onPress={() => navigation.replace('ArticleDetail', { article: item })}
+                  activeOpacity={0.85}
+                >
+                  {item.image_url ? (
+                    <Image
+                      source={{ uri: item.image_url }}
+                      style={styles.similarImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                  ) : (
+                    <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
+                  )}
+                  <Text style={styles.similarCardTitle} numberOfLines={3}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.similarCardSource} numberOfLines={1}>
+                    {item.source_name ?? item.sources?.name ?? ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        ) : null}
+
         {/* Comments Section */}
         <View style={styles.commentsSection}>
           <Text style={styles.commentsTitle}>
@@ -491,6 +540,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#e63946',
+  },
+  // Read More Like This
+  similarSection: {
+    marginTop: 28,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 20,
+  },
+  similarTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 14,
+  },
+  similarList: {
+    paddingRight: 16,
+  },
+  similarCard: {
+    width: 160,
+    marginRight: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  similarImage: {
+    width: '100%',
+    height: 100,
+  },
+  similarImagePlaceholder: {
+    backgroundColor: '#e8e8e8',
+  },
+  similarCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    lineHeight: 18,
+    padding: 8,
+    paddingBottom: 4,
+  },
+  similarCardSource: {
+    fontSize: 11,
+    color: '#888',
+    paddingHorizontal: 8,
+    paddingBottom: 8,
   },
   // Comments
   commentsSection: {

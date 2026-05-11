@@ -1,25 +1,100 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  Animated,
+  PanResponder,
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { NewsArticle } from '../types';
 
 interface Props {
   article: NewsArticle;
   onPress: (article: NewsArticle) => void;
+  /** Called when the user swipes left (bookmark action). */
+  onSwipeLeft?: (article: NewsArticle) => void;
+  /** Called when the user swipes right (share action). */
+  onSwipeRight?: (article: NewsArticle) => void;
 }
 
 const PLACEHOLDER_COLOR = '#e8e8e8';
+const SWIPE_THRESHOLD = 60;
 
-export default function ArticleCard({ article, onPress }: Props) {
+function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
   const likeCount = article.like_count ?? 0;
   const commentCount = article.comment_count ?? 0;
 
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Only capture gesture when horizontal movement is dominant
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8,
+      onPanResponderMove: (_, { dx }) => {
+        // Clamp so card doesn't fly too far off screen
+        const clamped = Math.max(-120, Math.min(120, dx));
+        translateX.setValue(clamped);
+      },
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx < -SWIPE_THRESHOLD && onSwipeLeft) {
+          Animated.timing(translateX, {
+            toValue: -300,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            onSwipeLeft(article);
+            Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          });
+        } else if (dx > SWIPE_THRESHOLD && onSwipeRight) {
+          Animated.timing(translateX, {
+            toValue: 300,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            onSwipeRight(article);
+            Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          });
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
+
+  const hasSwipe = !!(onSwipeLeft || onSwipeRight);
+
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => onPress(article)}
-      activeOpacity={0.85}
-    >
+    <View style={styles.swipeWrapper}>
+      {/* Action revealed on swipe-right (share) */}
+      {onSwipeRight ? (
+        <View style={[styles.actionBg, styles.actionShareBg]}>
+          <Text style={styles.actionText}>↗ Share</Text>
+        </View>
+      ) : null}
+      {/* Action revealed on swipe-left (bookmark) */}
+      {onSwipeLeft ? (
+        <View style={[styles.actionBg, styles.actionBookmarkBg, styles.actionRight]}>
+          <Text style={styles.actionText}>🔖 Save</Text>
+        </View>
+      ) : null}
+
+      <Animated.View
+        style={[{ transform: [{ translateX }] }]}
+        {...(hasSwipe ? panResponder.panHandlers : {})}
+      >
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onPress(article)}
+          activeOpacity={0.85}
+        >
       {/* Left: Image */}
       {article.image_url ? (
         <Image
@@ -56,9 +131,13 @@ export default function ArticleCard({ article, onPress }: Props) {
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 }
+
+export default React.memo(ArticleCard);
 
 const styles = StyleSheet.create({
   card: {
@@ -131,5 +210,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     fontWeight: '500',
+  },
+  swipeWrapper: {
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  actionBg: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  actionShareBg: {
+    left: 12,
+    backgroundColor: '#4caf50',
+  },
+  actionBookmarkBg: {
+    backgroundColor: '#e63946',
+  },
+  actionRight: {
+    right: 12,
+    left: undefined,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

@@ -5,7 +5,10 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  Share,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
 import CategoryFilter from '../components/CategoryFilter';
@@ -18,14 +21,17 @@ import {
   CATEGORY_FOR_YOU,
   CATEGORY_TRENDING,
 } from '../services/newsService';
+import { toggleBookmark } from '../services/bookmarkService';
 import { NewsArticle, Category } from '../types';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -36,6 +42,7 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  const flatListRef = useRef<FlatList<NewsArticle>>(null);
   // Prevents duplicate concurrent fetches within the same feed/page.
   const isFetchingRef = useRef(false);
   // Incremented whenever the category changes or a refresh is triggered so that
@@ -69,7 +76,12 @@ export default function HomeScreen() {
       if (fetchGenerationRef.current !== generation) return;
 
       setHasMore(moreAvailable);
-      setArticles(prev => append ? [...prev, ...data] : data);
+      setArticles(prev => {
+        if (!append) return data;
+        const existingIds = new Set(prev.map(a => a.id));
+        const fresh = data.filter(a => !existingIds.has(a.id));
+        return [...prev, ...fresh];
+      });
     } finally {
       // Only release the lock when it still belongs to this fetch.
       if (fetchGenerationRef.current === generation) {
@@ -98,6 +110,10 @@ export default function HomeScreen() {
     setPage(1);
     setHasMore(true);
     setArticles([]);
+
+    // Scroll to top when switching categories
+    flatListRef.current?.scrollToOffset({ animated: false, offset: 0 });
+
     loadArticles(selectedCategory, 1, false).finally(() => setLoading(false));
   }, [selectedCategory, loadArticles]);
 
@@ -130,6 +146,37 @@ export default function HomeScreen() {
     navigation.navigate('ArticleDetail', { article });
   };
 
+  const handleSwipeLeft = useCallback(async (article: NewsArticle) => {
+    if (!user) {
+      Alert.alert(
+        'Sign in required',
+        'Please sign in to bookmark articles.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+    try {
+      await toggleBookmark(article.id, user.id);
+    } catch (err) {
+      console.warn('[HomeScreen] Bookmark swipe failed:', err);
+    }
+  }, [user, navigation]);
+
+  const handleSwipeRight = useCallback(async (article: NewsArticle) => {
+    try {
+      await Share.share({
+        title: article.title,
+        message: `${article.title}\n${article.url}`,
+        url: article.url,
+      });
+    } catch (err) {
+      console.warn('[HomeScreen] Share swipe failed:', err);
+    }
+  }, []);
+
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -141,7 +188,7 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <CategoryFilter
           categories={categories}
           selectedId={selectedCategory}
@@ -155,12 +202,12 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           scrollEnabled={false}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <CategoryFilter
         categories={categories}
         selectedId={selectedCategory}
@@ -168,10 +215,16 @@ export default function HomeScreen() {
       />
 
       <FlatList
+        ref={flatListRef}
         data={articles}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ArticleCard article={item} onPress={openArticle} />
+          <ArticleCard
+            article={item}
+            onPress={openArticle}
+            onSwipeLeft={handleSwipeLeft}
+            onSwipeRight={handleSwipeRight}
+          />
         )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -181,8 +234,12 @@ export default function HomeScreen() {
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

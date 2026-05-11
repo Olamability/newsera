@@ -146,7 +146,7 @@ function AppNavigator() {
           <Stack.Screen
             name="ArticleDetail"
             component={ArticleDetailScreen}
-            options={{ title: 'Article' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="CategoryDetail"

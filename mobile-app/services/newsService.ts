@@ -6,6 +6,7 @@ import { ArticleRow, mapArticle } from './articleUtils';
 const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
+const RECOMMENDATION_CANDIDATE_MULTIPLIER = 3;
 
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 
@@ -176,7 +177,7 @@ export async function fetchSimilarArticles(
     const trendingIds = (trendingRows ?? [])
       .map((row: { article_id?: string }) => row.article_id)
       .filter((id): id is string => !!id && !seenIds.has(id))
-      .slice(0, needed * 3);
+      .slice(0, needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
 
     if (trendingIds.length > 0) {
       const { data } = await supabase
@@ -202,7 +203,7 @@ export async function fetchSimilarArticles(
         .select(ARTICLE_SELECT)
         .neq('id', articleId)
         .order('published_at', { ascending: false })
-        .limit(needed * 3);
+        .limit(needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
 
       for (const row of (data ?? []) as ArticleRow[]) {
         if (collected.length >= limit) break;

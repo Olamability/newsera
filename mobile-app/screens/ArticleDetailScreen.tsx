@@ -30,11 +30,12 @@ import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent } from '../services/shareService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
+const MAX_PREVIEW_LENGTH = 1400;
 
 const stripHtml = (value: string): string =>
   value
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
@@ -48,7 +49,9 @@ const buildArticlePreview = (snippet: string | null, content: string | null): st
   const plainText = stripHtml(content);
   if (!plainText) return null;
 
-  return plainText.length > 1400 ? `${plainText.slice(0, 1400).trimEnd()}…` : plainText;
+  return plainText.length > MAX_PREVIEW_LENGTH
+    ? `${plainText.slice(0, MAX_PREVIEW_LENGTH).trimEnd()}…`
+    : plainText;
 };
 
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
@@ -266,7 +269,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           ) : (
             <View style={styles.sourceLogoPlaceholder}>
               <Text style={styles.sourceLogoPlaceholderText}>
-                {sourceName.charAt(0).toUpperCase()}
+                {(sourceName || 'U').charAt(0).toUpperCase()}
               </Text>
             </View>
           )}

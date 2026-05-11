@@ -88,15 +88,44 @@ const buildArticlePreview = (snippet: string | null, content: string | null): st
     : plainText;
 };
 
+const formatPublishedTime = (publishedAt: string | null | undefined): string | null => {
+  if (!publishedAt) return null;
+
+  const publishedDate = new Date(publishedAt);
+  if (Number.isNaN(publishedDate.getTime())) return null;
+
+  const diffMs = Math.max(0, Date.now() - publishedDate.getTime());
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  if (diffMinutes < 60) {
+    const mins = Math.max(1, diffMinutes);
+    return `Published ${mins} min ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `Published ${diffHours} hr ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays <= 7) {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+
+  return publishedDate.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
   const sourceName = resolveArticleSourceName(article);
   const sourceLogo = article.sources?.logo_url ?? null;
-  const sourceWebsite = article.sources?.website_url ?? null;
-  const sourceVerified = !!article.sources?.is_verified;
-  const categoryName = article.category_name ?? article.categories?.name ?? null;
   const previewText = useMemo(() => buildArticlePreview(article.snippet, article.content), [article.content, article.snippet]);
+  const publishedTimeText = useMemo(() => formatPublishedTime(article.published_at), [article.published_at]);
 
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -222,14 +251,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [article]);
 
-  const handleOpenPublisherWebsite = useCallback(async () => {
-    if (!sourceWebsite) return;
-    const supported = await Linking.canOpenURL(sourceWebsite);
-    if (supported) {
-      await Linking.openURL(sourceWebsite);
-    }
-  }, [sourceWebsite]);
-
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
@@ -281,224 +302,190 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {article.image_url ? (
-        <Image
-          source={{ uri: article.image_url }}
-          style={styles.image}
-          contentFit="cover"
-          transition={300}
-        />
-      ) : null}
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <View style={styles.body}>
+            <Text style={styles.title}>{article.title}</Text>
 
-      <View style={styles.body}>
-        <View style={styles.publisherCard}>
-          {sourceLogo ? (
-            <Image
-              source={{ uri: sourceLogo }}
-              style={styles.sourceLogo}
-              contentFit="contain"
-              transition={200}
-            />
-          ) : (
-            <View style={styles.sourceLogoPlaceholder}>
-              <Text style={styles.sourceLogoPlaceholderText}>
-                {sourceName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={styles.publisherTextWrap}>
-            <View style={styles.publisherNameRow}>
-              <Text style={styles.source}>{sourceName}</Text>
-              {sourceVerified ? <Text style={styles.verifiedBadge}>✓ Verified</Text> : null}
-            </View>
-            {sourceWebsite ? (
-              <TouchableOpacity onPress={handleOpenPublisherWebsite} activeOpacity={0.7}>
-                <Text style={styles.sourceWebsite} numberOfLines={1}>
-                  {sourceWebsite}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-
-        {categoryName ? (
-          <TouchableOpacity
-            style={styles.categoryBadge}
-            onPress={() => {
-              const catId = article.category_id ?? article.categories?.id;
-              if (catId) {
-                navigation.navigate('CategoryDetail', {
-                  categoryId: catId,
-                  categoryName,
-                });
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.category}>{categoryName}</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <Text style={styles.title}>{article.title}</Text>
-
-        {article.published_at ? (
-          <Text style={styles.date}>
-            Published{' '}
-            {new Date(article.published_at).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </Text>
-        ) : null}
-
-        {previewText ? (
-          <View style={styles.previewBlock}>
-            <Text style={styles.previewLabel}>Preview</Text>
-            <Text style={styles.snippet}>{previewText}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleReadFull}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.buttonText}>Read on Source Website</Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={[
-                styles.bookmarkBtn,
-                bookmarked && styles.bookmarkBtnActive,
-                bookmarkLoading && styles.bookmarkBtnDisabled,
-              ]}
-              onPress={handleBookmark}
-              disabled={bookmarkLoading}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
-                {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.likeBtn,
-                liked && styles.likeBtnActive,
-                likeLoading && styles.likeBtnDisabled,
-              ]}
-              onPress={handleLike}
-              disabled={likeLoading}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.likeText, liked && styles.likeTextActive]}>
-                {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.shareBtn}
-              onPress={handleShare}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.shareText}>↗ Share</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Read More Like This */}
-        {similarArticles.length > 0 ? (
-          <View style={styles.similarSection}>
-            <Text style={styles.similarTitle}>More Like This</Text>
-            <FlatList
-              data={similarArticles}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.similarList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.similarCard}
-                  onPress={() => navigation.replace('ArticleDetail', { article: item })}
-                  activeOpacity={0.85}
-                >
-                  {item.image_url ? (
-                    <Image
-                      source={{ uri: item.image_url }}
-                      style={styles.similarImage}
-                      contentFit="cover"
-                      transition={200}
-                    />
-                  ) : (
-                    <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
-                  )}
-                  <Text style={styles.similarCardTitle} numberOfLines={3}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.similarCardSource} numberOfLines={1}>
-                    {item.source_name ?? item.sources?.name ?? ''}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        ) : null}
-
-        {/* Comments Section */}
-        <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>
-            Comments{comments.length > 0 ? ` (${comments.length})` : ''}
-          </Text>
-
-          {comments.length === 0 ? (
-            <Text style={styles.noComments}>No comments yet. Be the first!</Text>
-          ) : (
-            comments.map((comment) => (
-              <View key={comment.id} style={styles.commentItem}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.commentUser}>Guest</Text>
-                  <Text style={styles.commentDate}>
-                    {new Date(comment.created_at).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+            <View style={styles.sourceRow}>
+              {sourceLogo ? (
+                <Image
+                  source={{ uri: sourceLogo }}
+                  style={styles.sourceLogo}
+                  contentFit="contain"
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.sourceLogoPlaceholder}>
+                  <Text style={styles.sourceLogoPlaceholderText}>
+                    {sourceName.charAt(0).toUpperCase()}
                   </Text>
                 </View>
-                <Text style={styles.commentContent}>{comment.content}</Text>
+              )}
+              <View style={styles.sourceMetaWrap}>
+                <View style={styles.sourceMetaRow}>
+                  <Text style={styles.source}>{sourceName}</Text>
+                  {publishedTimeText ? (
+                    <>
+                      <Text style={styles.sourceMetaDot}>•</Text>
+                      <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
+                    </>
+                  ) : null}
+                </View>
               </View>
-            ))
-          )}
+            </View>
 
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Write a comment…"
-              placeholderTextColor="#aaa"
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-              maxLength={500}
-              editable={!commentSubmitting}
-            />
-            <TouchableOpacity
-              style={[
-                styles.commentSubmitBtn,
-                (!commentText.trim() || commentSubmitting) && styles.commentSubmitBtnDisabled,
-              ]}
-              onPress={handleAddComment}
-              disabled={!commentText.trim() || commentSubmitting}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.commentSubmitText}>Post</Text>
-            </TouchableOpacity>
+            {article.image_url ? (
+              <Image
+                source={{ uri: article.image_url }}
+                style={styles.featuredImage}
+                contentFit="cover"
+                transition={300}
+              />
+            ) : null}
+
+            {previewText ? (
+              <Text style={styles.articleContent}>{previewText}</Text>
+            ) : null}
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={handleReadFull}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.buttonText}>Read on Source Website</Text>
+              </TouchableOpacity>
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.bookmarkBtn,
+                    bookmarked && styles.bookmarkBtnActive,
+                    bookmarkLoading && styles.bookmarkBtnDisabled,
+                  ]}
+                  onPress={handleBookmark}
+                  disabled={bookmarkLoading}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
+                    {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.likeBtn,
+                    liked && styles.likeBtnActive,
+                    likeLoading && styles.likeBtnDisabled,
+                  ]}
+                  onPress={handleLike}
+                  disabled={likeLoading}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.likeText, liked && styles.likeTextActive]}>
+                    {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.shareBtn}
+                  onPress={handleShare}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.shareText}>↗ Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Read More Like This */}
+            {similarArticles.length > 0 ? (
+              <View style={styles.similarSection}>
+                <Text style={styles.similarTitle}>Read More Like This</Text>
+                <FlatList
+                  data={similarArticles}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.similarList}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.similarCard}
+                      onPress={() => navigation.replace('ArticleDetail', { article: item })}
+                      activeOpacity={0.85}
+                    >
+                      {item.image_url ? (
+                        <Image
+                          source={{ uri: item.image_url }}
+                          style={styles.similarImage}
+                          contentFit="cover"
+                          transition={200}
+                        />
+                      ) : (
+                        <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
+                      )}
+                      <Text style={styles.similarCardTitle} numberOfLines={3}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.similarCardSource} numberOfLines={1}>
+                        {item.source_name ?? item.sources?.name ?? ''}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            ) : null}
+
+            {/* Comments Section */}
+            <View style={styles.commentsSection}>
+              <Text style={styles.commentsTitle}>
+                Comments{comments.length > 0 ? ` (${comments.length})` : ''}
+              </Text>
+
+              {comments.length === 0 ? (
+                <Text style={styles.noComments}>No comments yet. Be the first!</Text>
+              ) : (
+                comments.map((comment) => (
+                  <View key={comment.id} style={styles.commentItem}>
+                    <View style={styles.commentHeader}>
+                      <Text style={styles.commentUser}>Guest</Text>
+                      <Text style={styles.commentDate}>
+                        {new Date(comment.created_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={styles.commentContent}>{comment.content}</Text>
+                  </View>
+                ))
+              )}
+
+              <View style={styles.commentInputRow}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Write a comment…"
+                  placeholderTextColor="#aaa"
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                  maxLength={500}
+                  editable={!commentSubmitting}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.commentSubmitBtn,
+                    (!commentText.trim() || commentSubmitting) && styles.commentSubmitBtnDisabled,
+                  ]}
+                  onPress={handleAddComment}
+                  disabled={!commentText.trim() || commentSubmitting}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.commentSubmitText}>Post</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </View>
-    </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -519,113 +506,77 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
   },
-  image: {
-    width: '100%',
-    height: 240,
-  },
   body: {
     padding: 16,
   },
-  publisherCard: {
+  title: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    lineHeight: 36,
+    marginBottom: 12,
+  },
+  sourceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sourceLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#f2f2f2',
   },
   sourceLogoPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f2f2f2',
   },
   sourceLogoPlaceholderText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     fontWeight: '700',
   },
-  publisherTextWrap: {
+  sourceMetaWrap: {
     flex: 1,
   },
-  publisherNameRow: {
+  sourceMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 2,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff5f6',
-    borderColor: '#ffd7dc',
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginBottom: 8,
-  },
-  category: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#e63946',
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    lineHeight: 30,
-    marginBottom: 12,
+    flexWrap: 'wrap',
   },
   source: {
-    fontSize: 14,
-    color: '#222',
+    fontSize: 15,
+    color: '#303030',
     fontWeight: '700',
     flexShrink: 1,
   },
-  verifiedBadge: {
-    fontSize: 11,
-    color: '#fff',
-    backgroundColor: '#0b8f3c',
-    fontWeight: '700',
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  sourceWebsite: {
-    fontSize: 12,
-    color: '#5c6f90',
-  },
-  date: {
+  sourceMetaDot: {
     fontSize: 13,
-    color: '#888',
-    marginBottom: 14,
+    color: '#909090',
   },
-  previewBlock: {
-    backgroundColor: '#fafafa',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    borderRadius: 12,
-    padding: 12,
+  sourceMetaText: {
+    fontSize: 13,
+    color: '#7a7a7a',
+  },
+  featuredImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 16,
+    backgroundColor: '#f1f1f1',
+    marginTop: 4,
     marginBottom: 24,
   },
-  previewLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    color: '#888',
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  snippet: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 24,
+  articleContent: {
+    fontSize: 17,
+    color: '#242424',
+    lineHeight: 30,
+    marginBottom: 24,
   },
   actions: {
     gap: 12,

@@ -7,6 +7,8 @@ const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 const RECOMMENDATION_CANDIDATE_MULTIPLIER = 3;
+const RECOMMENDATION_TRENDING_FETCH_MULTIPLIER = 6;
+type TrendingClickRow = { article_id?: string | null };
 
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 
@@ -172,10 +174,11 @@ export async function fetchSimilarArticles(
       .from('article_click_counts')
       .select('article_id')
       .order('click_count', { ascending: false })
-      .limit(needed * 6);
+      // Pull a wider pool before de-duplication against current recommendations.
+      .limit(needed * RECOMMENDATION_TRENDING_FETCH_MULTIPLIER);
 
     const trendingIds = (trendingRows ?? [])
-      .map((row: { article_id?: string }) => row.article_id)
+      .map((row: TrendingClickRow) => row.article_id)
       .filter((id): id is string => !!id && !seenIds.has(id))
       .slice(0, needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
 

@@ -27,19 +27,53 @@ import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
 import { fetchComments, addComment, ArticleComment } from '../services/commentService';
 import { fetchSimilarArticles } from '../services/newsService';
 import { useAuth } from '../context/AuthContext';
-import { buildArticleShareContent } from '../services/shareService';
+import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
-const MAX_PREVIEW_LENGTH = 1400;
+const MAX_PREVIEW_CHARS = 1400;
+const MAX_HTML_STRIP_ITERATIONS = 1000;
 
-const stripHtml = (value: string): string =>
-  value
-    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
+const stripTagBlocks = (value: string, tagName: string): string => {
+  let current = value;
+  const openTagPattern = new RegExp(`<${tagName}\\b`, 'i');
+  const closeTagToken = `</${tagName}`;
+  // Defensive cap to avoid pathological loops with malformed HTML.
+  let maxIterations = MAX_HTML_STRIP_ITERATIONS;
+
+  while (maxIterations-- > 0) {
+    const openIndex = current.search(openTagPattern);
+    if (openIndex === -1) break;
+
+    const closeIndexRelative = current.slice(openIndex).toLowerCase().indexOf(closeTagToken);
+    if (closeIndexRelative === -1) {
+      current = `${current.slice(0, openIndex)} `;
+      break;
+    }
+
+    const closeStart = openIndex + closeIndexRelative;
+    const closeEnd = current.indexOf('>', closeStart);
+    if (closeEnd === -1) {
+      current = `${current.slice(0, openIndex)} `;
+      break;
+    }
+
+    current = `${current.slice(0, openIndex)} ${current.slice(closeEnd + 1)}`;
+  }
+
+  return current;
+};
+
+const stripHtml = (value: string): string => {
+  const withoutStyles = stripTagBlocks(value, 'style');
+  const withoutScripts = stripTagBlocks(withoutStyles, 'script');
+
+  // Output is rendered in a plain Text component (never injected as HTML).
+  return withoutScripts
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+};
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const cleanedSnippet = snippet?.trim();
@@ -49,15 +83,15 @@ const buildArticlePreview = (snippet: string | null, content: string | null): st
   const plainText = stripHtml(content);
   if (!plainText) return null;
 
-  return plainText.length > MAX_PREVIEW_LENGTH
-    ? `${plainText.slice(0, MAX_PREVIEW_LENGTH).trimEnd()}…`
+  return plainText.length > MAX_PREVIEW_CHARS
+    ? `${plainText.slice(0, MAX_PREVIEW_CHARS).trimEnd()}…`
     : plainText;
 };
 
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
-  const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
+  const sourceName = resolveArticleSourceName(article);
   const sourceLogo = article.sources?.logo_url ?? null;
   const sourceWebsite = article.sources?.website_url ?? null;
   const sourceVerified = !!article.sources?.is_verified;
@@ -269,7 +303,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           ) : (
             <View style={styles.sourceLogoPlaceholder}>
               <Text style={styles.sourceLogoPlaceholderText}>
-                {(sourceName || 'U').charAt(0).toUpperCase()}
+                {sourceName.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
@@ -293,11 +327,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             style={styles.categoryBadge}
             onPress={() => {
               const catId = article.category_id ?? article.categories?.id;
-              const catName = categoryName ?? '';
               if (catId) {
                 navigation.navigate('CategoryDetail', {
                   categoryId: catId,
-                  categoryName: catName,
+                  categoryName,
                 });
               }
             }}

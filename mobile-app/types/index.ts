@@ -9,6 +9,8 @@ export interface Source {
   name: string;
   website_url: string | null;
   logo_url: string | null;
+  is_verified?: boolean | null;
+  promotion_tier?: 'organic' | 'promoted' | null;
 }
 
 export interface NewsArticle {
@@ -28,6 +30,11 @@ export interface NewsArticle {
   category_name?: string | null;
   like_count?: number | null;
   comment_count?: number | null;
+  is_sponsored?: boolean | null;
+  sponsor_name?: string | null;
+  campaign_id?: string | null;
+  distribution_channel?: 'organic' | 'promoted' | 'sponsored' | null;
+  analytics_label?: string | null;
 }
 
 export interface Bookmark {

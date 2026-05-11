@@ -6,6 +6,9 @@ import { ArticleRow, mapArticle } from './articleUtils';
 const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
+const RECOMMENDATION_CANDIDATE_MULTIPLIER = 3;
+const RECOMMENDATION_TRENDING_FETCH_MULTIPLIER = 6;
+type TrendingClickRow = { article_id?: string | null };
 
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 
@@ -167,19 +170,51 @@ export async function fetchSimilarArticles(
   // 3. Latest trending fallback
   if (collected.length < limit) {
     const needed = limit - collected.length;
-    const { data } = await supabase
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .neq('id', articleId)
-      .order('published_at', { ascending: false })
-      .limit(needed * 3);
+    const { data: trendingRows } = await supabase
+      .from('article_click_counts')
+      .select('article_id')
+      .order('click_count', { ascending: false })
+      // Pull a wider pool before de-duplication against current recommendations.
+      .limit(needed * RECOMMENDATION_TRENDING_FETCH_MULTIPLIER);
 
-    for (const row of (data ?? []) as ArticleRow[]) {
-      if (collected.length >= limit) break;
-      const mapped = mapArticle(row);
-      if (!seenIds.has(mapped.id)) {
-        seenIds.add(mapped.id);
-        collected.push(mapped);
+    const trendingIds = (trendingRows ?? [])
+      .map((row: TrendingClickRow) => row.article_id)
+      .filter((id): id is string => !!id && !seenIds.has(id))
+      .slice(0, needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
+
+    if (trendingIds.length > 0) {
+      const { data } = await supabase
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .in('id', trendingIds)
+        .order('published_at', { ascending: false });
+
+      for (const row of (data ?? []) as ArticleRow[]) {
+        if (collected.length >= limit) break;
+        const mapped = mapArticle(row);
+        if (!seenIds.has(mapped.id)) {
+          seenIds.add(mapped.id);
+          collected.push(mapped);
+        }
+      }
+    }
+
+    // Final fallback: latest articles if trending signal is unavailable.
+    if (collected.length < limit) {
+      const { data } = await supabase
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .neq('id', articleId)
+        .order('published_at', { ascending: false })
+        .limit(needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
+
+      for (const row of (data ?? []) as ArticleRow[]) {
+        if (collected.length >= limit) break;
+        const mapped = mapArticle(row);
+        if (!seenIds.has(mapped.id)) {
+          seenIds.add(mapped.id);
+          collected.push(mapped);
+        }
       }
     }
   }

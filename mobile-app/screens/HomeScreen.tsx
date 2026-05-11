@@ -75,12 +75,20 @@ export default function HomeScreen() {
       // Discard stale results if the category changed or a refresh fired mid-flight.
       if (fetchGenerationRef.current !== generation) return;
 
+      console.log('Category:', categoryId);
+      console.log('Page:', pageNum);
+      console.log('Fetched:', data.length);
+      console.log('HasMore:', moreAvailable);
+
       setHasMore(moreAvailable);
       setArticles(prev => {
         if (!append) return data;
-        const existingIds = new Set(prev.map(a => a.id));
-        const fresh = data.filter(a => !existingIds.has(a.id));
-        return [...prev, ...fresh];
+        const merged = [...prev, ...data];
+        const unique = merged.filter(
+          (item, index, self) =>
+            index === self.findIndex(t => t.id === item.id)
+        );
+        return unique;
       });
     } finally {
       // Only release the lock when it still belongs to this fetch.
@@ -128,7 +136,7 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const onEndReached = useCallback(async () => {
+  const handleLoadMore = useCallback(async () => {
     // Guard: skip if already loading or no more pages
     if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
 
@@ -229,7 +237,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        onEndReached={onEndReached}
+        onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingBottom: 40 }}

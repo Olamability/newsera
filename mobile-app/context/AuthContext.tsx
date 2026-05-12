@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 
 interface AuthContextValue {
@@ -26,19 +26,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load persisted session from AsyncStorage via the supabase client
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
-    });
+    // Restore persisted session from AsyncStorage. Always resolve loading so
+    // the rest of the app is never blocked by an auth failure.
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      })
+      .catch((err) => {
+        console.warn('[Auth] Failed to restore session:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
 
     // Subscribe to auth state changes (login, logout, token refresh)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, updatedSession) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, updatedSession) => {
       setSession(updatedSession);
       setUser(updatedSession?.user ?? null);
+
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('[Auth] Token refreshed successfully.');
+      } else if (event === 'SIGNED_OUT') {
+        // Covers both explicit sign-out and expired refresh tokens.
+        // Public content remains fully functional via the anon key.
+        console.log('[Auth] Session ended — public browsing continues.');
+      }
     });
 
     return () => subscription.unsubscribe();

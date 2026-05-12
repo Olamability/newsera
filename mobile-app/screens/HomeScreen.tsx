@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Share,
   Alert,
+  Text,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ArticleCard from '../components/ArticleCard';
@@ -45,6 +47,7 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fetchError, setFetchError] = useState(false);
 
   const flatListRef = useRef<FlatList<NewsArticle>>(null);
   // Prevents duplicate concurrent fetches within the same feed/page.
@@ -79,11 +82,7 @@ export default function HomeScreen() {
       // Discard stale results if the category changed or a refresh fired mid-flight.
       if (fetchGenerationRef.current !== generation) return;
 
-      console.log('Category:', categoryId);
-      console.log('Page:', pageNum);
-      console.log('Fetched:', data.length);
-      console.log('HasMore:', moreAvailable);
-
+      setFetchError(false);
       setHasMore(moreAvailable);
       setArticles(prev => {
         if (!append) return data;
@@ -94,6 +93,13 @@ export default function HomeScreen() {
         );
         return unique;
       });
+    } catch (err) {
+      if (fetchGenerationRef.current !== generation) return;
+      console.warn('[HomeScreen] Failed to load articles:', err);
+      if (!append) {
+        setFetchError(true);
+        setArticles([]);
+      }
     } finally {
       // Only release the lock when it still belongs to this fetch.
       if (fetchGenerationRef.current === generation) {
@@ -103,31 +109,40 @@ export default function HomeScreen() {
   }, []);
 
   const loadCategories = useCallback(async () => {
-    const c = await fetchCategories();
-    setCategories(c);
+    try {
+      const c = await fetchCategories();
+      setCategories(c);
+    } catch (err) {
+      // fetchCategories already returns a fallback, but guard defensively.
+      console.warn('[HomeScreen] Unexpected error loading categories:', err);
+    }
   }, []);
 
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
 
-  // Reset and reload when category changes
-  useEffect(() => {
-    // Invalidate any in-flight fetch from the previous feed and release the lock
-    // so the fresh fetch below is never blocked.
+  // Shared helper: invalidate any in-flight fetch, reset feed state, and kick
+  // off a fresh first-page load. Used by both the category-change effect and
+  // the manual retry handler so the logic stays consistent.
+  const resetAndLoad = useCallback((categoryId: string) => {
     fetchGenerationRef.current += 1;
     isFetchingRef.current = false;
 
     setLoading(true);
+    setFetchError(false);
     setPage(1);
     setHasMore(true);
     setArticles([]);
-
-    // Scroll to top when switching categories
     flatListRef.current?.scrollToOffset({ animated: false, offset: 0 });
 
-    loadArticles(selectedCategory, 1, false).finally(() => setLoading(false));
-  }, [selectedCategory, loadArticles]);
+    loadArticles(categoryId, 1, false).finally(() => setLoading(false));
+  }, [loadArticles]);
+
+  // Reset and reload when category changes
+  useEffect(() => {
+    resetAndLoad(selectedCategory);
+  }, [selectedCategory, resetAndLoad]);
 
   const onRefresh = async () => {
     fetchGenerationRef.current += 1;
@@ -136,8 +151,11 @@ export default function HomeScreen() {
     setRefreshing(true);
     setPage(1);
     setHasMore(true);
-    await loadArticles(selectedCategory, 1, false);
-    setRefreshing(false);
+    try {
+      await loadArticles(selectedCategory, 1, false);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleLoadMore = useCallback(async () => {
@@ -192,6 +210,10 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleRetry = useCallback(() => {
+    resetAndLoad(selectedCategory);
+  }, [selectedCategory, resetAndLoad]);
+
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -218,6 +240,33 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           scrollEnabled={false}
         />
+      </SafeAreaView>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <HomeHeader searchValue={searchQuery} onSearchChange={setSearchQuery} />
+        <CategoryFilter
+          categories={categories}
+          selectedId={selectedCategory}
+          onSelect={setSelectedCategory}
+        />
+        <View style={styles.errorContainer} accessibilityRole="alert">
+          <Text style={styles.errorIcon}>📡</Text>
+          <Text style={styles.errorTitle}>Couldn't load articles</Text>
+          <Text style={styles.errorSubtitle}>Check your connection and try again.</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={handleRetry}
+            activeOpacity={0.8}
+            accessibilityLabel="Retry loading articles"
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -269,5 +318,39 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#e63946',
+  },
+  retryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

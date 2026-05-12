@@ -63,19 +63,26 @@ const VIRTUAL_CATEGORIES: Category[] = [
 
 /**
  * CATEGORIES
+ * Never throws — returns at minimum the virtual categories so the UI
+ * always has something to render even when the network or auth is broken.
  */
 export async function fetchCategories(): Promise<Category[]> {
-  const { data, error } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name');
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name');
 
-  console.log('📦 categories:', data);
-  console.log('❌ categories error:', error);
+    if (error) {
+      console.warn('[fetchCategories] Failed to load categories:', error.message);
+      return VIRTUAL_CATEGORIES;
+    }
 
-  if (error) throw error;
-
-  return [...VIRTUAL_CATEGORIES, ...(data ?? [])];
+    return [...VIRTUAL_CATEGORIES, ...(data ?? [])];
+  } catch (err) {
+    console.warn('[fetchCategories] Unexpected error:', err);
+    return VIRTUAL_CATEGORIES;
+  }
 }
 
 /**

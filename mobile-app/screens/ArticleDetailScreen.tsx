@@ -239,12 +239,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       // Refetch the authoritative count to stay in sync across devices
       const count = await getLikeCount(article.id);
       setLikeCount(count);
-    } catch (err) {
-      if (err instanceof Error && err.message === 'AUTH_REQUIRED') {
-        Alert.alert('Sign in required', 'You need to be logged in to like.');
-      } else {
-        Alert.alert('Error', 'Failed to update like. Please try again.');
-      }
+    } catch {
+      Alert.alert('Error', 'Failed to update like. Please try again.');
     } finally {
       setLikeLoading(false);
     }
@@ -265,12 +261,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setCommentText('');
       const updated = await fetchComments(article.id);
       setComments(updated);
-    } catch (err) {
-      if (err instanceof Error && err.message === 'AUTH_REQUIRED') {
-        Alert.alert('Sign in required', 'You need to be logged in to comment.');
-      } else {
-        Alert.alert('Error', 'Failed to post comment. Please try again.');
-      }
+    } catch {
+      Alert.alert('Error', 'Failed to post comment. Please try again.');
     } finally {
       setCommentSubmitting(false);
     }

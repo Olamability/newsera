@@ -45,7 +45,6 @@ export async function addComment(
       article_id: articleId,
       user_id: user.id,
       content,
-      created_at: new Date().toISOString(),
     });
 
   if (error) {

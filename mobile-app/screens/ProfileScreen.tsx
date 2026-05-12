@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -16,11 +14,10 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList, MainTabParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
-
-const SETTINGS_KEY = 'newsera_settings';
+import { useTheme } from '../context/ThemeContext';
+import { openStoreReview } from '../services/rateUsService';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Me'>,
@@ -30,44 +27,8 @@ type Nav = CompositeNavigationProp<
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user, signOut } = useAuth();
+  const { themeMode, setThemeMode } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-
-  // Load persisted dark mode state
-  useEffect(() => {
-    AsyncStorage.getItem(SETTINGS_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        try {
-          const parsed = JSON.parse(raw);
-          setDarkMode(parsed.darkMode === true);
-        } catch {
-          // corrupted data — ignore and keep default
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const toggleDarkMode = useCallback(async (value: boolean) => {
-    setDarkMode(value);
-    try {
-      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-      let current: Record<string, unknown> = {};
-      if (raw) {
-        try {
-          current = JSON.parse(raw);
-        } catch {
-          // corrupted — start fresh
-        }
-      }
-      await AsyncStorage.setItem(
-        SETTINGS_KEY,
-        JSON.stringify({ ...current, darkMode: value })
-      );
-    } catch {
-      // non-fatal
-    }
-  }, []);
 
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -92,20 +53,22 @@ const ProfileScreen: React.FC = () => {
   };
 
   const handleRateUs = useCallback(async () => {
-    const url =
-      Platform.OS === 'android'
-        ? 'market://details?id=com.newsera.app'
-        : 'https://apps.apple.com/app/newsera';
-    const supported = await Linking.canOpenURL(url).catch(() => false);
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert('Rate Us', 'Thank you for your support! ⭐');
-    }
+    await openStoreReview();
   }, []);
 
   const ArrowIcon = () => (
     <Ionicons name="chevron-forward" size={18} color="#ccc" />
+  );
+
+  // Shared dark mode switch — shows toggle; tapping toggles between dark and light
+  // (system mode is preserved when toggling off from system-auto-dark)
+  const darkModeSwitch = (
+    <Switch
+      value={themeMode === 'dark'}
+      onValueChange={(v) => setThemeMode(v ? 'dark' : (themeMode === 'system' ? 'system' : 'light'))}
+      trackColor={{ false: '#ccc', true: '#e63946' }}
+      thumbColor="#fff"
+    />
   );
 
   // ─── Section Renderer ─────────────────────────────────────────────────────
@@ -156,14 +119,7 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.section}>
           {renderMenuItem('grid-outline', 'Widget', () => navigation.navigate('Widget'))}
           {renderMenuItem('globe-outline', 'Country & Language', () => navigation.navigate('CountryLanguage'))}
-          {renderMenuItem('moon-outline', 'Dark Mode', () => {}, (
-            <Switch
-              value={darkMode}
-              onValueChange={toggleDarkMode}
-              trackColor={{ false: '#ccc', true: '#e63946' }}
-              thumbColor="#fff"
-            />
-          ), true)}
+          {renderMenuItem('moon-outline', 'Dark Mode', () => {}, darkModeSwitch, true)}
         </View>
 
         <Text style={styles.sectionHeader}>SUPPORT</Text>
@@ -214,14 +170,7 @@ const ProfileScreen: React.FC = () => {
         {renderMenuItem('globe-outline', 'Country & Language', () => navigation.navigate('CountryLanguage'))}
         {renderMenuItem('settings-outline', 'App Settings', () => navigation.navigate('Settings'))}
         {renderMenuItem('ban-outline', 'Blocked Users', () => navigation.navigate('BlockedUsers'))}
-        {renderMenuItem('moon-outline', 'Dark Mode', () => {}, (
-          <Switch
-            value={darkMode}
-            onValueChange={toggleDarkMode}
-            trackColor={{ false: '#ccc', true: '#e63946' }}
-            thumbColor="#fff"
-          />
-        ), true)}
+        {renderMenuItem('moon-outline', 'Dark Mode', () => {}, darkModeSwitch, true)}
       </View>
 
       {/* Support */}

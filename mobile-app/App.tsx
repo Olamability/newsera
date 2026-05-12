@@ -18,11 +18,20 @@ import BookmarksScreen from './screens/BookmarksScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import CategoryDetailScreen from './screens/CategoryDetailScreen';
 import RecentlyViewedScreen from './screens/RecentlyViewedScreen';
-import PlaceholderScreen from './screens/PlaceholderScreen';
 import TrendingScreen from './screens/TrendingScreen';
+import CountryLanguageScreen from './screens/CountryLanguageScreen';
+import FeedbackScreen from './screens/FeedbackScreen';
+import ReadLaterScreen from './screens/ReadLaterScreen';
+import OfflineReadingScreen from './screens/OfflineReadingScreen';
+import WidgetScreen from './screens/WidgetScreen';
+import InboxScreen from './screens/InboxScreen';
+import RewardsScreen from './screens/RewardsScreen';
+import BlockedUsersScreen from './screens/BlockedUsersScreen';
 import { RootStackParamList, MainTabParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { registerForPushNotificationsAsync } from './services/notificationService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -33,6 +42,8 @@ const INACTIVE_COLOR = '#9e9e9e';
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
   const tabBarPaddingBottom = Math.max(insets.bottom, 10);
   const tabBarHeight = 56 + tabBarPaddingBottom;
 
@@ -55,9 +66,9 @@ function MainTabs() {
         tabBarActiveTintColor: ACTIVE_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: c.surface,
           borderTopWidth: 1,
-          borderTopColor: '#efefef',
+          borderTopColor: c.border,
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 4,
           height: tabBarHeight,
@@ -97,6 +108,8 @@ function MainTabs() {
 }
 
 function AppNavigator() {
+  const { isDark } = useTheme();
+
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
@@ -178,50 +191,50 @@ function AppNavigator() {
             options={{ title: 'Recently Viewed' }}
           />
 
-          {/* Placeholder screens for Me hub features */}
+          {/* Feature screens — all fully implemented */}
           <Stack.Screen
             name="Widget"
-            component={PlaceholderScreen}
-            options={{ title: 'Widget' }}
+            component={WidgetScreen}
+            options={{ title: 'Customise Feed' }}
           />
           <Stack.Screen
             name="Inbox"
-            component={PlaceholderScreen}
+            component={InboxScreen}
             options={{ title: 'Inbox' }}
           />
           <Stack.Screen
             name="OfflineReading"
-            component={PlaceholderScreen}
+            component={OfflineReadingScreen}
             options={{ title: 'Offline Reading' }}
           />
           <Stack.Screen
             name="ReadLater"
-            component={PlaceholderScreen}
+            component={ReadLaterScreen}
             options={{ title: 'Read Later' }}
           />
           <Stack.Screen
             name="BlockedUsers"
-            component={PlaceholderScreen}
-            options={{ title: 'Blocked Users' }}
+            component={BlockedUsersScreen}
+            options={{ title: 'Blocked Content' }}
           />
           <Stack.Screen
             name="CountryLanguage"
-            component={PlaceholderScreen}
+            component={CountryLanguageScreen}
             options={{ title: 'Country & Language' }}
           />
           <Stack.Screen
             name="Rewards"
-            component={PlaceholderScreen}
+            component={RewardsScreen}
             options={{ title: 'Rewards' }}
           />
           <Stack.Screen
             name="Feedback"
-            component={PlaceholderScreen}
+            component={FeedbackScreen}
             options={{ title: 'Suggestions & Feedback' }}
           />
         </Stack.Navigator>
       </NavigationContainer>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </>
   );
 }
@@ -229,11 +242,15 @@ function AppNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <CategoryProvider>
-          <AppNavigator />
-        </CategoryProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <SettingsProvider>
+          <AuthProvider>
+            <CategoryProvider>
+              <AppNavigator />
+            </CategoryProvider>
+          </AuthProvider>
+        </SettingsProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

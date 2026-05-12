@@ -60,12 +60,14 @@ const ProfileScreen: React.FC = () => {
     <Ionicons name="chevron-forward" size={18} color="#ccc" />
   );
 
-  // Shared dark mode switch — shows toggle; tapping toggles between dark and light
-  // (system mode is preserved when toggling off from system-auto-dark)
+  // Toggles between dark and light mode while preserving 'system' when toggling off.
+  const handleDarkModeToggle = (v: boolean) =>
+    setThemeMode(v ? 'dark' : themeMode === 'system' ? 'system' : 'light');
+
   const darkModeSwitch = (
     <Switch
       value={themeMode === 'dark'}
-      onValueChange={(v) => setThemeMode(v ? 'dark' : (themeMode === 'system' ? 'system' : 'light'))}
+      onValueChange={handleDarkModeToggle}
       trackColor={{ false: '#ccc', true: '#e63946' }}
       thumbColor="#fff"
     />

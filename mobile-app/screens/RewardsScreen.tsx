@@ -163,7 +163,7 @@ const RewardsScreen: React.FC = () => {
               style={[
                 styles.milestoneCard,
                 { backgroundColor: c.surface, borderColor: c.border },
-                !m.earned && styles.milestoneEarned,
+                !m.earned && styles.milestoneLocked,
               ]}
             >
               <Text style={[styles.milestoneIcon, !m.earned && styles.milestoneIconLocked]}>
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  milestoneEarned: {
+  milestoneLocked: {
     opacity: 0.45,
   },
   milestoneIcon: { fontSize: 28, marginBottom: 6 },

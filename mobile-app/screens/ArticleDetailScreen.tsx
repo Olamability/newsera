@@ -31,6 +31,7 @@ import { fetchSimilarArticlesPage } from '../services/newsServicePublic';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 import { sanitizeArticleContent } from '../services/articleUtils';
+import { InteractionAuthRequiredError } from '../services/interactionErrors';
 import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
@@ -239,8 +240,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       // Refetch the authoritative count to stay in sync across devices
       const count = await getLikeCount(article.id);
       setLikeCount(count);
-    } catch {
-      Alert.alert('Error', 'Failed to update like. Please try again.');
+    } catch (err) {
+      if (err instanceof InteractionAuthRequiredError) {
+        promptSignInForInteraction('like');
+      } else {
+        Alert.alert('Error', 'Failed to update like. Please try again.');
+      }
     } finally {
       setLikeLoading(false);
     }
@@ -261,8 +266,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setCommentText('');
       const updated = await fetchComments(article.id);
       setComments(updated);
-    } catch {
-      Alert.alert('Error', 'Failed to post comment. Please try again.');
+    } catch (err) {
+      if (err instanceof InteractionAuthRequiredError) {
+        promptSignInForInteraction('comment');
+      } else {
+        Alert.alert('Error', 'Failed to post comment. Please try again.');
+      }
     } finally {
       setCommentSubmitting(false);
     }

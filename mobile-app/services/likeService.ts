@@ -71,6 +71,8 @@ export async function toggleLike(articleId: string): Promise<boolean> {
     return false; // Like removed
   }
 
+  // Session can expire between getUser() and write attempts, so keep this
+  // guard to return a stable auth-required error for the UI layer.
   if (isAuthRequiredInteractionError(insertError)) {
     throw new InteractionAuthRequiredError();
   }

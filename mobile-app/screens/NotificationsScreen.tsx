@@ -15,6 +15,7 @@ import {
   StoredNotification,
 } from '../services/notificationService';
 import { RootStackParamList, MainTabParamList } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Notifications'>,
@@ -23,6 +24,8 @@ type Nav = CompositeNavigationProp<
 
 const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const { theme } = useTheme();
+  const c = theme.colors;
   const [notifications, setNotifications] = useState<StoredNotification[]>([]);
 
   const load = useCallback(async () => {
@@ -56,34 +59,34 @@ const NotificationsScreen: React.FC = () => {
       });
       return (
         <TouchableOpacity
-          style={styles.item}
+          style={[styles.item, { backgroundColor: c.card, borderColor: c.border }]}
           onPress={() => handlePress(item)}
           activeOpacity={0.8}
         >
           <View style={styles.itemContent}>
-            <Text style={styles.itemTitle} numberOfLines={2}>
+            <Text style={[styles.itemTitle, { color: c.text }]} numberOfLines={2}>
               {item.body}
             </Text>
-            <Text style={styles.itemDate}>{date}</Text>
+            <Text style={[styles.itemDate, { color: c.textSecondary }]}>{date}</Text>
           </View>
           <TouchableOpacity
             onPress={() => handleDismiss(item.id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.dismiss}>✕</Text>
+            <Text style={[styles.dismiss, { color: c.border }]}>✕</Text>
           </TouchableOpacity>
         </TouchableOpacity>
       );
     },
-    [handlePress, handleDismiss]
+    [c, handlePress, handleDismiss]
   );
 
   if (notifications.length === 0) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { backgroundColor: c.background }]}>
         <Text style={styles.emptyIcon}>🔔</Text>
-        <Text style={styles.emptyTitle}>No notifications yet</Text>
-        <Text style={styles.emptySub}>
+        <Text style={[styles.emptyTitle, { color: c.text }]}>No notifications yet</Text>
+        <Text style={[styles.emptySub, { color: c.textSecondary }]}>
           Breaking news alerts will appear here.
         </Text>
       </View>
@@ -95,7 +98,7 @@ const NotificationsScreen: React.FC = () => {
       data={notifications}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { backgroundColor: c.background }]}
       keyboardShouldPersistTaps="handled"
     />
   );
@@ -104,7 +107,6 @@ const NotificationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -116,24 +118,21 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   emptySub: {
     fontSize: 15,
-    color: '#888',
     textAlign: 'center',
     lineHeight: 22,
   },
   list: {
-    backgroundColor: '#f5f5f5',
     paddingVertical: 8,
     paddingBottom: 32,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    borderWidth: 1,
     marginHorizontal: 12,
     marginVertical: 5,
     borderRadius: 12,
@@ -146,17 +145,14 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a1a1a',
     lineHeight: 20,
     marginBottom: 4,
   },
   itemDate: {
     fontSize: 12,
-    color: '#888',
   },
   dismiss: {
     fontSize: 16,
-    color: '#ccc',
     fontWeight: '700',
   },
 });

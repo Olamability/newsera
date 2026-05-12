@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../context/ThemeContext';
+import { useSettings } from '../context/SettingsContext';
+import { ThemeMode } from '../types';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { version: APP_VERSION } = require('../package.json') as { version: string };
 
@@ -13,14 +18,10 @@ const SETTINGS_KEY = 'newsera_settings';
 
 interface AppSettings {
   pushNotifications: boolean;
-  dataSaver: boolean;
-  darkMode: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   pushNotifications: true,
-  dataSaver: false,
-  darkMode: false,
 };
 
 async function loadSettings(): Promise<AppSettings> {
@@ -41,7 +42,16 @@ async function saveSettings(settings: AppSettings): Promise<void> {
   }
 }
 
+const THEME_OPTIONS: { value: ThemeMode; label: string; emoji: string }[] = [
+  { value: 'light', label: 'Light', emoji: '☀️' },
+  { value: 'dark', label: 'Dark', emoji: '🌙' },
+  { value: 'system', label: 'Follow System', emoji: '🖥️' },
+];
+
 const SettingsScreen: React.FC = () => {
+  const { themeMode, setThemeMode, theme } = useTheme();
+  const { prefs, updatePrefs } = useSettings();
+  const c = theme.colors;
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
@@ -61,14 +71,46 @@ const SettingsScreen: React.FC = () => {
   if (!loaded) return null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.sectionHeader}>Preferences</Text>
+    <ScrollView
+      style={[styles.container, { backgroundColor: c.background }]}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Appearance */}
+      <Text style={[styles.sectionHeader, { color: c.textSecondary }]}>APPEARANCE</Text>
+      <View style={[styles.section, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {THEME_OPTIONS.map((opt, index) => {
+          const active = themeMode === opt.value;
+          return (
+            <View key={opt.value}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => setThemeMode(opt.value)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.optEmoji}>{opt.emoji}</Text>
+                <Text style={[styles.rowLabel, { color: c.text }]}>{opt.label}</Text>
+                {active && (
+                  <Text style={[styles.activeCheck, { color: c.primary }]}>✓</Text>
+                )}
+              </TouchableOpacity>
+              {index < THEME_OPTIONS.length - 1 && (
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+              )}
+            </View>
+          );
+        })}
+      </View>
 
-      <View style={styles.section}>
-        <View style={styles.row}>
+      {/* Preferences */}
+      <Text style={[styles.sectionHeader, { color: c.textSecondary }]}>PREFERENCES</Text>
+      <View style={[styles.section, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <View style={styles.switchRow}>
           <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Push Notifications</Text>
-            <Text style={styles.rowSub}>Receive breaking news alerts</Text>
+            <Text style={[styles.rowLabel, { color: c.text }]}>Push Notifications</Text>
+            <Text style={[styles.rowSub, { color: c.textSecondary }]}>
+              Receive breaking news alerts
+            </Text>
           </View>
           <Switch
             value={settings.pushNotifications}
@@ -78,65 +120,66 @@ const SettingsScreen: React.FC = () => {
           />
         </View>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-        <View style={styles.row}>
+        <View style={styles.switchRow}>
           <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Data Saver</Text>
-            <Text style={styles.rowSub}>Load lower-resolution images</Text>
+            <Text style={[styles.rowLabel, { color: c.text }]}>Data Saver</Text>
+            <Text style={[styles.rowSub, { color: c.textSecondary }]}>
+              Load lower-resolution images
+            </Text>
           </View>
           <Switch
-            value={settings.dataSaver}
-            onValueChange={(v) => update({ dataSaver: v })}
+            value={prefs.dataSaver}
+            onValueChange={(v) => updatePrefs({ dataSaver: v })}
             trackColor={{ false: '#ccc', true: '#e63946' }}
             thumbColor="#fff"
-          />
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.row}>
-          <View style={styles.rowText}>
-            <Text style={styles.rowLabel}>Dark Mode</Text>
-            <Text style={styles.rowSub}>Coming soon</Text>
-          </View>
-          <Switch
-            value={settings.darkMode}
-            onValueChange={(v) => update({ darkMode: v })}
-            trackColor={{ false: '#ccc', true: '#e63946' }}
-            thumbColor="#fff"
-            disabled
           />
         </View>
       </View>
 
-      <Text style={styles.version}>NewsEra v{APP_VERSION}</Text>
-    </View>
+      <Text style={[styles.version, { color: c.border }]}>NewsEra v{APP_VERSION}</Text>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 16,
-  },
+  container: { flex: 1 },
+  scroll: { paddingTop: 20, paddingBottom: 40 },
   sectionHeader: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#888',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginHorizontal: 20,
     marginBottom: 8,
+    marginTop: 4,
   },
   section: {
-    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#eee',
+    marginBottom: 24,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  optEmoji: {
+    fontSize: 18,
+    marginRight: 14,
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  activeCheck: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -147,26 +190,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
-  rowLabel: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
   rowSub: {
     fontSize: 13,
-    color: '#888',
     marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
     marginLeft: 20,
   },
   version: {
-    marginTop: 32,
+    marginTop: 8,
     textAlign: 'center',
     fontSize: 13,
-    color: '#bbb',
   },
 });
 

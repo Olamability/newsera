@@ -7,7 +7,6 @@ import {
   Linking,
   Modal,
   Platform,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -29,9 +28,10 @@ import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
 import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
 import { fetchComments, addComment, ArticleComment } from '../services/commentService';
-import { fetchSimilarArticles } from '../services/newsService';
+import { fetchSimilarArticlesPage } from '../services/newsService';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
+import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 const MAX_PREVIEW_CHARS = 1400;
@@ -40,6 +40,10 @@ const MENU_CLOSE_ANIMATION_DELAY = 250;
 const MIN_BOTTOM_PADDING = 40;
 const BASE_BOTTOM_PADDING = 24;
 const MENU_SHEET_TRANSLATE_Y = 300;
+const COMMENT_BAR_HEIGHT = 62;
+const SIMILAR_PAGE_SIZE = 10;
+// Extra clearance so content isn't hidden behind the sticky comment bar
+const STICKY_BAR_CLEARANCE = 8;
 
 const stripTagBlocks = (value: string, tagName: string): string => {
   let current = value;
@@ -148,6 +152,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
+  const [similarHasMore, setSimilarHasMore] = useState(true);
+  const [similarLoadingMore, setSimilarLoadingMore] = useState(false);
+  const similarPageRef = useRef(1);
+  const loadingMoreRef = useRef(false);
+  const seenIdsRef = useRef<string[]>([]);
 
   // Options bottom sheet
   const [menuVisible, setMenuVisible] = useState(false);
@@ -235,11 +244,29 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .catch(() => {});
   }, [article.id]);
 
-  // Load "Read More Like This" recommendations
+  // Load "Read More Like This" recommendations — initial page
   useEffect(() => {
-    fetchSimilarArticles(article.id, article.category_id, article.source_id)
-      .then(setSimilarArticles)
-      .catch(() => {});
+    setSimilarArticles([]);
+    setSimilarHasMore(true);
+    similarPageRef.current = 1;
+    seenIdsRef.current = [];
+
+    (async () => {
+      setSimilarLoadingMore(true);
+      try {
+        const { articles, hasMore } = await fetchSimilarArticlesPage(
+          article.id, article.category_id, article.source_id, 1, SIMILAR_PAGE_SIZE, []
+        );
+        setSimilarArticles(articles);
+        setSimilarHasMore(hasMore);
+        similarPageRef.current = 2;
+        seenIdsRef.current = articles.map((a) => a.id);
+      } catch (err) {
+        console.error('[Similar] Initial fetch failed:', err);
+        setSimilarHasMore(false);
+      }
+      setSimilarLoadingMore(false);
+    })();
   }, [article.id, article.category_id, article.source_id]);
 
   const handleLike = useCallback(async () => {
@@ -353,6 +380,26 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [user, article.id, article.source_id, article.category_id, article.url]);
 
+  const loadMoreSimilar = useCallback(async () => {
+    if (!similarHasMore || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setSimilarLoadingMore(true);
+    try {
+      const { articles, hasMore } = await fetchSimilarArticlesPage(
+        article.id, article.category_id, article.source_id,
+        similarPageRef.current, SIMILAR_PAGE_SIZE, seenIdsRef.current
+      );
+      setSimilarArticles((prev) => [...prev, ...articles]);
+      setSimilarHasMore(hasMore);
+      similarPageRef.current += 1;
+      seenIdsRef.current = [...seenIdsRef.current, ...articles.map((a) => a.id)];
+    } catch (err) {
+      console.error('[Similar] Load more failed:', err);
+    }
+    setSimilarLoadingMore(false);
+    loadingMoreRef.current = false;
+  }, [article.id, article.category_id, article.source_id, similarHasMore]);
+
   const menuTranslateY = menuAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [MENU_SHEET_TRANSLATE_Y, 0],
@@ -392,195 +439,226 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      >
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING) }]}
-        >
-          <View style={styles.body}>
-            <Text style={styles.title}>{article.title}</Text>
+      {/* ── Main scrollable area + sticky comment bar ── */}
+      <View style={styles.flex}>
+        <FlatList
+          data={similarArticles}
+          keyExtractor={(item) => item.id}
+          style={styles.flex}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: COMMENT_BAR_HEIGHT + insets.bottom + STICKY_BAR_CLEARANCE },
+          ]}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMoreSimilar}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews
+          ListHeaderComponent={
+            <View style={styles.body}>
+              {/* 1. Article Title */}
+              <Text style={styles.title}>{article.title}</Text>
 
-            {/* ── Source row: logo + stacked name/time ── */}
-            <View style={styles.sourceRow}>
-              {sourceLogo ? (
+              {/* 2. Source Row: logo + stacked name/time */}
+              <View style={styles.sourceRow}>
+                {sourceLogo ? (
+                  <Image
+                    source={{ uri: sourceLogo }}
+                    style={styles.sourceLogo}
+                    contentFit="contain"
+                    transition={200}
+                  />
+                ) : (
+                  <View style={styles.sourceLogoPlaceholder}>
+                    <Text style={styles.sourceLogoPlaceholderText}>
+                      {sourceName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.sourceMetaWrap}>
+                  <Text style={styles.source}>{sourceName}</Text>
+                  {publishedTimeText ? (
+                    <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* 3. Featured Image */}
+              {article.image_url ? (
                 <Image
-                  source={{ uri: sourceLogo }}
-                  style={styles.sourceLogo}
-                  contentFit="contain"
+                  source={{ uri: article.image_url }}
+                  style={styles.featuredImage}
+                  contentFit="cover"
+                  transition={300}
+                />
+              ) : null}
+
+              {/* 4. Article Snippet / Content */}
+              {previewText ? (
+                <Text style={styles.articleContent}>{previewText}</Text>
+              ) : null}
+
+              {/* 5. Read on Source Website (tight to snippet) */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleReadFull}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.buttonText}>Read on Source Website</Text>
+                </TouchableOpacity>
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.bookmarkBtn,
+                      bookmarked && styles.bookmarkBtnActive,
+                      bookmarkLoading && styles.bookmarkBtnDisabled,
+                    ]}
+                    onPress={handleBookmark}
+                    disabled={bookmarkLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
+                      {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.likeBtn,
+                      liked && styles.likeBtnActive,
+                      likeLoading && styles.likeBtnDisabled,
+                    ]}
+                    onPress={handleLike}
+                    disabled={likeLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.likeText, liked && styles.likeTextActive]}>
+                      {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.shareBtn}
+                    onPress={handleShare}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.shareText}>↗ Share</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 6. "Read More Like This" section header */}
+              <View style={styles.similarSection}>
+                <Text style={styles.similarTitle}>Read More Like This</Text>
+              </View>
+
+              {/* Skeleton placeholder while first page loads */}
+              {similarLoadingMore && similarArticles.length === 0 ? (
+                <>
+                  <SkeletonCard />
+                  <SkeletonCard />
+                  <SkeletonCard />
+                </>
+              ) : null}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.similarCard}
+              onPress={() => navigation.replace('ArticleDetail', { article: item })}
+              activeOpacity={0.85}
+            >
+              {item.image_url ? (
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={styles.similarImage}
+                  contentFit="cover"
                   transition={200}
                 />
               ) : (
-                <View style={styles.sourceLogoPlaceholder}>
-                  <Text style={styles.sourceLogoPlaceholderText}>
-                    {sourceName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
               )}
-              <View style={styles.sourceMetaWrap}>
-                <Text style={styles.source}>{sourceName}</Text>
-                {publishedTimeText ? (
-                  <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
-                ) : null}
+              <View style={styles.similarCardContent}>
+                <Text style={styles.similarCardTitle} numberOfLines={3}>
+                  {item.title}
+                </Text>
+                <Text style={styles.similarCardSource} numberOfLines={1}>
+                  {item.source_name ?? item.sources?.name ?? ''}
+                </Text>
               </View>
-            </View>
+            </TouchableOpacity>
+          )}
+          ListFooterComponent={
+            <>
+              {/* Skeleton while loading next page */}
+              {similarLoadingMore && similarArticles.length > 0 ? (
+                <>
+                  <SkeletonCard />
+                  <SkeletonCard />
+                </>
+              ) : null}
 
-            {article.image_url ? (
-              <Image
-                source={{ uri: article.image_url }}
-                style={styles.featuredImage}
-                contentFit="cover"
-                transition={300}
-              />
-            ) : null}
+              {/* 7. Comments section */}
+              <View style={styles.commentsSection}>
+                <Text style={styles.commentsTitle}>
+                  Comments{comments.length > 0 ? ` (${comments.length})` : ''}
+                </Text>
 
-            {previewText ? (
-              <Text style={styles.articleContent}>{previewText}</Text>
-            ) : null}
-
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleReadFull}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.buttonText}>Read on Source Website</Text>
-              </TouchableOpacity>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.bookmarkBtn,
-                    bookmarked && styles.bookmarkBtnActive,
-                    bookmarkLoading && styles.bookmarkBtnDisabled,
-                  ]}
-                  onPress={handleBookmark}
-                  disabled={bookmarkLoading}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
-                    {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.likeBtn,
-                    liked && styles.likeBtnActive,
-                    likeLoading && styles.likeBtnDisabled,
-                  ]}
-                  onPress={handleLike}
-                  disabled={likeLoading}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.likeText, liked && styles.likeTextActive]}>
-                    {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.shareBtn}
-                  onPress={handleShare}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.shareText}>↗ Share</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Read More Like This */}
-            {similarArticles.length > 0 ? (
-              <View style={styles.similarSection}>
-                <Text style={styles.similarTitle}>Read More Like This</Text>
-                <FlatList
-                  data={similarArticles}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.similarList}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.similarCard}
-                      onPress={() => navigation.replace('ArticleDetail', { article: item })}
-                      activeOpacity={0.85}
-                    >
-                      {item.image_url ? (
-                        <Image
-                          source={{ uri: item.image_url }}
-                          style={styles.similarImage}
-                          contentFit="cover"
-                          transition={200}
-                        />
-                      ) : (
-                        <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
-                      )}
-                      <Text style={styles.similarCardTitle} numberOfLines={3}>
-                        {item.title}
-                      </Text>
-                      <Text style={styles.similarCardSource} numberOfLines={1}>
-                        {item.source_name ?? item.sources?.name ?? ''}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            ) : null}
-
-            {/* Comments Section */}
-            <View style={styles.commentsSection}>
-              <Text style={styles.commentsTitle}>
-                Comments{comments.length > 0 ? ` (${comments.length})` : ''}
-              </Text>
-
-              {comments.length === 0 ? (
-                <Text style={styles.noComments}>No comments yet. Be the first!</Text>
-              ) : (
-                comments.map((comment) => (
-                  <View key={comment.id} style={styles.commentItem}>
-                    <View style={styles.commentHeader}>
-                      <Text style={styles.commentUser}>Guest</Text>
-                      <Text style={styles.commentDate}>
-                        {new Date(comment.created_at).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </Text>
+                {comments.length === 0 ? (
+                  <Text style={styles.noComments}>No comments yet. Be the first!</Text>
+                ) : (
+                  comments.map((comment) => (
+                    <View key={comment.id} style={styles.commentItem}>
+                      <View style={styles.commentHeader}>
+                        <Text style={styles.commentUser}>Guest</Text>
+                        <Text style={styles.commentDate}>
+                          {new Date(comment.created_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </Text>
+                      </View>
+                      <Text style={styles.commentContent}>{comment.content}</Text>
                     </View>
-                    <Text style={styles.commentContent}>{comment.content}</Text>
-                  </View>
-                ))
-              )}
-
-              <View style={styles.commentInputRow}>
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Write a comment…"
-                  placeholderTextColor="#aaa"
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                  maxLength={500}
-                  editable={!commentSubmitting}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.commentSubmitBtn,
-                    (!commentText.trim() || commentSubmitting) && styles.commentSubmitBtnDisabled,
-                  ]}
-                  onPress={handleAddComment}
-                  disabled={!commentText.trim() || commentSubmitting}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.commentSubmitText}>Post</Text>
-                </TouchableOpacity>
+                  ))
+                )}
               </View>
-            </View>
+            </>
+          }
+        />
+
+        {/* ── Sticky Comment Bar (fixed above Android nav) ── */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) }]}>
+            <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
+            <TextInput
+              style={styles.stickyInput}
+              placeholder="Write a comment…"
+              placeholderTextColor="#aaa"
+              value={commentText}
+              onChangeText={setCommentText}
+              maxLength={500}
+              editable={!commentSubmitting}
+              returnKeyType="send"
+              onSubmitEditing={handleAddComment}
+            />
+            <TouchableOpacity
+              style={[
+                styles.stickyPostBtn,
+                (!commentText.trim() || commentSubmitting) && styles.stickyPostBtnDisabled,
+              ]}
+              onPress={handleAddComment}
+              disabled={!commentText.trim() || commentSubmitting}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.stickyPostText}>Post</Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
 
       {/* ── Options Bottom Sheet ── */}
       <Modal
@@ -675,8 +753,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  content: {
-    // paddingBottom is applied dynamically via insets
+  listContent: {
+    backgroundColor: '#fff',
   },
   body: {
     padding: 16,
@@ -734,16 +812,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#f1f1f1',
     marginTop: 4,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   articleContent: {
     fontSize: 17,
     color: '#242424',
     lineHeight: 30,
-    marginBottom: 24,
+    marginBottom: 12,
   },
   actions: {
-    gap: 12,
+    gap: 8,
   },
   button: {
     backgroundColor: '#e63946',
@@ -820,9 +898,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#e63946',
   },
-  // Read More Like This
+  // ── Read More Like This ──
   similarSection: {
-    marginTop: 28,
+    marginTop: 24,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     paddingTop: 20,
@@ -831,15 +909,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#1a1a1a',
-    marginBottom: 14,
+    marginBottom: 4,
   },
-  similarList: {
-    paddingRight: 16,
-  },
+  // Horizontal card: image left, content right
   similarCard: {
-    width: 160,
-    marginRight: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 6,
     borderRadius: 12,
     overflow: 'hidden',
     ...Platform.select({
@@ -853,32 +931,41 @@ const styles = StyleSheet.create({
     }),
   },
   similarImage: {
-    width: '100%',
-    height: 100,
+    width: 100,
+    height: 90,
+    borderRadius: 10,
+    backgroundColor: '#e8e8e8',
   },
   similarImagePlaceholder: {
     backgroundColor: '#e8e8e8',
+  },
+  similarCardContent: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    justifyContent: 'space-between',
+    minHeight: 90,
   },
   similarCardTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: '#1a1a1a',
     lineHeight: 18,
-    padding: 8,
-    paddingBottom: 4,
+    flex: 1,
   },
   similarCardSource: {
     fontSize: 11,
     color: '#888',
-    paddingHorizontal: 8,
-    paddingBottom: 8,
+    marginTop: 6,
   },
-  // Comments
+  // ── Comments ──
   commentsSection: {
-    marginTop: 28,
+    marginTop: 24,
+    marginHorizontal: 16,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     paddingTop: 20,
+    paddingBottom: 8,
   },
   commentsTitle: {
     fontSize: 17,
@@ -917,36 +1004,52 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 21,
   },
-  commentInputRow: {
+  // ── Sticky Comment Bar ──
+  stickyBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 10,
-    marginTop: 12,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e8e8e8',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+      },
+      android: { elevation: 8 },
+    }),
   },
-  commentInput: {
+  stickyBarIcon: {
+    marginRight: 2,
+  },
+  stickyInput: {
     flex: 1,
+    height: 38,
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     fontSize: 14,
     color: '#1a1a1a',
-    maxHeight: 100,
     backgroundColor: '#fafafa',
   },
-  commentSubmitBtn: {
+  stickyPostBtn: {
     backgroundColor: '#e63946',
-    borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  commentSubmitBtnDisabled: {
+  stickyPostBtnDisabled: {
     opacity: 0.5,
   },
-  commentSubmitText: {
+  stickyPostText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',

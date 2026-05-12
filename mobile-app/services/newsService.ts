@@ -108,6 +108,105 @@ export async function fetchTrendingArticles(
   return { articles, hasMore };
 }
 
+const SIMILAR_PAGE_SIZE = 10;
+
+/**
+ * SIMILAR ARTICLES PAGINATED — for infinite "Read More Like This" feed.
+ * Priority: same category → same source → latest trending fallback.
+ * Excludes previously-seen article IDs to avoid duplicates across pages.
+ *
+ * @param articleId  The current article (always excluded)
+ * @param categoryId Category of the current article (nullable)
+ * @param sourceId   Source of the current article (nullable)
+ * @param page       1-indexed page number
+ * @param pageSize   Items per page (default 10)
+ * @param excludeIds IDs that have already been shown (from prior pages)
+ */
+export async function fetchSimilarArticlesPage(
+  articleId: string,
+  categoryId: string | null,
+  sourceId: string | null,
+  page: number,
+  pageSize: number = SIMILAR_PAGE_SIZE,
+  excludeIds: string[] = [],
+): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
+  const allExcluded = Array.from(new Set([articleId, ...excludeIds]));
+  const seenIds = new Set<string>(allExcluded);
+  const collected: NewsArticle[] = [];
+
+  // PostgREST NOT IN clause: unquoted UUIDs are valid since PostgreSQL
+  // auto-casts string literals to the uuid column type inside the IN list.
+  const buildExclusionClause = () => `(${allExcluded.join(',')})`;
+
+  // 1. Same category
+  if (categoryId && collected.length < pageSize) {
+    const needed = pageSize - collected.length;
+    const { data, error } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .eq('category_id', categoryId)
+      .not('id', 'in', buildExclusionClause())
+      .order('published_at', { ascending: false })
+      .limit(needed * 2);
+
+    if (error) console.warn('[fetchSimilarArticlesPage] category query:', error.message);
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= pageSize) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  // 2. Same source
+  if (sourceId && collected.length < pageSize) {
+    const needed = pageSize - collected.length;
+    const { data, error } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .eq('source_id', sourceId)
+      .not('id', 'in', buildExclusionClause())
+      .order('published_at', { ascending: false })
+      .limit(needed * 2);
+
+    if (error) console.warn('[fetchSimilarArticlesPage] source query:', error.message);
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= pageSize) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  // 3. Latest fallback
+  if (collected.length < pageSize) {
+    const needed = pageSize - collected.length;
+    const { data, error } = await supabase
+      .from('articles')
+      .select(ARTICLE_SELECT)
+      .not('id', 'in', buildExclusionClause())
+      .order('published_at', { ascending: false })
+      .limit(needed * 3);
+
+    if (error) console.warn('[fetchSimilarArticlesPage] fallback query:', error.message);
+    for (const row of (data ?? []) as ArticleRow[]) {
+      if (collected.length >= pageSize) break;
+      const mapped = mapArticle(row);
+      if (!seenIds.has(mapped.id)) {
+        seenIds.add(mapped.id);
+        collected.push(mapped);
+      }
+    }
+  }
+
+  console.log(`🔁 fetchSimilarArticlesPage — page: ${page}, returned: ${collected.length}`);
+  return { articles: collected, hasMore: collected.length >= pageSize };
+}
+
 /**
  * SIMILAR ARTICLES — for "Read More Like This" section.
  * Priority: same category → same source → latest trending fallback.

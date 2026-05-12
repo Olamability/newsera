@@ -19,6 +19,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import CategoryDetailScreen from './screens/CategoryDetailScreen';
 import RecentlyViewedScreen from './screens/RecentlyViewedScreen';
 import PlaceholderScreen from './screens/PlaceholderScreen';
+import TrendingScreen from './screens/TrendingScreen';
 import { RootStackParamList, MainTabParamList } from './types';
 import { CategoryProvider } from './context/CategoryContext';
 import { AuthProvider } from './context/AuthContext';
@@ -74,7 +75,7 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: 'NewsEra', tabBarLabel: 'Home' }}
+        options={{ headerShown: false, tabBarLabel: 'Home' }}
       />
       <Tab.Screen
         name="Search"
@@ -152,6 +153,12 @@ function AppNavigator() {
             name="CategoryDetail"
             component={CategoryDetailScreen}
             options={({ route }) => ({ title: route.params.categoryName })}
+          />
+
+          <Stack.Screen
+            name="Trending"
+            component={TrendingScreen}
+            options={{ title: 'Headlines' }}
           />
 
           {/* Secondary screens */}

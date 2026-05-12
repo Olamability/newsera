@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
 import CategoryFilter from '../components/CategoryFilter';
+import HomeHeader from '../components/HomeHeader';
+import HeadlinesSection from '../components/HeadlinesSection';
 import {
   fetchArticles,
   fetchCategories,
@@ -42,6 +44,7 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const flatListRef = useRef<FlatList<NewsArticle>>(null);
   // Prevents duplicate concurrent fetches within the same feed/page.
@@ -155,6 +158,13 @@ export default function HomeScreen() {
     navigation.navigate('ArticleDetail', { article });
   };
 
+  // Filter articles by search query (case-insensitive title match)
+  const displayedArticles = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return articles;
+    return articles.filter((a) => a.title.toLowerCase().includes(q));
+  }, [articles, searchQuery]);
+
   const handleSwipeLeft = useCallback(async (article: NewsArticle) => {
     if (!user) {
       Alert.alert(
@@ -194,6 +204,7 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
+        <HomeHeader searchValue={searchQuery} onSearchChange={setSearchQuery} />
         <CategoryFilter
           categories={categories}
           selectedId={selectedCategory}
@@ -213,6 +224,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <HomeHeader searchValue={searchQuery} onSearchChange={setSearchQuery} />
       <CategoryFilter
         categories={categories}
         selectedId={selectedCategory}
@@ -221,7 +233,7 @@ export default function HomeScreen() {
 
       <FlatList
         ref={flatListRef}
-        data={articles}
+        data={displayedArticles}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ArticleCard
@@ -231,6 +243,7 @@ export default function HomeScreen() {
             onSwipeRight={handleSwipeRight}
           />
         )}
+        ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

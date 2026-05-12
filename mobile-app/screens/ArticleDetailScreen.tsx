@@ -548,13 +548,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <View
           style={[
             styles.stickyBar,
-            keyboardVisible && styles.stickyBarKeyboardOpen,
             { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) },
           ]}
         >
           <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
           <TextInput
-            style={styles.stickyInput}
+            style={[styles.stickyInput, keyboardVisible && styles.stickyInputFocused]}
             placeholder="Write a comment…"
             placeholderTextColor="#aaa"
             value={commentText}
@@ -695,10 +694,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#242424',
     lineHeight: 30,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   actions: {
-    marginTop: 2,
     gap: 8,
   },
   button: {
@@ -902,9 +900,6 @@ const styles = StyleSheet.create({
       android: { elevation: 8 },
     }),
   },
-  stickyBarKeyboardOpen: {
-    paddingTop: 8,
-  },
   stickyBarIcon: {
     marginRight: 2,
   },
@@ -918,6 +913,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1a1a1a',
     backgroundColor: '#fafafa',
+  },
+  stickyInputFocused: {
+    borderColor: '#d0d0d0',
+    backgroundColor: '#fff',
   },
   stickyPostBtn: {
     backgroundColor: '#e63946',

@@ -50,6 +50,10 @@ const HTML_ENTITY_MAP: Record<string, string> = {
   '&lt;': '<',
   '&gt;': '>',
 };
+const ENTITY_REPLACEMENTS = Object.entries(HTML_ENTITY_MAP).map(([entity, replacement]) => ({
+  pattern: new RegExp(entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+  replacement,
+}));
 
 const stripTagBlocks = (value: string, tagName: string): string => {
   const pattern = new RegExp(`<${tagName}\\b[^>]*>[\\s\\S]*?<\\/${tagName}>`, 'gi');
@@ -62,11 +66,12 @@ const decodeCommonEntities = (value: string): string => {
   for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
     const baseDecoded = decoded
       .replace(/&nbsp;?/gi, ' ')
+      // Handles malformed source payloads like "on$nbsp;Monday".
       .replace(/\$nbsp;?/gi, ' ')
       .replace(/&#160;?/gi, ' ')
       .replace(/&amp;nbsp;?/gi, ' ');
-    const next = Object.entries(HTML_ENTITY_MAP).reduce((acc, [entity, replacement]) => (
-      acc.replace(new RegExp(entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replacement)
+    const next = ENTITY_REPLACEMENTS.reduce((acc, { pattern, replacement }) => (
+      acc.replace(pattern, replacement)
     ), baseDecoded);
 
     if (next === decoded) break;

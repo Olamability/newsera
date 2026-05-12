@@ -30,6 +30,7 @@ export interface NewsArticle {
   category_name?: string | null;
   like_count?: number | null;
   comment_count?: number | null;
+  comments_count?: number | null;
   is_sponsored?: boolean | null;
   sponsor_name?: string | null;
   campaign_id?: string | null;

@@ -95,7 +95,7 @@ const TrendingScreen: React.FC = () => {
             setHasMore(false);
           }
         }
-      }, 350);
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
     };
 
     const channel = supabasePublic

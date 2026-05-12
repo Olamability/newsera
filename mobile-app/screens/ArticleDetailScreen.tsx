@@ -153,8 +153,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const similarPageRef = useRef(1);
   const loadingMoreRef = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
-  const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
-
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -490,6 +488,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setSimilarLoadingMore(false);
     loadingMoreRef.current = false;
   }, [article.id, article.category_id, article.source_id, similarHasMore]);
+  const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
 
   const renderCommentNode = (comment: ThreadedComment, depth: number = 0): React.ReactNode => {
     const hasReplies = comment.replies.length > 0;

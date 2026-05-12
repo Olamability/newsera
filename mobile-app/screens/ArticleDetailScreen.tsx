@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   Alert,
   FlatList,
   Keyboard,
@@ -254,6 +255,38 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [article]);
 
+  const handleReport = useCallback(() => {
+    Alert.alert('Report', 'Thanks. We have received your report.');
+  }, []);
+
+  const handleHeaderMenu = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Favourite', 'Report', 'Share'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            void handleBookmark();
+          } else if (buttonIndex === 2) {
+            handleReport();
+          } else if (buttonIndex === 3) {
+            void handleShare();
+          }
+        }
+      );
+      return;
+    }
+
+    Alert.alert('Actions', undefined, [
+      { text: 'Favourite', onPress: () => void handleBookmark() },
+      { text: 'Report', onPress: handleReport },
+      { text: 'Share', onPress: () => void handleShare() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [handleBookmark, handleReport, handleShare]);
+
   const handleReadFull = useCallback(async () => {
     // Track click — non-blocking; link opens regardless of tracking result
     try {
@@ -343,12 +376,21 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.headerCenter} />
-
-        <View style={styles.headerRight}>
+        <View style={styles.headerCenter}>
           <Text style={styles.headerSource} numberOfLines={1} ellipsizeMode="tail">
             {sourceName}
           </Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={handleHeaderMenu}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color="#1a1a1a" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -602,21 +644,27 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 0,
+    width: 88,
+    gap: 4,
   },
   headerCenter: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   headerRight: {
-    maxWidth: '55%',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    marginLeft: 8,
+    width: 88,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   headerSource: {
     fontSize: 14,
     color: '#555',
     fontWeight: '600',
+    textAlign: 'center',
+    maxWidth: '100%',
   },
   headerBtn: {
     width: 40,

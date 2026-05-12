@@ -13,11 +13,16 @@ type ErrorLike = { code?: string; message?: string };
 
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 const loggedErrors = new Set<string>();
+const MAX_LOGGED_ERRORS = 200;
 
 function logPublicErrorOnce(scope: string, error: unknown): void {
   const e = (error ?? {}) as ErrorLike;
   const key = `${scope}:${e.code ?? 'unknown'}:${e.message ?? String(error)}`;
   if (loggedErrors.has(key)) return;
+  if (loggedErrors.size >= MAX_LOGGED_ERRORS) {
+    const oldest = loggedErrors.values().next().value;
+    if (oldest) loggedErrors.delete(oldest);
+  }
   loggedErrors.add(key);
   console.warn(`[PublicData] ${scope} failed:`, e.message ?? error);
 }
@@ -122,17 +127,16 @@ export async function fetchSimilarArticlesPagePublic(
   const allExcluded = Array.from(new Set([articleId, ...excludeIds]));
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
-  const buildExclusionClause = () => `(${allExcluded.join(',')})`;
 
   if (categoryId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data, error } = await supabasePublic
+    let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('category_id', categoryId)
-      .not('id', 'in', buildExclusionClause())
       .order('published_at', { ascending: false })
       .limit(needed * 2);
+    const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', error);
     for (const row of (data ?? []) as ArticleRow[]) {
@@ -147,13 +151,13 @@ export async function fetchSimilarArticlesPagePublic(
 
   if (sourceId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data, error } = await supabasePublic
+    let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('source_id', sourceId)
-      .not('id', 'in', buildExclusionClause())
       .order('published_at', { ascending: false })
       .limit(needed * 2);
+    const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', error);
     for (const row of (data ?? []) as ArticleRow[]) {
@@ -168,12 +172,12 @@ export async function fetchSimilarArticlesPagePublic(
 
   if (collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data, error } = await supabasePublic
+    let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
-      .not('id', 'in', buildExclusionClause())
       .order('published_at', { ascending: false })
       .limit(needed * 3);
+    const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:fallback', error);
     for (const row of (data ?? []) as ArticleRow[]) {

@@ -14,8 +14,6 @@ import { NewsArticle, RootStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const HEADLINES_LIMIT = 8;
-
 const HeadlinesSection: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const [headlines, setHeadlines] = useState<NewsArticle[]>([]);
@@ -27,7 +25,7 @@ const HeadlinesSection: React.FC = () => {
     fetchedRef.current = true;
     try {
       const data = await fetchHeadlinesPublic();
-      setHeadlines(data.slice(0, HEADLINES_LIMIT));
+      setHeadlines(data);
     } catch (err) {
       console.warn('[HeadlinesSection] Failed to load headlines:', err);
     } finally {

@@ -5,9 +5,14 @@ type ErrorLike = {
 
 export function isAuthError(error: unknown): boolean {
   const candidate = error as ErrorLike | null | undefined;
-  const message = candidate?.message ?? '';
+  const message = (candidate?.message ?? '').toLowerCase();
 
-  return candidate?.code === 'PGRST303' || message.includes('JWT');
+  return (
+    candidate?.code === 'PGRST303' ||
+    message.includes('jwt expired') ||
+    message.includes('invalid jwt') ||
+    (message.includes('jwt') && message.includes('token'))
+  );
 }
 
 export function isNetworkError(error: unknown): boolean {

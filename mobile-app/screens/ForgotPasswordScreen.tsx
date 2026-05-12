@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../services/supabase';
+import { supabaseAuth } from '../services/supabase';
 
 const ForgotPasswordScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -28,7 +28,7 @@ const ForgotPasswordScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await supabaseAuth.auth.resetPasswordForEmail(email.trim());
       if (error) throw error;
       setSent(true);
     } catch (err: unknown) {

@@ -10,8 +10,9 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
-import { fetchTrendingArticles } from '../services/newsService';
+import { fetchTrendingArticles } from '../services/newsServicePublic';
 import { NewsArticle, RootStackParamList } from '../types';
+import { isAuthError } from '../services/publicDataErrors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -40,6 +41,11 @@ const TrendingScreen: React.FC = () => {
       if (fetchGenerationRef.current !== generation) return;
       setHasMore(moreAvailable);
       setArticles(prev => (append ? [...prev, ...data] : data));
+    } catch (err) {
+      if (fetchGenerationRef.current !== generation) return;
+      if (isAuthError(err)) {
+        setHasMore(false);
+      }
     } finally {
       if (fetchGenerationRef.current === generation) {
         isFetchingRef.current = false;

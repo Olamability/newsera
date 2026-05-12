@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 
 export interface ArticleComment {
   id: string;
@@ -12,7 +12,7 @@ export interface ArticleComment {
  * Fetch all flat comments for an article, ordered oldest-first.
  */
 export async function fetchComments(articleId: string): Promise<ArticleComment[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('article_comments')
     .select('id, article_id, user_id, content, created_at')
     .eq('article_id', articleId)
@@ -30,7 +30,7 @@ export async function addComment(
   userId: string,
   content: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('article_comments')
     .insert({ article_id: articleId, user_id: userId, content });
 

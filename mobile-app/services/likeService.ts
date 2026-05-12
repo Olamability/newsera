@@ -1,10 +1,10 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 
 /**
  * Check whether a user (or device) has liked a given article.
  */
 export async function isLiked(articleId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('article_likes')
     .select('id')
     .eq('article_id', articleId)
@@ -19,7 +19,7 @@ export async function isLiked(articleId: string, userId: string): Promise<boolea
  * Get the total like count for an article.
  */
 export async function getLikeCount(articleId: string): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await supabaseAuth
     .from('article_likes')
     .select('id', { count: 'exact', head: true })
     .eq('article_id', articleId);
@@ -36,7 +36,7 @@ export async function getLikeCount(articleId: string): Promise<number> {
 export async function toggleLike(articleId: string, userId: string): Promise<boolean> {
   // Attempt to insert first; if the unique constraint fires, the user already
   // liked the article → remove the like instead.
-  const { error: insertError } = await supabase
+  const { error: insertError } = await supabaseAuth
     .from('article_likes')
     .insert({ article_id: articleId, user_id: userId });
 
@@ -46,7 +46,7 @@ export async function toggleLike(articleId: string, userId: string): Promise<boo
 
   // Postgres unique-constraint violation code
   if (insertError.code === '23505') {
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAuth
       .from('article_likes')
       .delete()
       .eq('article_id', articleId)

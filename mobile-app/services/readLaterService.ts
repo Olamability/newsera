@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import { NewsArticle, ReadLaterEntry } from '../types';
 
 const READ_LATER_KEY = 'newsera_read_later';
@@ -47,14 +47,14 @@ export async function isInLocalReadLater(articleId: string): Promise<boolean> {
 // ─── Supabase (authenticated users) ──────────────────────────────────────────
 
 export async function addSupabaseReadLater(articleId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('read_later')
     .upsert({ user_id: userId, article_id: articleId }, { onConflict: 'user_id,article_id' });
   if (error) throw error;
 }
 
 export async function removeSupabaseReadLater(articleId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('read_later')
     .delete()
     .eq('user_id', userId)
@@ -63,7 +63,7 @@ export async function removeSupabaseReadLater(articleId: string, userId: string)
 }
 
 export async function fetchSupabaseReadLater(userId: string): Promise<NewsArticle[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('read_later')
     .select(
       `article_id,

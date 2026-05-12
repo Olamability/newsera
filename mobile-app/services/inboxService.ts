@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import { InboxMessage } from '../types';
 
 export async function fetchInboxMessages(
@@ -8,7 +8,7 @@ export async function fetchInboxMessages(
 ): Promise<InboxMessage[]> {
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('inbox_messages')
     .select('*')
     .eq('user_id', userId)
@@ -19,7 +19,7 @@ export async function fetchInboxMessages(
 }
 
 export async function markMessageRead(messageId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('inbox_messages')
     .update({ read: true })
     .eq('id', messageId);
@@ -27,7 +27,7 @@ export async function markMessageRead(messageId: string): Promise<void> {
 }
 
 export async function deleteMessage(messageId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('inbox_messages')
     .delete()
     .eq('id', messageId)
@@ -36,7 +36,7 @@ export async function deleteMessage(messageId: string, userId: string): Promise<
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await supabaseAuth
     .from('inbox_messages')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)

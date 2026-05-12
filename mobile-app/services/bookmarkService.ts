@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import { NewsArticle } from '../types';
 
 /**
@@ -6,7 +6,7 @@ import { NewsArticle } from '../types';
  * Returns false (not bookmarked) when called for an unauthenticated user.
  */
 export async function isBookmarked(articleId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('bookmarks')
     .select('id')
     .eq('user_id', userId)
@@ -24,7 +24,7 @@ export async function isBookmarked(articleId: string, userId: string): Promise<b
  * Add a bookmark for the authenticated user.
  */
 export async function addBookmark(articleId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('bookmarks')
     .insert({ user_id: userId, article_id: articleId });
   if (error) {
@@ -37,7 +37,7 @@ export async function addBookmark(articleId: string, userId: string): Promise<vo
  * Remove a bookmark for the authenticated user.
  */
 export async function removeBookmark(articleId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('bookmarks')
     .delete()
     .eq('user_id', userId)
@@ -68,7 +68,7 @@ export async function toggleBookmark(articleId: string, userId: string): Promise
  * joined with the articles table for full article data.
  */
 export async function fetchBookmarkedArticles(userId: string): Promise<NewsArticle[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('bookmarks')
     .select(
       `article_id,

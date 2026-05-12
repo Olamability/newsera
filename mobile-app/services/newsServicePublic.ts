@@ -8,6 +8,8 @@ const PERSONALIZED_DISPLAY_COUNT = 10;
 const RECOMMENDATION_CANDIDATE_MULTIPLIER = 3;
 const RECOMMENDATION_TRENDING_FETCH_MULTIPLIER = 6;
 const HEADLINES_LIMIT = 8;
+const SIMILAR_PRIMARY_FETCH_MULTIPLIER = 2;
+const SIMILAR_FALLBACK_FETCH_MULTIPLIER = 3;
 type TrendingClickRow = { article_id?: string | null };
 type ErrorLike = { code?: string; message?: string };
 
@@ -127,6 +129,7 @@ export async function fetchSimilarArticlesPagePublic(
   const allExcluded = Array.from(new Set([articleId, ...excludeIds]));
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
+  const pageOffset = Math.max(0, page - 1) * pageSize;
 
   if (categoryId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
@@ -135,7 +138,7 @@ export async function fetchSimilarArticlesPagePublic(
       .select(ARTICLE_SELECT)
       .eq('category_id', categoryId)
       .order('published_at', { ascending: false })
-      .limit(needed * 2);
+      .limit((needed + pageOffset) * SIMILAR_PRIMARY_FETCH_MULTIPLIER);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', error);
@@ -156,7 +159,7 @@ export async function fetchSimilarArticlesPagePublic(
       .select(ARTICLE_SELECT)
       .eq('source_id', sourceId)
       .order('published_at', { ascending: false })
-      .limit(needed * 2);
+      .limit((needed + pageOffset) * SIMILAR_PRIMARY_FETCH_MULTIPLIER);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', error);
@@ -176,7 +179,7 @@ export async function fetchSimilarArticlesPagePublic(
       .from('articles')
       .select(ARTICLE_SELECT)
       .order('published_at', { ascending: false })
-      .limit(needed * 3);
+      .limit((needed + pageOffset) * SIMILAR_FALLBACK_FETCH_MULTIPLIER);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:fallback', error);

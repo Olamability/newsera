@@ -397,7 +397,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* ── Main scrollable area + sticky comment bar ── */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
       >
         <FlatList
           data={similarArticles}
@@ -953,14 +953,17 @@ const styles = StyleSheet.create({
   },
   stickyInput: {
     flex: 1,
-    height: 38,
+    minHeight: 40,
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
     borderRadius: 20,
     paddingHorizontal: 14,
+    paddingVertical: 8,
     fontSize: 14,
+    lineHeight: 20,
     color: '#1a1a1a',
     backgroundColor: '#fafafa',
+    textAlignVertical: 'center', // Android-only; iOS centers text via paddingVertical
   },
   stickyInputFocused: {
     borderColor: '#d0d0d0',

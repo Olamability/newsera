@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   Share,
@@ -11,9 +13,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,6 +36,10 @@ import { buildArticleShareContent, resolveArticleSourceName } from '../services/
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 const MAX_PREVIEW_CHARS = 1400;
 const MAX_HTML_STRIP_ITERATIONS = 1000;
+const MENU_CLOSE_ANIMATION_DELAY = 250;
+const MIN_BOTTOM_PADDING = 40;
+const BASE_BOTTOM_PADDING = 24;
+const MENU_SHEET_TRANSLATE_Y = 300;
 
 const stripTagBlocks = (value: string, tagName: string): string => {
   let current = value;
@@ -122,6 +130,7 @@ const formatPublishedTime = (publishedAt: string | null | undefined): string | n
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const sourceName = resolveArticleSourceName(article);
   const sourceLogo = article.sources?.logo_url ?? null;
   const previewText = useMemo(() => buildArticlePreview(article.snippet, article.content), [article.content, article.snippet]);
@@ -139,6 +148,56 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
+
+  // Options bottom sheet
+  const [menuVisible, setMenuVisible] = useState(false);
+  const menuAnim = useRef(new Animated.Value(0)).current;
+
+  const openMenu = useCallback(() => {
+    setMenuVisible(true);
+    Animated.spring(menuAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 12,
+      stiffness: 150,
+    }).start();
+  }, [menuAnim]);
+
+  const closeMenu = useCallback(() => {
+    Animated.timing(menuAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => setMenuVisible(false));
+  }, [menuAnim]);
+
+  const handleMenuFavourite = useCallback(() => {
+    closeMenu();
+    setTimeout(() => handleBookmark(), MENU_CLOSE_ANIMATION_DELAY);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeMenu]);
+
+  const handleMenuReport = useCallback(() => {
+    closeMenu();
+    setTimeout(() => {
+      Alert.alert(
+        'Report Article',
+        'Why are you reporting this article?',
+        [
+          { text: 'Misinformation', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
+          { text: 'Inappropriate content', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
+          { text: 'Spam', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }, MENU_CLOSE_ANIMATION_DELAY);
+  }, [closeMenu]);
+
+  const handleMenuShare = useCallback(() => {
+    closeMenu();
+    setTimeout(() => handleShare(), MENU_CLOSE_ANIMATION_DELAY);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeMenu]);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
@@ -294,18 +353,58 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [user, article.id, article.source_id, article.category_id, article.url]);
 
+  const menuTranslateY = menuAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [MENU_SHEET_TRANSLATE_Y, 0],
+  });
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
+
+      {/* ── Custom Header ── */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={26} color="#1a1a1a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.navigate('MainTabs')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="home" size={22} color="#1a1a1a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={openMenu}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color="#1a1a1a" />
+        </TouchableOpacity>
+      </View>
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING) }]}
+        >
           <View style={styles.body}>
             <Text style={styles.title}>{article.title}</Text>
 
+            {/* ── Source row: logo + stacked name/time ── */}
             <View style={styles.sourceRow}>
               {sourceLogo ? (
                 <Image
@@ -322,15 +421,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
               )}
               <View style={styles.sourceMetaWrap}>
-                <View style={styles.sourceMetaRow}>
-                  <Text style={styles.source}>{sourceName}</Text>
-                  {publishedTimeText ? (
-                    <>
-                      <Text style={styles.sourceMetaDot}>•</Text>
-                      <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
-                    </>
-                  ) : null}
-                </View>
+                <Text style={styles.source}>{sourceName}</Text>
+                {publishedTimeText ? (
+                  <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -487,6 +581,66 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Options Bottom Sheet ── */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="none"
+        onRequestClose={closeMenu}
+        statusBarTranslucent
+      >
+        <TouchableWithoutFeedback onPress={closeMenu}>
+          <View style={styles.menuOverlay} />
+        </TouchableWithoutFeedback>
+        <Animated.View
+          style={[
+            styles.menuSheet,
+            { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING), transform: [{ translateY: menuTranslateY }] },
+          ]}
+        >
+          <View style={styles.menuHandle} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleMenuFavourite}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#e63946" />
+            <Text style={styles.menuItemText}>{bookmarked ? 'Remove Bookmark' : 'Favourite'}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleMenuReport}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="flag-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Report</Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleMenuShare}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="share-social-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Share</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, styles.menuCancelItem]}
+            onPress={closeMenu}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.menuCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -499,26 +653,45 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  // ── Custom Header ──
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
   content: {
-    paddingBottom: 40,
+    // paddingBottom is applied dynamically via insets
   },
   body: {
     padding: 16,
   },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1a1a1a',
     lineHeight: 36,
     marginBottom: 12,
   },
+  // ── Source row ──
   sourceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     marginBottom: 16,
   },
@@ -543,26 +716,17 @@ const styles = StyleSheet.create({
   },
   sourceMetaWrap: {
     flex: 1,
-  },
-  sourceMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   source: {
     fontSize: 15,
     color: '#303030',
     fontWeight: '700',
-    flexShrink: 1,
-  },
-  sourceMetaDot: {
-    fontSize: 13,
-    color: '#909090',
   },
   sourceMetaText: {
     fontSize: 13,
     color: '#7a7a7a',
+    marginTop: 2,
   },
   featuredImage: {
     width: '100%',
@@ -786,6 +950,65 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  // ── Options Bottom Sheet ──
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  menuSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+      },
+      android: { elevation: 16 },
+    }),
+  },
+  menuHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  menuCancelItem: {
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  menuCancelText: {
+    fontSize: 16,
+    color: '#888',
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
   },
 });
 

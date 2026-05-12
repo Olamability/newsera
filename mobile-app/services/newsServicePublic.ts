@@ -12,10 +12,64 @@ const SIMILAR_PRIMARY_FETCH_MULTIPLIER = 2;
 const SIMILAR_FALLBACK_FETCH_MULTIPLIER = 3;
 type TrendingClickRow = { article_id?: string | null };
 type ErrorLike = { code?: string; message?: string };
+type EngagementFeedRow = {
+  id: string;
+  title: string;
+  content: string | null;
+  snippet: string | null;
+  source_id: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  url: string;
+  category_id: string | null;
+  source_name: string | null;
+  source_website_url: string | null;
+  source_logo_url: string | null;
+  category_name: string | null;
+  category_slug: string | null;
+  likes_count: number | null;
+  comments_count: number | null;
+  replies_count: number | null;
+  views_count: number | null;
+  engagement_score: number | null;
+};
 
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 const loggedErrors = new Set<string>();
 const MAX_LOGGED_ERRORS = 200;
+
+function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    snippet: row.snippet,
+    source_id: row.source_id,
+    image_url: row.image_url,
+    published_at: row.published_at,
+    url: row.url,
+    category_id: row.category_id,
+    sources: row.source_id
+      ? {
+          id: row.source_id,
+          name: row.source_name ?? 'Unknown source',
+          website_url: row.source_website_url,
+          logo_url: row.source_logo_url,
+        }
+      : null,
+    categories: row.category_id
+      ? {
+          id: row.category_id,
+          name: row.category_name ?? '',
+          slug: row.category_slug ?? undefined,
+        }
+      : null,
+    source_name: row.source_name ?? 'Unknown source',
+    category_name: row.category_name,
+    like_count: row.likes_count ?? 0,
+    comment_count: (row.comments_count ?? 0) + (row.replies_count ?? 0),
+  };
+}
 
 function logPublicErrorOnce(scope: string, error: unknown): void {
   const e = (error ?? {}) as ErrorLike;
@@ -100,8 +154,9 @@ export async function fetchTrendingArticlesPublic(
   const to = page * limit - 1;
 
   const { data, error } = await supabasePublic
-    .from('articles')
-    .select(ARTICLE_SELECT)
+    .from('articles_engagement_feed')
+    .select('*')
+    .order('engagement_score', { ascending: false })
     .order('published_at', { ascending: false })
     .range(from, to);
 
@@ -111,7 +166,7 @@ export async function fetchTrendingArticlesPublic(
   }
 
   const rawCount = (data ?? []).length;
-  const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
+  const articles = ((data as EngagementFeedRow[]) ?? []).map(mapEngagementFeedRow);
   const hasMore = rawCount >= limit;
   return { articles, hasMore };
 }

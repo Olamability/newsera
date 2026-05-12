@@ -11,6 +11,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
 import { fetchTrendingArticles } from '../services/newsServicePublic';
+import { supabasePublic } from '../services/supabase';
 import { NewsArticle, RootStackParamList } from '../types';
 import { isAuthError } from '../services/publicDataErrors';
 
@@ -18,6 +19,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
+const MIN_REALTIME_REFRESH_LIMIT = 20;
+const REALTIME_REFRESH_DEBOUNCE_MS = 350;
 
 const TrendingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -30,6 +33,7 @@ const TrendingScreen: React.FC = () => {
 
   const isFetchingRef = useRef(false);
   const fetchGenerationRef = useRef(0);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadArticles = useCallback(async (pageNum: number, append: boolean) => {
     if (isFetchingRef.current) return;
@@ -53,6 +57,7 @@ const TrendingScreen: React.FC = () => {
     }
   }, []);
 
+
   useEffect(() => {
     fetchGenerationRef.current += 1;
     isFetchingRef.current = false;
@@ -62,6 +67,46 @@ const TrendingScreen: React.FC = () => {
     setArticles([]);
     loadArticles(1, false).finally(() => setLoading(false));
   }, [loadArticles]);
+
+  useEffect(() => {
+    const scheduleRealtimeRefresh = () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+      }
+
+      realtimeRefreshTimerRef.current = setTimeout(async () => {
+        if (isFetchingRef.current) return;
+        const generation = fetchGenerationRef.current;
+        const limit = MIN_REALTIME_REFRESH_LIMIT;
+        try {
+          const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(1, limit);
+          if (fetchGenerationRef.current !== generation) return;
+          setArticles(data);
+          setHasMore(moreAvailable);
+          setPage(1);
+        } catch (err) {
+          if (fetchGenerationRef.current !== generation) return;
+          if (isAuthError(err)) {
+            setHasMore(false);
+          }
+        }
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
+    };
+
+    const channel = supabasePublic
+      .channel('trending_engagement_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_likes' }, scheduleRealtimeRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_comments' }, scheduleRealtimeRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_clicks' }, scheduleRealtimeRefresh)
+      .subscribe();
+
+    return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+      }
+      void supabasePublic.removeChannel(channel);
+    };
+  }, []);
 
   const onRefresh = async () => {
     fetchGenerationRef.current += 1;

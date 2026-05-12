@@ -5,6 +5,7 @@ import {
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Linking,
   Platform,
   Share,
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,11 +37,19 @@ import { InteractionAuthRequiredError } from '../services/interactionErrors';
 import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
+type LikeRealtimePayload = {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: { user_id?: string | null } | null;
+  old: { user_id?: string | null } | null;
+};
+type ThreadedComment = ArticleComment & { replies: ThreadedComment[] };
 const MAX_PREVIEW_CHARS = 1400;
 const COMMENT_BAR_HEIGHT = 62;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
+const REPLY_INDENT_PER_LEVEL = 16;
+const MAX_REPLY_INDENT = 48;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const sanitizedSnippet = sanitizeArticleContent(snippet);
@@ -85,6 +95,34 @@ const formatPublishedTime = (publishedAt: string | null | undefined): string | n
   });
 };
 
+const buildThreadedComments = (flat: ArticleComment[]): ThreadedComment[] => {
+  const map = new Map<string, ThreadedComment>();
+  flat.forEach((comment) => {
+    map.set(comment.id, { ...comment, replies: [] });
+  });
+
+  const roots: ThreadedComment[] = [];
+  map.forEach((comment) => {
+    if (comment.parent_id && map.has(comment.parent_id)) {
+      map.get(comment.parent_id)?.replies.push(comment);
+      return;
+    }
+    roots.push(comment);
+  });
+
+  return roots;
+};
+
+const buildExpandedRepliesMap = (flat: ArticleComment[]): Record<string, boolean> => {
+  const expanded: Record<string, boolean> = {};
+  flat.forEach((comment) => {
+    if (comment.parent_id) {
+      expanded[comment.parent_id] = true;
+    }
+  });
+  return expanded;
+};
+
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
@@ -104,6 +142,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [comments, setComments] = useState<ArticleComment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
@@ -112,6 +152,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const similarPageRef = useRef(1);
   const loadingMoreRef = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
@@ -141,7 +186,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .catch(() => {});
   }, [article.id, user]);
 
-  const promptSignInForInteraction = useCallback((action: 'like' | 'comment') => {
+  const promptSignInForInteraction = useCallback((action: 'like' | 'comment' | 'reply') => {
     Alert.alert(
       'Sign in required',
       `You need to be logged in to ${action}.`,
@@ -170,14 +215,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Near real-time like count refresh
   useEffect(() => {
-    const refreshLikeCount = () => {
-      getLikeCount(article.id)
-        .then(setLikeCount)
-        .catch(() => {});
-    };
-
     const channel = supabasePublic
-      .channel(`article-likes-${article.id}`)
+      .channel(`article_likes_changes:${article.id}`)
       .on(
         'postgres_changes',
         {
@@ -186,7 +225,17 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           table: 'article_likes',
           filter: `article_id=eq.${article.id}`,
         },
-        refreshLikeCount
+        (payload) => {
+          const typedPayload = payload as unknown as LikeRealtimePayload;
+
+          if (typedPayload.eventType === 'INSERT') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setLikeCount((prev) => prev + 1);
+          } else if (typedPayload.eventType === 'DELETE') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setLikeCount((prev) => Math.max(0, prev - 1));
+          }
+        }
       )
       .subscribe();
 
@@ -198,7 +247,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   // Load comments
   useEffect(() => {
     fetchComments(article.id)
-      .then(setComments)
+      .then((loaded) => {
+        setComments(loaded);
+        setExpandedReplies(buildExpandedRepliesMap(loaded));
+      })
       .catch(() => {});
   }, [article.id]);
 
@@ -233,14 +285,24 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       return;
     }
 
+    const previousLiked = liked;
+    const previousCount = likeCount;
+    const nextLiked = !previousLiked;
     setLikeLoading(true);
+    setLiked(nextLiked);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)));
+
     try {
-      const next = await toggleLike(article.id);
-      setLiked(next);
-      // Refetch the authoritative count to stay in sync across devices
-      const count = await getLikeCount(article.id);
-      setLikeCount(count);
+      const confirmed = await toggleLike(article.id);
+      setLiked(confirmed);
+      const authoritativeCount = await getLikeCount(article.id);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setLikeCount(authoritativeCount);
     } catch (err) {
+      setLiked(previousLiked);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setLikeCount(previousCount);
       if (err instanceof InteractionAuthRequiredError) {
         promptSignInForInteraction('like');
       } else {
@@ -249,11 +311,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setLikeLoading(false);
     }
-  }, [user, article.id, promptSignInForInteraction]);
+  }, [user, liked, likeCount, article.id, promptSignInForInteraction]);
 
   const handleAddComment = useCallback(async () => {
     if (!user) {
-      promptSignInForInteraction('comment');
+      promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
       return;
     }
 
@@ -262,20 +324,29 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
     setCommentSubmitting(true);
     try {
-      await addComment(article.id, text);
+      await addComment(article.id, text, replyingToCommentId);
       setCommentText('');
+      setReplyingToCommentId(null);
       const updated = await fetchComments(article.id);
       setComments(updated);
+      setExpandedReplies(buildExpandedRepliesMap(updated));
     } catch (err) {
       if (err instanceof InteractionAuthRequiredError) {
-        promptSignInForInteraction('comment');
+        promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
       } else {
         Alert.alert('Error', 'Failed to post comment. Please try again.');
       }
     } finally {
       setCommentSubmitting(false);
     }
-  }, [user, article.id, commentText, promptSignInForInteraction]);
+  }, [user, article.id, commentText, replyingToCommentId, promptSignInForInteraction]);
+
+  const toggleReplies = useCallback((commentId: string) => {
+    setExpandedReplies((prev) => ({
+      ...prev,
+      [commentId]: !(prev[commentId] ?? true),
+    }));
+  }, []);
 
   const handleBookmark = useCallback(async () => {
     if (!user) {
@@ -404,6 +475,43 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setSimilarLoadingMore(false);
     loadingMoreRef.current = false;
   }, [article.id, article.category_id, article.source_id, similarHasMore]);
+  const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
+
+  const renderCommentNode = (comment: ThreadedComment, depth: number = 0): React.ReactNode => {
+    const hasReplies = comment.replies.length > 0;
+    const repliesExpanded = expandedReplies[comment.id] ?? true;
+    const indent = Math.min(depth * REPLY_INDENT_PER_LEVEL, MAX_REPLY_INDENT);
+
+    return (
+      <View key={comment.id} style={{ marginLeft: indent }}>
+        <View style={[styles.commentItem, depth > 0 && styles.replyCommentItem]}>
+          <View style={styles.commentHeader}>
+            <Text style={styles.commentUser}>Guest</Text>
+            <Text style={styles.commentDate}>
+              {new Date(comment.created_at).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+          <Text style={styles.commentContent}>{comment.content}</Text>
+          <View style={styles.commentActionsRow}>
+            <TouchableOpacity onPress={() => setReplyingToCommentId(comment.id)} activeOpacity={0.7}>
+              <Text style={styles.commentActionText}>Reply</Text>
+            </TouchableOpacity>
+            {hasReplies ? (
+              <TouchableOpacity onPress={() => toggleReplies(comment.id)} activeOpacity={0.7}>
+                <Text style={styles.commentActionText}>
+                  {repliesExpanded ? 'Hide replies' : `View replies (${comment.replies.length})`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+        {hasReplies && repliesExpanded ? comment.replies.map((reply) => renderCommentNode(reply, depth + 1)) : null}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -621,20 +729,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 {comments.length === 0 ? (
                   <Text style={styles.noComments}>No comments yet. Be the first!</Text>
                 ) : (
-                  comments.map((comment) => (
-                    <View key={comment.id} style={styles.commentItem}>
-                      <View style={styles.commentHeader}>
-                        <Text style={styles.commentUser}>Guest</Text>
-                        <Text style={styles.commentDate}>
-                          {new Date(comment.created_at).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </Text>
-                      </View>
-                      <Text style={styles.commentContent}>{comment.content}</Text>
-                    </View>
-                  ))
+                  threadedComments.map((comment) => renderCommentNode(comment))
                 )}
               </View>
             </>
@@ -648,10 +743,15 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) },
           ]}
         >
-          <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
+          <Ionicons
+            name={replyingToCommentId ? 'return-up-forward-outline' : 'chatbubble-outline'}
+            size={18}
+            color="#888"
+            style={styles.stickyBarIcon}
+          />
           <TextInput
             style={[styles.stickyInput, keyboardVisible && styles.stickyInputFocused]}
-            placeholder="Write a comment…"
+            placeholder={replyingToCommentId ? 'Write a reply…' : 'Write a comment…'}
             placeholderTextColor="#aaa"
             value={commentText}
             onChangeText={setCommentText}
@@ -669,8 +769,17 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             disabled={!commentText.trim() || commentSubmitting}
             activeOpacity={0.85}
           >
-            <Text style={styles.stickyPostText}>Post</Text>
+            <Text style={styles.stickyPostText}>{replyingToCommentId ? 'Reply' : 'Post'}</Text>
           </TouchableOpacity>
+          {replyingToCommentId ? (
+            <TouchableOpacity
+              style={styles.stickyCancelReplyBtn}
+              onPress={() => setReplyingToCommentId(null)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.stickyCancelReplyText}>Cancel</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -964,6 +1073,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
   },
+  replyCommentItem: {
+    backgroundColor: '#fcfcfc',
+    borderLeftWidth: 2,
+    borderLeftColor: '#ececec',
+  },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -982,6 +1096,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 21,
+  },
+  commentActionsRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 14,
+  },
+  commentActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6f6f6f',
   },
   // ── Sticky Comment Bar ──
   stickyBar: {
@@ -1039,6 +1163,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  stickyCancelReplyBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  stickyCancelReplyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7a7a7a',
   },
 });
 

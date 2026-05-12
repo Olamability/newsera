@@ -68,7 +68,6 @@ function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
     category_name: row.category_name,
     like_count: row.likes_count ?? 0,
     comment_count: (row.comments_count ?? 0) + (row.replies_count ?? 0),
-    comments_count: (row.comments_count ?? 0) + (row.replies_count ?? 0),
   };
 }
 

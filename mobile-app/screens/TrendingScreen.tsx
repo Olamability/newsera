@@ -19,7 +19,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
-const MAX_REALTIME_REFRESH_LIMIT = 50;
 const MIN_REALTIME_REFRESH_LIMIT = 20;
 const REALTIME_REFRESH_DEBOUNCE_MS = 350;
 
@@ -35,7 +34,6 @@ const TrendingScreen: React.FC = () => {
   const isFetchingRef = useRef(false);
   const fetchGenerationRef = useRef(0);
   const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadedCountRef = useRef(0);
 
   const loadArticles = useCallback(async (pageNum: number, append: boolean) => {
     if (isFetchingRef.current) return;
@@ -59,9 +57,6 @@ const TrendingScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadedCountRef.current = articles.length;
-  }, [articles.length]);
 
   useEffect(() => {
     fetchGenerationRef.current += 1;
@@ -82,7 +77,7 @@ const TrendingScreen: React.FC = () => {
       realtimeRefreshTimerRef.current = setTimeout(async () => {
         if (isFetchingRef.current) return;
         const generation = fetchGenerationRef.current;
-        const limit = Math.min(MAX_REALTIME_REFRESH_LIMIT, Math.max(loadedCountRef.current, MIN_REALTIME_REFRESH_LIMIT));
+        const limit = MIN_REALTIME_REFRESH_LIMIT;
         try {
           const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(1, limit);
           if (fetchGenerationRef.current !== generation) return;

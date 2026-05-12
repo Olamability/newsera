@@ -145,7 +145,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const optimisticRealtimeLikeSkipRef = useRef(0);
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
   const [similarHasMore, setSimilarHasMore] = useState(true);
@@ -228,12 +227,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         },
         (payload) => {
           const typedPayload = payload as unknown as LikeRealtimePayload;
-          const actorId = typedPayload.new?.user_id ?? typedPayload.old?.user_id ?? null;
-
-          if (actorId && user?.id && actorId === user.id && optimisticRealtimeLikeSkipRef.current > 0) {
-            optimisticRealtimeLikeSkipRef.current -= 1;
-            return;
-          }
 
           if (typedPayload.eventType === 'INSERT') {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -249,7 +242,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => {
       void supabasePublic.removeChannel(channel);
     };
-  }, [article.id, user?.id]);
+  }, [article.id]);
 
   // Load comments
   useEffect(() => {
@@ -293,29 +286,23 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     const previousLiked = liked;
+    const previousCount = likeCount;
     const nextLiked = !previousLiked;
     setLikeLoading(true);
     setLiked(nextLiked);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)));
-    optimisticRealtimeLikeSkipRef.current += 1;
 
     try {
       const confirmed = await toggleLike(article.id);
       setLiked(confirmed);
-      if (confirmed !== nextLiked) {
-        const optimisticDelta = nextLiked ? 1 : -1;
-        const confirmedDelta = confirmed ? 1 : -1;
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setLikeCount((prev) => Math.max(0, prev + confirmedDelta - optimisticDelta));
-      }
+      const authoritativeCount = await getLikeCount(article.id);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setLikeCount(authoritativeCount);
     } catch (err) {
-      optimisticRealtimeLikeSkipRef.current = Math.max(0, optimisticRealtimeLikeSkipRef.current - 1);
-      const optimisticDelta = nextLiked ? 1 : -1;
-      const rollbackDelta = previousLiked ? 1 : -1;
       setLiked(previousLiked);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setLikeCount((prev) => Math.max(0, prev + rollbackDelta - optimisticDelta));
+      setLikeCount(previousCount);
       if (err instanceof InteractionAuthRequiredError) {
         promptSignInForInteraction('like');
       } else {
@@ -324,7 +311,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setLikeLoading(false);
     }
-  }, [user, liked, article.id, promptSignInForInteraction]);
+  }, [user, liked, likeCount, article.id, promptSignInForInteraction]);
 
   const handleAddComment = useCallback(async () => {
     if (!user) {

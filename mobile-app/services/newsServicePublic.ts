@@ -129,17 +129,17 @@ export async function fetchSimilarArticlesPagePublic(
   const allExcluded = Array.from(new Set([articleId, ...excludeIds]));
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
-  const pageOffset = Math.max(0, page - 1) * pageSize;
 
   if (categoryId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
     const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
+    const stageOffset = Math.max(0, page - 1) * needed;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('category_id', categoryId)
       .order('published_at', { ascending: false })
-      .range(pageOffset, pageOffset + fetchLimit - 1);
+      .range(stageOffset, stageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', error);
@@ -156,12 +156,13 @@ export async function fetchSimilarArticlesPagePublic(
   if (sourceId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
     const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
+    const stageOffset = Math.max(0, page - 1) * needed;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('source_id', sourceId)
       .order('published_at', { ascending: false })
-      .range(pageOffset, pageOffset + fetchLimit - 1);
+      .range(stageOffset, stageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', error);
@@ -178,11 +179,12 @@ export async function fetchSimilarArticlesPagePublic(
   if (collected.length < pageSize) {
     const needed = pageSize - collected.length;
     const fetchLimit = needed * SIMILAR_FALLBACK_FETCH_MULTIPLIER;
+    const stageOffset = Math.max(0, page - 1) * needed;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .order('published_at', { ascending: false })
-      .range(pageOffset, pageOffset + fetchLimit - 1);
+      .range(stageOffset, stageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:fallback', error);

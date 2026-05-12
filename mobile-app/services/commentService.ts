@@ -1,4 +1,5 @@
 import { supabaseAuth } from './supabase';
+import { isAuthRequiredInteractionError } from './interactionErrors';
 
 export interface ArticleComment {
   id: string;
@@ -6,17 +7,6 @@ export interface ArticleComment {
   user_id: string;
   content: string;
   created_at: string;
-}
-
-type SupabaseErrorLike = {
-  code?: string;
-  message?: string;
-};
-
-function isAuthRequiredError(error: unknown): boolean {
-  const candidate = error as SupabaseErrorLike | null | undefined;
-  const message = (candidate?.message ?? '').toLowerCase();
-  return candidate?.code === '42501' || message.includes('row-level security');
 }
 
 /**
@@ -59,7 +49,7 @@ export async function addComment(
     });
 
   if (error) {
-    if (isAuthRequiredError(error)) {
+    if (isAuthRequiredInteractionError(error)) {
       throw new Error('AUTH_REQUIRED');
     }
     throw error;

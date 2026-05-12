@@ -1,15 +1,5 @@
 import { supabaseAuth } from './supabase';
-
-type SupabaseErrorLike = {
-  code?: string;
-  message?: string;
-};
-
-function isAuthRequiredError(error: unknown): boolean {
-  const candidate = error as SupabaseErrorLike | null | undefined;
-  const message = (candidate?.message ?? '').toLowerCase();
-  return candidate?.code === '42501' || message.includes('row-level security');
-}
+import { isAuthRequiredInteractionError } from './interactionErrors';
 
 /**
  * Check whether a user (or device) has liked a given article.
@@ -81,7 +71,7 @@ export async function toggleLike(articleId: string): Promise<boolean> {
     return false; // Like removed
   }
 
-  if (isAuthRequiredError(insertError)) {
+  if (isAuthRequiredInteractionError(insertError)) {
     throw new Error('AUTH_REQUIRED');
   }
 

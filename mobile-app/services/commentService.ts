@@ -6,6 +6,7 @@ export interface ArticleComment {
   article_id: string;
   user_id: string;
   content: string;
+  parent_id: string | null;
   created_at: string;
 }
 
@@ -15,7 +16,7 @@ export interface ArticleComment {
 export async function fetchComments(articleId: string): Promise<ArticleComment[]> {
   const { data, error } = await supabaseAuth
     .from('article_comments')
-    .select('id, article_id, user_id, content, created_at')
+    .select('id, article_id, user_id, content, parent_id, created_at')
     .eq('article_id', articleId)
     .order('created_at', { ascending: true });
 
@@ -28,7 +29,8 @@ export async function fetchComments(articleId: string): Promise<ArticleComment[]
  */
 export async function addComment(
   articleId: string,
-  content: string
+  content: string,
+  parentId: string | null = null,
 ): Promise<void> {
   const {
     data: { user },
@@ -45,6 +47,7 @@ export async function addComment(
       article_id: articleId,
       user_id: user.id,
       content,
+      parent_id: parentId,
     });
 
   if (error) {

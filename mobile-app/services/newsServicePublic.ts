@@ -133,12 +133,13 @@ export async function fetchSimilarArticlesPagePublic(
 
   if (categoryId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
+    const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('category_id', categoryId)
       .order('published_at', { ascending: false })
-      .limit((needed + pageOffset) * SIMILAR_PRIMARY_FETCH_MULTIPLIER);
+      .range(pageOffset, pageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', error);
@@ -154,12 +155,13 @@ export async function fetchSimilarArticlesPagePublic(
 
   if (sourceId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
+    const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('source_id', sourceId)
       .order('published_at', { ascending: false })
-      .limit((needed + pageOffset) * SIMILAR_PRIMARY_FETCH_MULTIPLIER);
+      .range(pageOffset, pageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', error);
@@ -175,11 +177,12 @@ export async function fetchSimilarArticlesPagePublic(
 
   if (collected.length < pageSize) {
     const needed = pageSize - collected.length;
+    const fetchLimit = needed * SIMILAR_FALLBACK_FETCH_MULTIPLIER;
     let query = supabasePublic
       .from('articles')
       .select(ARTICLE_SELECT)
       .order('published_at', { ascending: false })
-      .limit((needed + pageOffset) * SIMILAR_FALLBACK_FETCH_MULTIPLIER);
+      .range(pageOffset, pageOffset + fetchLimit - 1);
     const { data, error } = await query;
 
     if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:fallback', error);

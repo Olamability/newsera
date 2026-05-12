@@ -122,10 +122,10 @@ export default function HomeScreen() {
     loadCategories();
   }, [loadCategories]);
 
-  // Reset and reload when category changes
-  useEffect(() => {
-    // Invalidate any in-flight fetch from the previous feed and release the lock
-    // so the fresh fetch below is never blocked.
+  // Shared helper: invalidate any in-flight fetch, reset feed state, and kick
+  // off a fresh first-page load. Used by both the category-change effect and
+  // the manual retry handler so the logic stays consistent.
+  const resetAndLoad = useCallback((categoryId: string) => {
     fetchGenerationRef.current += 1;
     isFetchingRef.current = false;
 
@@ -134,12 +134,15 @@ export default function HomeScreen() {
     setPage(1);
     setHasMore(true);
     setArticles([]);
-
-    // Scroll to top when switching categories
     flatListRef.current?.scrollToOffset({ animated: false, offset: 0 });
 
-    loadArticles(selectedCategory, 1, false).finally(() => setLoading(false));
-  }, [selectedCategory, loadArticles]);
+    loadArticles(categoryId, 1, false).finally(() => setLoading(false));
+  }, [loadArticles]);
+
+  // Reset and reload when category changes
+  useEffect(() => {
+    resetAndLoad(selectedCategory);
+  }, [selectedCategory, resetAndLoad]);
 
   const onRefresh = async () => {
     fetchGenerationRef.current += 1;
@@ -208,17 +211,8 @@ export default function HomeScreen() {
   }, []);
 
   const handleRetry = useCallback(() => {
-    fetchGenerationRef.current += 1;
-    isFetchingRef.current = false;
-
-    setLoading(true);
-    setFetchError(false);
-    setPage(1);
-    setHasMore(true);
-    setArticles([]);
-
-    loadArticles(selectedCategory, 1, false).finally(() => setLoading(false));
-  }, [selectedCategory, loadArticles]);
+    resetAndLoad(selectedCategory);
+  }, [selectedCategory, resetAndLoad]);
 
   const renderFooter = () => {
     if (!loadingMore) return null;
@@ -259,11 +253,17 @@ export default function HomeScreen() {
           selectedId={selectedCategory}
           onSelect={setSelectedCategory}
         />
-        <View style={styles.errorContainer}>
+        <View style={styles.errorContainer} accessibilityRole="alert">
           <Text style={styles.errorIcon}>📡</Text>
           <Text style={styles.errorTitle}>Couldn't load articles</Text>
           <Text style={styles.errorSubtitle}>Check your connection and try again.</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={handleRetry}
+            activeOpacity={0.8}
+            accessibilityLabel="Retry loading articles"
+            accessibilityRole="button"
+          >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>

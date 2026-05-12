@@ -1,5 +1,5 @@
 import { supabaseAuth } from './supabase';
-import { isAuthRequiredInteractionError } from './interactionErrors';
+import { InteractionAuthRequiredError, isAuthRequiredInteractionError } from './interactionErrors';
 
 export interface ArticleComment {
   id: string;
@@ -36,7 +36,7 @@ export async function addComment(
   } = await supabaseAuth.auth.getUser();
 
   if (userError || !user) {
-    throw new Error('AUTH_REQUIRED');
+    throw new InteractionAuthRequiredError();
   }
 
   const { error } = await supabaseAuth
@@ -49,7 +49,7 @@ export async function addComment(
 
   if (error) {
     if (isAuthRequiredInteractionError(error)) {
-      throw new Error('AUTH_REQUIRED');
+      throw new InteractionAuthRequiredError();
     }
     throw error;
   }

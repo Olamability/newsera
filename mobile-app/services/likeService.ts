@@ -1,5 +1,5 @@
 import { supabaseAuth } from './supabase';
-import { isAuthRequiredInteractionError } from './interactionErrors';
+import { InteractionAuthRequiredError, isAuthRequiredInteractionError } from './interactionErrors';
 
 /**
  * Check whether a user (or device) has liked a given article.
@@ -47,7 +47,7 @@ export async function toggleLike(articleId: string): Promise<boolean> {
   } = await supabaseAuth.auth.getUser();
 
   if (userError || !user) {
-    throw new Error('AUTH_REQUIRED');
+    throw new InteractionAuthRequiredError();
   }
 
   // Attempt to insert first; if the unique constraint fires, the user already
@@ -72,7 +72,7 @@ export async function toggleLike(articleId: string): Promise<boolean> {
   }
 
   if (isAuthRequiredInteractionError(insertError)) {
-    throw new Error('AUTH_REQUIRED');
+    throw new InteractionAuthRequiredError();
   }
 
   throw insertError;

@@ -304,14 +304,18 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const confirmed = await toggleLike(article.id);
       setLiked(confirmed);
       if (confirmed !== nextLiked) {
+        const optimisticDelta = nextLiked ? 1 : -1;
+        const confirmedDelta = confirmed ? 1 : -1;
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setLikeCount((prev) => Math.max(0, prev + (confirmed ? 1 : -1) - (nextLiked ? 1 : -1)));
+        setLikeCount((prev) => Math.max(0, prev + confirmedDelta - optimisticDelta));
       }
     } catch (err) {
       optimisticRealtimeLikeSkipRef.current = Math.max(0, optimisticRealtimeLikeSkipRef.current - 1);
+      const optimisticDelta = nextLiked ? 1 : -1;
+      const rollbackDelta = previousLiked ? 1 : -1;
       setLiked(previousLiked);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setLikeCount((prev) => Math.max(0, prev + (previousLiked ? 1 : -1) - (nextLiked ? 1 : -1)));
+      setLikeCount((prev) => Math.max(0, prev + rollbackDelta - optimisticDelta));
       if (err instanceof InteractionAuthRequiredError) {
         promptSignInForInteraction('like');
       } else {

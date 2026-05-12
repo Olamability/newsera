@@ -94,7 +94,7 @@ SELECT
     (COALESCE(l.likes_count, 0) * 1.0)
     + (COALESCE(cm.comments_count, 0) * 2.0)
     + (COALESCE(cm.replies_count, 0) * 1.5)
-    + (0 * 3.0)
+    + 0.0 -- shares_count * 3.0 (placeholder until share tracking table is introduced)
     + (COALESCE(v.views_count, 0) * 0.2)
     - (
       GREATEST(

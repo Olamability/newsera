@@ -134,13 +134,14 @@ export async function fetchSimilarArticlesPage(
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
 
-  const buildExclusionClause = () =>
-    `(${allExcluded.map((id) => `"${id}"`).join(',')})`;
+  // PostgREST NOT IN clause: unquoted UUIDs are valid since PostgreSQL
+  // auto-casts string literals to the uuid column type inside the IN list.
+  const buildExclusionClause = () => `(${allExcluded.join(',')})`;
 
   // 1. Same category
   if (categoryId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('category_id', categoryId)
@@ -148,6 +149,7 @@ export async function fetchSimilarArticlesPage(
       .order('published_at', { ascending: false })
       .limit(needed * 2);
 
+    if (error) console.warn('[fetchSimilarArticlesPage] category query:', error.message);
     for (const row of (data ?? []) as ArticleRow[]) {
       if (collected.length >= pageSize) break;
       const mapped = mapArticle(row);
@@ -161,7 +163,7 @@ export async function fetchSimilarArticlesPage(
   // 2. Same source
   if (sourceId && collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('articles')
       .select(ARTICLE_SELECT)
       .eq('source_id', sourceId)
@@ -169,6 +171,7 @@ export async function fetchSimilarArticlesPage(
       .order('published_at', { ascending: false })
       .limit(needed * 2);
 
+    if (error) console.warn('[fetchSimilarArticlesPage] source query:', error.message);
     for (const row of (data ?? []) as ArticleRow[]) {
       if (collected.length >= pageSize) break;
       const mapped = mapArticle(row);
@@ -182,13 +185,14 @@ export async function fetchSimilarArticlesPage(
   // 3. Latest fallback
   if (collected.length < pageSize) {
     const needed = pageSize - collected.length;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('articles')
       .select(ARTICLE_SELECT)
       .not('id', 'in', buildExclusionClause())
       .order('published_at', { ascending: false })
       .limit(needed * 3);
 
+    if (error) console.warn('[fetchSimilarArticlesPage] fallback query:', error.message);
     for (const row of (data ?? []) as ArticleRow[]) {
       if (collected.length >= pageSize) break;
       const mapped = mapArticle(row);

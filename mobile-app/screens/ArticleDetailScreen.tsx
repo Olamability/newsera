@@ -42,6 +42,8 @@ const BASE_BOTTOM_PADDING = 24;
 const MENU_SHEET_TRANSLATE_Y = 300;
 const COMMENT_BAR_HEIGHT = 62;
 const SIMILAR_PAGE_SIZE = 10;
+// Extra clearance so content isn't hidden behind the sticky comment bar
+const STICKY_BAR_CLEARANCE = 8;
 
 const stripTagBlocks = (value: string, tagName: string): string => {
   let current = value;
@@ -259,7 +261,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         setSimilarHasMore(hasMore);
         similarPageRef.current = 2;
         seenIdsRef.current = articles.map((a) => a.id);
-      } catch (_) {}
+      } catch (err) {
+        console.error('[Similar] Initial fetch failed:', err);
+        setSimilarHasMore(false);
+      }
       setSimilarLoadingMore(false);
     })();
   }, [article.id, article.category_id, article.source_id]);
@@ -388,7 +393,9 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setSimilarHasMore(hasMore);
       similarPageRef.current += 1;
       seenIdsRef.current = [...seenIdsRef.current, ...articles.map((a) => a.id)];
-    } catch (_) {}
+    } catch (err) {
+      console.error('[Similar] Load more failed:', err);
+    }
     setSimilarLoadingMore(false);
     loadingMoreRef.current = false;
   }, [article.id, article.category_id, article.source_id, similarHasMore]);
@@ -440,7 +447,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           style={styles.flex}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: COMMENT_BAR_HEIGHT + insets.bottom + 8 },
+            { paddingBottom: COMMENT_BAR_HEIGHT + insets.bottom + STICKY_BAR_CLEARANCE },
           ]}
           showsVerticalScrollIndicator={false}
           onEndReached={loadMoreSimilar}
@@ -625,7 +632,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) }]}>
             <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
             <TextInput
               style={styles.stickyInput}
@@ -815,7 +822,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 8,
-    marginBottom: 4,
   },
   button: {
     backgroundColor: '#e63946',

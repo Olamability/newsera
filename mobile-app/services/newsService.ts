@@ -134,7 +134,8 @@ export async function fetchSimilarArticlesPage(
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
 
-  const buildExclusionClause = () => `(${allExcluded.join(',')})`;
+  const buildExclusionClause = () =>
+    `(${allExcluded.map((id) => `"${id}"`).join(',')})`;
 
   // 1. Same category
   if (categoryId && collected.length < pageSize) {

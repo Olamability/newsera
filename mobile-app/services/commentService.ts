@@ -8,6 +8,17 @@ export interface ArticleComment {
   created_at: string;
 }
 
+type SupabaseErrorLike = {
+  code?: string;
+  message?: string;
+};
+
+function isAuthRequiredError(error: unknown): boolean {
+  const candidate = error as SupabaseErrorLike | null | undefined;
+  const message = (candidate?.message ?? '').toLowerCase();
+  return candidate?.code === '42501' || message.includes('row-level security');
+}
+
 /**
  * Fetch all flat comments for an article, ordered oldest-first.
  */
@@ -27,12 +38,30 @@ export async function fetchComments(articleId: string): Promise<ArticleComment[]
  */
 export async function addComment(
   articleId: string,
-  userId: string,
   content: string
 ): Promise<void> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabaseAuth.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
   const { error } = await supabaseAuth
     .from('article_comments')
-    .insert({ article_id: articleId, user_id: userId, content });
+    .insert({
+      article_id: articleId,
+      user_id: user.id,
+      content,
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) throw error;
+  if (error) {
+    if (isAuthRequiredError(error)) {
+      throw new Error('AUTH_REQUIRED');
+    }
+    throw error;
+  }
 }

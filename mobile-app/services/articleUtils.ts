@@ -60,12 +60,14 @@ const decodeCommonEntities = (value: string): string => {
   let decoded = value;
 
   for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
-    const next = decoded
+    const baseDecoded = decoded
       .replace(/&nbsp;?/gi, ' ')
       .replace(/\$nbsp;?/gi, ' ')
       .replace(/&#160;?/gi, ' ')
-      .replace(/&amp;nbsp;?/gi, ' ')
-      .replace(/&(amp|quot|apos|lt|gt|#39);/gi, (match) => HTML_ENTITY_MAP[match.toLowerCase()] ?? match);
+      .replace(/&amp;nbsp;?/gi, ' ');
+    const next = Object.entries(HTML_ENTITY_MAP).reduce((acc, [entity, replacement]) => (
+      acc.replace(new RegExp(entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replacement)
+    ), baseDecoded);
 
     if (next === decoded) break;
     decoded = next;
@@ -91,7 +93,11 @@ export function sanitizeArticleContent(text: string | null | undefined): string 
     .map((line) => line.replace(/[ \t]+/g, ' ').trim())
     .filter(Boolean);
 
-  return normalizedLines.join('\n\n').replace(/\s{2,}/g, ' ').trim();
+  return normalizedLines
+    .join('\n\n')
+    .replace(/[^\S\n]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function mapArticle(row: ArticleRow): NewsArticle {

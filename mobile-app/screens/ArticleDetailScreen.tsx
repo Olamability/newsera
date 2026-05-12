@@ -40,8 +40,8 @@ const SIMILAR_PAGE_SIZE = 10;
 const STICKY_BAR_CLEARANCE = 8;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
-  const cleanedSnippet = sanitizeArticleContent(snippet);
-  if (cleanedSnippet) return cleanedSnippet;
+  const sanitizedSnippet = sanitizeArticleContent(snippet);
+  if (sanitizedSnippet) return sanitizedSnippet;
 
   if (!content) return null;
   const plainText = sanitizeArticleContent(content);

@@ -41,6 +41,59 @@ export function resolveImageUrl(row: ArticleRow): string | null {
   return extractFirstImageFromContent(row.content as string | null);
 }
 
+const MAX_SANITIZE_PASSES = 3;
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&#39;': "'",
+  '&lt;': '<',
+  '&gt;': '>',
+};
+
+const stripTagBlocks = (value: string, tagName: string): string => {
+  const pattern = new RegExp(`<${tagName}\\b[^>]*>[\\s\\S]*?<\\/${tagName}>`, 'gi');
+  return value.replace(pattern, ' ');
+};
+
+const decodeCommonEntities = (value: string): string => {
+  let decoded = value;
+
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
+    const next = decoded
+      .replace(/&nbsp;?/gi, ' ')
+      .replace(/\$nbsp;?/gi, ' ')
+      .replace(/&#160;?/gi, ' ')
+      .replace(/&amp;nbsp;?/gi, ' ')
+      .replace(/&(amp|quot|apos|lt|gt|#39);/gi, (match) => HTML_ENTITY_MAP[match.toLowerCase()] ?? match);
+
+    if (next === decoded) break;
+    decoded = next;
+  }
+
+  return decoded;
+};
+
+export function sanitizeArticleContent(text: string | null | undefined): string {
+  if (!text) return '';
+
+  const withParagraphBreaks = text
+    .replace(/\u00a0/g, ' ')
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|tr)>/gi, '\n');
+
+  const withoutUnsafeBlocks = stripTagBlocks(stripTagBlocks(withParagraphBreaks, 'style'), 'script');
+  const withoutTags = withoutUnsafeBlocks.replace(/<[^>]+>/g, ' ');
+  const decoded = decodeCommonEntities(withoutTags);
+  const withoutRawEntities = decoded.replace(/&[a-z0-9#]+;?/gi, ' ');
+  const normalizedLines = withoutRawEntities
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean);
+
+  return normalizedLines.join('\n\n').replace(/\s{2,}/g, ' ').trim();
+}
+
 export function mapArticle(row: ArticleRow): NewsArticle {
   return {
     ...(row as unknown as NewsArticle),

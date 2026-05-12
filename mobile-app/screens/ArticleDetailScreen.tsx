@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Animated,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,68 +29,22 @@ import { fetchComments, addComment, ArticleComment } from '../services/commentSe
 import { fetchSimilarArticlesPage } from '../services/newsService';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
+import { sanitizeArticleContent } from '../services/articleUtils';
 import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 const MAX_PREVIEW_CHARS = 1400;
-const MAX_HTML_STRIP_ITERATIONS = 1000;
-const MENU_CLOSE_ANIMATION_DELAY = 250;
-const MIN_BOTTOM_PADDING = 40;
-const BASE_BOTTOM_PADDING = 24;
-const MENU_SHEET_TRANSLATE_Y = 300;
 const COMMENT_BAR_HEIGHT = 62;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
 
-const stripTagBlocks = (value: string, tagName: string): string => {
-  let current = value;
-  const openTagPattern = new RegExp(`<${tagName}\\b`, 'i');
-  const closeTagToken = `</${tagName}`;
-  // Defensive cap to avoid pathological loops with malformed HTML.
-  let maxIterations = MAX_HTML_STRIP_ITERATIONS;
-
-  while (maxIterations-- > 0) {
-    const openIndex = current.search(openTagPattern);
-    if (openIndex === -1) break;
-
-    const closeIndexRelative = current.slice(openIndex).toLowerCase().indexOf(closeTagToken);
-    if (closeIndexRelative === -1) {
-      current = `${current.slice(0, openIndex)} `;
-      break;
-    }
-
-    const closeStart = openIndex + closeIndexRelative;
-    const closeEnd = current.indexOf('>', closeStart);
-    if (closeEnd === -1) {
-      current = `${current.slice(0, openIndex)} `;
-      break;
-    }
-
-    current = `${current.slice(0, openIndex)} ${current.slice(closeEnd + 1)}`;
-  }
-
-  return current;
-};
-
-const stripHtml = (value: string): string => {
-  const withoutStyles = stripTagBlocks(value, 'style');
-  const withoutScripts = stripTagBlocks(withoutStyles, 'script');
-
-  // Output is rendered in a plain Text component (never injected as HTML).
-  return withoutScripts
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
-  const cleanedSnippet = snippet?.trim();
+  const cleanedSnippet = sanitizeArticleContent(snippet);
   if (cleanedSnippet) return cleanedSnippet;
 
   if (!content) return null;
-  const plainText = stripHtml(content);
+  const plainText = sanitizeArticleContent(content);
   if (!plainText) return null;
 
   return plainText.length > MAX_PREVIEW_CHARS
@@ -150,6 +102,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [comments, setComments] = useState<ArticleComment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
   const [similarHasMore, setSimilarHasMore] = useState(true);
@@ -158,61 +111,25 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const loadingMoreRef = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
 
-  // Options bottom sheet
-  const [menuVisible, setMenuVisible] = useState(false);
-  const menuAnim = useRef(new Animated.Value(0)).current;
-
-  const openMenu = useCallback(() => {
-    setMenuVisible(true);
-    Animated.spring(menuAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      damping: 12,
-      stiffness: 150,
-    }).start();
-  }, [menuAnim]);
-
-  const closeMenu = useCallback(() => {
-    Animated.timing(menuAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => setMenuVisible(false));
-  }, [menuAnim]);
-
-  const handleMenuFavourite = useCallback(() => {
-    closeMenu();
-    setTimeout(() => handleBookmark(), MENU_CLOSE_ANIMATION_DELAY);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeMenu]);
-
-  const handleMenuReport = useCallback(() => {
-    closeMenu();
-    setTimeout(() => {
-      Alert.alert(
-        'Report Article',
-        'Why are you reporting this article?',
-        [
-          { text: 'Misinformation', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
-          { text: 'Inappropriate content', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
-          { text: 'Spam', onPress: () => Alert.alert('Reported', 'Thank you for your feedback.') },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-    }, MENU_CLOSE_ANIMATION_DELAY);
-  }, [closeMenu]);
-
-  const handleMenuShare = useCallback(() => {
-    closeMenu();
-    setTimeout(() => handleShare(), MENU_CLOSE_ANIMATION_DELAY);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeMenu]);
-
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {
     saveRecentlyViewed(article);
     checkAndNotifyBreakingNews(article);
   }, [article]);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // Load bookmark state for authenticated users
   useEffect(() => {
@@ -400,47 +317,46 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     loadingMoreRef.current = false;
   }, [article.id, article.category_id, article.source_id, similarHasMore]);
 
-  const menuTranslateY = menuAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [MENU_SHEET_TRANSLATE_Y, 0],
-  });
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar style="dark" />
 
       {/* ── Custom Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back" size={26} color="#1a1a1a" />
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back" size={26} color="#1a1a1a" />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.navigate('MainTabs')}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="home" size={22} color="#1a1a1a" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('MainTabs')}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="home" size={22} color="#1a1a1a" />
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={openMenu}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="ellipsis-vertical" size={22} color="#1a1a1a" />
-        </TouchableOpacity>
+        <View style={styles.headerCenter} />
+
+        <View style={styles.headerRight}>
+          <Text style={styles.headerSource} numberOfLines={1} ellipsizeMode="tail">
+            {sourceName}
+          </Text>
+        </View>
       </View>
 
       {/* ── Main scrollable area + sticky comment bar ── */}
-      <View style={styles.flex}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <FlatList
           data={similarArticles}
           keyExtractor={(item) => item.id}
@@ -629,96 +545,38 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         />
 
         {/* ── Sticky Comment Bar (fixed above Android nav) ── */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) }]}>
-            <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
-            <TextInput
-              style={styles.stickyInput}
-              placeholder="Write a comment…"
-              placeholderTextColor="#aaa"
-              value={commentText}
-              onChangeText={setCommentText}
-              maxLength={500}
-              editable={!commentSubmitting}
-              returnKeyType="send"
-              onSubmitEditing={handleAddComment}
-            />
-            <TouchableOpacity
-              style={[
-                styles.stickyPostBtn,
-                (!commentText.trim() || commentSubmitting) && styles.stickyPostBtnDisabled,
-              ]}
-              onPress={handleAddComment}
-              disabled={!commentText.trim() || commentSubmitting}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.stickyPostText}>Post</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-
-      {/* ── Options Bottom Sheet ── */}
-      <Modal
-        visible={menuVisible}
-        transparent
-        animationType="none"
-        onRequestClose={closeMenu}
-        statusBarTranslucent
-      >
-        <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.menuOverlay} />
-        </TouchableWithoutFeedback>
-        <Animated.View
+        <View
           style={[
-            styles.menuSheet,
-            { paddingBottom: Math.max(insets.bottom + BASE_BOTTOM_PADDING, MIN_BOTTOM_PADDING), transform: [{ translateY: menuTranslateY }] },
+            styles.stickyBar,
+            keyboardVisible && styles.stickyBarKeyboardOpen,
+            { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) },
           ]}
         >
-          <View style={styles.menuHandle} />
-
+          <Ionicons name="chatbubble-outline" size={18} color="#888" style={styles.stickyBarIcon} />
+          <TextInput
+            style={styles.stickyInput}
+            placeholder="Write a comment…"
+            placeholderTextColor="#aaa"
+            value={commentText}
+            onChangeText={setCommentText}
+            maxLength={500}
+            editable={!commentSubmitting}
+            returnKeyType="send"
+            onSubmitEditing={handleAddComment}
+          />
           <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleMenuFavourite}
-            activeOpacity={0.75}
+            style={[
+              styles.stickyPostBtn,
+              (!commentText.trim() || commentSubmitting) && styles.stickyPostBtnDisabled,
+            ]}
+            onPress={handleAddComment}
+            disabled={!commentText.trim() || commentSubmitting}
+            activeOpacity={0.85}
           >
-            <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#e63946" />
-            <Text style={styles.menuItemText}>{bookmarked ? 'Remove Bookmark' : 'Favourite'}</Text>
+            <Text style={styles.stickyPostText}>Post</Text>
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleMenuReport}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="flag-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Report</Text>
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleMenuShare}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="share-social-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Share</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.menuItem, styles.menuCancelItem]}
-            onPress={closeMenu}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.menuCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </Modal>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -741,6 +599,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  headerCenter: {
+    flex: 1,
+  },
+  headerRight: {
+    maxWidth: '55%',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  headerSource: {
+    fontSize: 14,
+    color: '#555',
+    fontWeight: '600',
   },
   headerBtn: {
     width: 40,
@@ -818,9 +695,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#242424',
     lineHeight: 30,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   actions: {
+    marginTop: 2,
     gap: 8,
   },
   button: {
@@ -1024,6 +902,9 @@ const styles = StyleSheet.create({
       android: { elevation: 8 },
     }),
   },
+  stickyBarKeyboardOpen: {
+    paddingTop: 8,
+  },
   stickyBarIcon: {
     marginRight: 2,
   },
@@ -1053,65 +934,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-  },
-  // ── Options Bottom Sheet ──
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  menuSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-      },
-      android: { elevation: 16 },
-    }),
-  },
-  menuHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 16,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  menuCancelItem: {
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  menuCancelText: {
-    fontSize: 16,
-    color: '#888',
-    fontWeight: '600',
-    textAlign: 'center',
-    flex: 1,
   },
 });
 

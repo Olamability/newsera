@@ -24,12 +24,13 @@ import {
   CATEGORY_ALL,
   CATEGORY_FOR_YOU,
   CATEGORY_TRENDING,
-} from '../services/newsService';
+} from '../services/newsServicePublic';
 import { toggleBookmark } from '../services/bookmarkService';
 import { NewsArticle, Category } from '../types';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent } from '../services/shareService';
+import { isAuthError } from '../services/publicDataErrors';
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
@@ -95,6 +96,9 @@ export default function HomeScreen() {
       });
     } catch (err) {
       if (fetchGenerationRef.current !== generation) return;
+      if (isAuthError(err)) {
+        setHasMore(false);
+      }
       console.warn('[HomeScreen] Failed to load articles:', err);
       if (!append) {
         setFetchError(true);

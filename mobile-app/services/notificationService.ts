@@ -13,7 +13,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from './supabase';
+import { supabaseAuth, supabasePublic } from './supabase';
 import { getDeviceId } from './deviceId';
 import { NewsArticle } from '../types';
 
@@ -121,7 +121,7 @@ export async function registerForPushNotificationsAsync(): Promise<void> {
     const pushToken = tokenData.data;
     const deviceId = await getDeviceId();
 
-    const { error: upsertError } = await supabase.from('user_devices').upsert(
+    const { error: upsertError } = await supabaseAuth.from('user_devices').upsert(
       { device_id: deviceId, push_token: pushToken },
       { onConflict: 'device_id' }
     );
@@ -157,7 +157,7 @@ export async function checkAndNotifyBreakingNews(article: NewsArticle): Promise<
 
     // Check 2: high click velocity
     let isHighVelocity = false;
-    const { count } = await supabase
+    const { count } = await supabasePublic
       .from('article_clicks')
       .select('id', { count: 'exact', head: true })
       .eq('article_id', article.id)

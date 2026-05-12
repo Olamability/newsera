@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { supabase } from '../services/supabase';
+import { supabaseAuth } from '../services/supabase';
 
 interface AuthContextValue {
   user: User | null;
@@ -28,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Restore persisted session from AsyncStorage. Always resolve loading so
     // the rest of the app is never blocked by an auth failure.
-    supabase.auth.getSession()
+    supabaseAuth.auth.getSession()
       .then(({ data: { session: currentSession } }) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Subscribe to auth state changes (login, logout, token refresh)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, updatedSession) => {
+    } = supabaseAuth.auth.onAuthStateChange((event: AuthChangeEvent, updatedSession) => {
       setSession(updatedSession);
       setUser(updatedSession?.user ?? null);
 
@@ -60,17 +60,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string): Promise<void> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabaseAuth.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabaseAuth.auth.signUp({ email, password });
     if (error) throw error;
   };
 
   const signOut = async (): Promise<void> => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabaseAuth.auth.signOut();
     if (error) throw error;
   };
 

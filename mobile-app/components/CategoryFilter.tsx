@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Category } from '../types';
-import { CATEGORY_ALL } from '../services/newsService';
+import { CATEGORY_ALL } from '../services/newsServicePublic';
 
 interface Props {
   categories: Category[];

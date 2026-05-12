@@ -20,14 +20,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, NewsArticle } from '../types';
-import { supabase } from '../services/supabase';
+import { supabasePublic } from '../services/supabase';
 import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
 import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
 import { fetchComments, addComment, ArticleComment } from '../services/commentService';
-import { fetchSimilarArticlesPage } from '../services/newsService';
+import { fetchSimilarArticlesPage } from '../services/newsServicePublic';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 import { sanitizeArticleContent } from '../services/articleUtils';
@@ -295,7 +295,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // Dedup: skip insert if this user/device already clicked this article in the last 30 seconds
       const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
-      const { data: recent } = await supabase
+      const { data: recent } = await supabasePublic
         .from('article_clicks')
         .select('id')
         .eq('article_id', article.id)
@@ -304,7 +304,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         .limit(1);
 
       if (!recent || recent.length === 0) {
-        await supabase.from('article_clicks').insert({
+        await supabasePublic.from('article_clicks').insert({
           article_id: article.id,
           source_id: article.source_id,
           device_id: trackingId,
@@ -312,7 +312,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         // Atomically insert or increment the user interest score for this category
         if (article.category_id) {
-          await supabase.rpc('increment_user_interest', {
+          await supabasePublic.rpc('increment_user_interest', {
             p_user_id: trackingId,
             p_category_id: article.category_id,
           });

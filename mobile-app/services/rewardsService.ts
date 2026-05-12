@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import { UserRewards, RewardEvent } from '../types';
 
 const POINTS: Record<RewardEvent['event_type'], number> = {
@@ -21,7 +21,7 @@ function localDateString(d: Date): string {
 }
 
 export async function getUserRewards(userId: string): Promise<UserRewards | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('user_rewards')
     .select('*')
     .eq('user_id', userId)
@@ -31,7 +31,7 @@ export async function getUserRewards(userId: string): Promise<UserRewards | null
 }
 
 export async function getRewardEvents(userId: string, limit = 20): Promise<RewardEvent[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('reward_events')
     .select('*')
     .eq('user_id', userId)
@@ -48,7 +48,7 @@ export async function recordRewardEvent(
 ): Promise<void> {
   const points = POINTS[eventType] ?? 0;
 
-  await supabase
+  await supabaseAuth
     .from('reward_events')
     .insert({ user_id: userId, event_type: eventType, points, description });
 
@@ -57,7 +57,7 @@ export async function recordRewardEvent(
   const existing = await getUserRewards(userId);
 
   if (!existing) {
-    await supabase.from('user_rewards').insert({
+    await supabaseAuth.from('user_rewards').insert({
       user_id: userId,
       total_points: points,
       articles_read: eventType === 'read' ? 1 : 0,
@@ -75,7 +75,7 @@ export async function recordRewardEvent(
     newStreak = lastDate === yesterday ? newStreak + 1 : 1;
   }
 
-  await supabase
+  await supabaseAuth
     .from('user_rewards')
     .update({
       total_points: existing.total_points + points,

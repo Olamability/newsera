@@ -9,12 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import HeadlineCarousel from './HeadlineCarousel';
-import { fetchArticles } from '../services/newsService';
+import { fetchHeadlinesPublic } from '../services/newsServicePublic';
 import { NewsArticle, RootStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-const HEADLINES_LIMIT = 8;
 
 const HeadlinesSection: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -26,12 +24,8 @@ const HeadlinesSection: React.FC = () => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     try {
-      const { articles } = await fetchArticles(1, null);
-      // Prefer articles with images; pad with any remaining if needed
-      const withImages = articles.filter((a) => a.image_url);
-      const withoutImages = articles.filter((a) => !a.image_url);
-      const combined = [...withImages, ...withoutImages].slice(0, HEADLINES_LIMIT);
-      setHeadlines(combined);
+      const data = await fetchHeadlinesPublic();
+      setHeadlines(data);
     } catch (err) {
       console.warn('[HeadlinesSection] Failed to load headlines:', err);
     } finally {

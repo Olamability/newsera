@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import { BlockedEntry } from '../types';
 
 const BLOCKED_SOURCES_KEY = 'newsera_blocked_sources';
@@ -36,7 +36,7 @@ export async function unblockSourceLocally(sourceId: string): Promise<void> {
 // ─── Supabase (authenticated users) ──────────────────────────────────────────
 
 export async function fetchBlockedEntries(userId: string): Promise<BlockedEntry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from('blocked_users')
     .select('*, blocked_source:sources(id, name, logo_url)')
     .eq('user_id', userId)
@@ -46,7 +46,7 @@ export async function fetchBlockedEntries(userId: string): Promise<BlockedEntry[
 }
 
 export async function blockSourceForUser(userId: string, sourceId: string): Promise<void> {
-  const { error } = await supabase.from('blocked_users').upsert(
+  const { error } = await supabaseAuth.from('blocked_users').upsert(
     { user_id: userId, blocked_source_id: sourceId },
     { onConflict: 'user_id,blocked_source_id' }
   );
@@ -59,7 +59,7 @@ export async function unblockEntry(
   userId: string,
   sourceId?: string | null
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAuth
     .from('blocked_users')
     .delete()
     .eq('id', entryId)

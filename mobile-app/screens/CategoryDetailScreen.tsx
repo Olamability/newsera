@@ -9,8 +9,9 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
-import { fetchArticles } from '../services/newsService';
+import { fetchArticles } from '../services/newsServicePublic';
 import { NewsArticle, RootStackParamList } from '../types';
+import { isAuthError } from '../services/publicDataErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoryDetail'>;
 type Nav = NativeStackNavigationProp<RootStackParamList, 'CategoryDetail'>;
@@ -39,6 +40,9 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
         setHasMore(more);
         setArticles((prev) => (append ? [...prev, ...data] : data));
       } catch (err) {
+        if (isAuthError(err)) {
+          setHasMore(false);
+        }
         console.warn('[CategoryDetail] Failed to load:', err);
       } finally {
         isFetchingRef.current = false;

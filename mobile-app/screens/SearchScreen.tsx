@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
-import { supabase } from '../services/supabase';
+import { supabasePublic } from '../services/supabase';
 import { ArticleRow, mapArticle } from '../services/articleUtils';
 import { NewsArticle, RootStackParamList, MainTabParamList } from '../types';
 
@@ -40,7 +40,7 @@ const SearchScreen: React.FC = () => {
     setLoading(true);
     setSearched(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabasePublic
         .from('articles')
         .select(ARTICLE_SELECT)
         .ilike('title', `%${q.trim()}%`)

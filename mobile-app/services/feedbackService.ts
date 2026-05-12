@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 
 export type FeedbackCategory = 'bug' | 'feature' | 'content' | 'other';
 
@@ -10,7 +10,7 @@ export interface FeedbackPayload {
 }
 
 export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
-  const { error } = await supabase.from('feedback').insert({
+  const { error } = await supabaseAuth.from('feedback').insert({
     category: payload.category,
     message: payload.message.trim(),
     email: payload.email?.trim() || null,

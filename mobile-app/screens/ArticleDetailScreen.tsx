@@ -48,6 +48,8 @@ const COMMENT_BAR_HEIGHT = 62;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
+const REPLY_INDENT_PER_LEVEL = 16;
+const MAX_REPLY_INDENT = 48;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const sanitizedSnippet = sanitizeArticleContent(snippet);
@@ -492,7 +494,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const renderCommentNode = (comment: ThreadedComment, depth: number = 0): React.ReactNode => {
     const hasReplies = comment.replies.length > 0;
     const repliesExpanded = expandedReplies[comment.id] ?? true;
-    const indent = Math.min(depth * 16, 48);
+    const indent = Math.min(depth * REPLY_INDENT_PER_LEVEL, MAX_REPLY_INDENT);
 
     return (
       <View key={comment.id} style={{ marginLeft: indent }}>

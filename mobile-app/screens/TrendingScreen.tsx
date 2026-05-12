@@ -20,6 +20,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 const MAX_REALTIME_REFRESH_LIMIT = 50;
+const MIN_REALTIME_REFRESH_LIMIT = 20;
+const REALTIME_REFRESH_DEBOUNCE_MS = 350;
 
 const TrendingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -80,7 +82,7 @@ const TrendingScreen: React.FC = () => {
       realtimeRefreshTimerRef.current = setTimeout(async () => {
         if (isFetchingRef.current) return;
         const generation = fetchGenerationRef.current;
-        const limit = Math.min(MAX_REALTIME_REFRESH_LIMIT, Math.max(loadedCountRef.current, 20));
+        const limit = Math.min(MAX_REALTIME_REFRESH_LIMIT, Math.max(loadedCountRef.current, MIN_REALTIME_REFRESH_LIMIT));
         try {
           const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(1, limit);
           if (fetchGenerationRef.current !== generation) return;

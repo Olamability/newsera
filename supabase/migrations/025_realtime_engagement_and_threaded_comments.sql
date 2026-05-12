@@ -88,7 +88,7 @@ SELECT
   COALESCE(l.likes_count, 0)::int AS likes_count,
   COALESCE(cm.comments_count, 0)::int AS comments_count,
   COALESCE(cm.replies_count, 0)::int AS replies_count,
-  0::numeric AS shares_count,
+  0::int AS shares_count,
   COALESCE(v.views_count, 0)::int AS views_count,
   (
     (COALESCE(l.likes_count, 0) * 1.0)

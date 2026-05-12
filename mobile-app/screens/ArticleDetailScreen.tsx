@@ -31,6 +31,7 @@ import { fetchSimilarArticlesPage } from '../services/newsServicePublic';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 import { sanitizeArticleContent } from '../services/articleUtils';
+import { InteractionAuthRequiredError } from '../services/interactionErrors';
 import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
@@ -140,20 +141,59 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .catch(() => {});
   }, [article.id, user]);
 
-  // Load like state and count (works for both authenticated and guest users)
+  const promptSignInForInteraction = useCallback((action: 'like' | 'comment') => {
+    Alert.alert(
+      'Sign in required',
+      `You need to be logged in to ${action}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+      ]
+    );
+  }, [navigation]);
+
+  // Load like state and count
   useEffect(() => {
     getLikeCount(article.id)
       .then(setLikeCount)
       .catch(() => {});
 
-    (async () => {
-      try {
-        const userId = user?.id ?? (await getDeviceId());
-        const liked = await isLiked(article.id, userId);
-        setLiked(liked);
-      } catch (_) {}
-    })();
+    if (!user) {
+      setLiked(false);
+      return;
+    }
+
+    isLiked(article.id)
+      .then(setLiked)
+      .catch(() => {});
   }, [article.id, user]);
+
+  // Near real-time like count refresh
+  useEffect(() => {
+    const refreshLikeCount = () => {
+      getLikeCount(article.id)
+        .then(setLikeCount)
+        .catch(() => {});
+    };
+
+    const channel = supabasePublic
+      .channel(`article-likes-${article.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'article_likes',
+          filter: `article_id=eq.${article.id}`,
+        },
+        refreshLikeCount
+      )
+      .subscribe();
+
+    return () => {
+      void supabasePublic.removeChannel(channel);
+    };
+  }, [article.id]);
 
   // Load comments
   useEffect(() => {
@@ -188,39 +228,54 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [article.id, article.category_id, article.source_id]);
 
   const handleLike = useCallback(async () => {
+    if (!user) {
+      promptSignInForInteraction('like');
+      return;
+    }
+
     setLikeLoading(true);
     try {
-      const userId = user?.id ?? (await getDeviceId());
-      const next = await toggleLike(article.id, userId);
+      const next = await toggleLike(article.id);
       setLiked(next);
       // Refetch the authoritative count to stay in sync across devices
       const count = await getLikeCount(article.id);
       setLikeCount(count);
     } catch (err) {
-      console.error('[Like] Toggle failed:', err);
+      if (err instanceof InteractionAuthRequiredError) {
+        promptSignInForInteraction('like');
+      } else {
+        Alert.alert('Error', 'Failed to update like. Please try again.');
+      }
     } finally {
       setLikeLoading(false);
     }
-  }, [user, article.id]);
+  }, [user, article.id, promptSignInForInteraction]);
 
   const handleAddComment = useCallback(async () => {
+    if (!user) {
+      promptSignInForInteraction('comment');
+      return;
+    }
+
     const text = commentText.trim();
     if (!text) return;
 
     setCommentSubmitting(true);
     try {
-      const userId = user?.id ?? (await getDeviceId());
-      await addComment(article.id, userId, text);
+      await addComment(article.id, text);
       setCommentText('');
       const updated = await fetchComments(article.id);
       setComments(updated);
     } catch (err) {
-      console.error('[Comment] Submit failed:', err);
-      Alert.alert('Error', 'Failed to post comment. Please try again.');
+      if (err instanceof InteractionAuthRequiredError) {
+        promptSignInForInteraction('comment');
+      } else {
+        Alert.alert('Error', 'Failed to post comment. Please try again.');
+      }
     } finally {
       setCommentSubmitting(false);
     }
-  }, [user, article.id, commentText]);
+  }, [user, article.id, commentText, promptSignInForInteraction]);
 
   const handleBookmark = useCallback(async () => {
     if (!user) {

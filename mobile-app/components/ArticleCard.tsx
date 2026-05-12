@@ -6,7 +6,7 @@ import {
   Text,
   Image,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   Platform,
 } from 'react-native';
 import { NewsArticle } from '../types';
@@ -87,13 +87,13 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
       ) : null}
 
       <Animated.View
-        style={[{ transform: [{ translateX }] }]}
+        style={[styles.animatedCard, { transform: [{ translateX }] }]}
         {...(hasSwipe ? panResponder.panHandlers : {})}
       >
-        <TouchableOpacity
-          style={styles.card}
+        <Pressable
+          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
           onPress={() => onPress(article)}
-          activeOpacity={0.85}
+          android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}
         >
       {/* Left: Image */}
       {article.image_url ? (
@@ -131,7 +131,7 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
           </View>
         </View>
       </View>
-        </TouchableOpacity>
+        </Pressable>
       </Animated.View>
     </View>
   );
@@ -144,8 +144,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 16,
-    marginHorizontal: 12,
-    marginVertical: 6,
     padding: 12,
     alignItems: 'flex-start',
     ...Platform.select({
@@ -159,6 +157,18 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
+  },
+  cardPressed: {
+    // iOS press feedback — Android uses android_ripple above
+    opacity: 0.85,
+  },
+  animatedCard: {
+    // Clip any ripple or press effect to the card boundary so action
+    // backgrounds behind the card cannot leak through on press.
+    overflow: 'hidden',
+    borderRadius: 16,
+    marginHorizontal: 12,
+    marginVertical: 6,
   },
   image: {
     width: 100,

@@ -137,7 +137,7 @@ export const subscribeToTrendingEngagementEvents = (onEvent: () => void): (() =>
     trendingEntry = { channel, callbacks };
   }
 
-  const callback = () => onEvent();
+  const callback = onEvent;
   trendingEntry.callbacks.add(callback);
 
   return () => {

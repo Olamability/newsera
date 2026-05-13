@@ -57,7 +57,8 @@ const STICKY_BAR_CLEARANCE = 8;
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
-const IOS_KEYBOARD_OFFSET = 14;
+const APPROX_HEADER_HEIGHT = 56;
+let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const sanitizedSnippet = sanitizeArticleContent(snippet);
@@ -162,9 +163,10 @@ const sortCommentsAscending = (items: ArticleComment[]): ArticleComment[] => (
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 );
 
-const generateOptimisticCommentId = (): string => (
-  `optimistic-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
-);
+const generateOptimisticCommentId = (): string => {
+  optimisticCommentSequence += 1;
+  return `optimistic-${Date.now()}-${optimisticCommentSequence}`;
+};
 
 const upsertComment = (items: ArticleComment[], incoming: ArticleComment): ArticleComment[] => {
   const index = items.findIndex((item) => item.id === incoming.id);
@@ -785,7 +787,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_KEYBOARD_OFFSET : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? APPROX_HEADER_HEIGHT : 0}
       >
         <FlatList
           data={similarArticles}

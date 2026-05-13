@@ -14,6 +14,7 @@ import {
   Pressable,
   Share,
   StyleSheet,
+  Dimensions,
   Text,
   TextInput,
   TouchableOpacity,
@@ -60,7 +61,7 @@ const COMMENT_BAR_HEIGHT = 102;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
-const COMMENTS_SHEET_MAX_HEIGHT = '88%';
+const COMMENTS_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;

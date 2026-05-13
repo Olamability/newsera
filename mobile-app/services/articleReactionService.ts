@@ -45,7 +45,7 @@ export async function getArticleReactionSummary(articleId: string): Promise<Arti
       dislikeCount += 1;
     }
 
-    if (user?.id && row.user_id === user.id && (row.reaction_type === 'like' || row.reaction_type === 'dislike')) {
+    if (user?.id && row.user_id === user.id) {
       userReaction = row.reaction_type;
     }
   }

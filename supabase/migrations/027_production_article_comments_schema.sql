@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS article_comments (
 -- Make sure required columns exist.
 ALTER TABLE article_comments
   ADD COLUMN IF NOT EXISTS parent_id uuid NULL,
-  ADD COLUMN IF NOT EXISTS likes_count integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+  ADD COLUMN IF NOT EXISTS likes_count integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
 -- Ensure PK/default on id.
 ALTER TABLE article_comments

@@ -64,10 +64,6 @@ export async function addComment(
     throw new Error('Invalid comment payload.');
   }
 
-  if (typeof parentId !== 'string' && parentId !== null) {
-    throw new Error('Invalid parent comment identifier.');
-  }
-
   const {
     data: { session },
     error: sessionError,

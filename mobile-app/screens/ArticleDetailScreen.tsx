@@ -484,7 +484,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const parentId = replyingToCommentId;
     const createdAt = new Date().toISOString();
-    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
     const optimisticComment: ArticleComment = {
       id: optimisticId,
       article_id: article.id,
@@ -712,7 +712,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             >
               <Text style={styles.commentActionText}>Reply</Text>
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Coming soon', 'Comment likes will be available soon.')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.commentActionText}>Like</Text>
             </TouchableOpacity>
             {hasReplies ? (

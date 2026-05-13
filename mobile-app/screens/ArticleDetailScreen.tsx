@@ -56,7 +56,7 @@ import SkeletonCard from '../components/SkeletonCard';
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 type ThreadedComment = ArticleComment & { replies: ThreadedComment[] };
 const MAX_PREVIEW_CHARS = 1400;
-const COMMENT_BAR_HEIGHT = 62;
+const COMMENT_BAR_HEIGHT = 102;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
@@ -509,8 +509,14 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setLiked(nextLiked);
     setDisliked(nextDisliked);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1) + (previousDisliked && nextLiked ? 1 : 0)));
-    setDislikeCount((prev) => Math.max(0, prev + (nextDisliked ? 1 : -1) + (previousLiked && nextDisliked ? 1 : 0)));
+    setLikeCount((prev) => Math.max(0, prev + (
+      (nextLiked && !previousLiked ? 1 : 0)
+      - (!nextLiked && previousLiked ? 1 : 0)
+    )));
+    setDislikeCount((prev) => Math.max(0, prev + (
+      (nextDisliked && !previousDisliked ? 1 : 0)
+      - (!nextDisliked && previousDisliked ? 1 : 0)
+    )));
 
     try {
       const confirmed = await toggleArticleReaction(article.id, reaction);

@@ -65,7 +65,7 @@ export async function addComment(
       parent_id: parentId,
       created_at: createdAt,
     });
-    throw new Error('Invalid comment payload.');
+    throw new Error('Comment requires valid article ID, user ID, and content.');
   }
 
   const {

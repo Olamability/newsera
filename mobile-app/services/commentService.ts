@@ -7,21 +7,38 @@ export interface ArticleComment {
   user_id: string;
   content: string;
   parent_id: string | null;
+  likes_count?: number;
   created_at: string;
 }
 
+export const COMMENTS_PAGE_SIZE = 20;
+
+export type CommentPageResult = {
+  comments: ArticleComment[];
+  hasMore: boolean;
+};
+
 /**
- * Fetch all flat comments for an article, ordered oldest-first.
+ * Fetch a paginated set of comments for an article, ordered oldest-first.
  */
-export async function fetchComments(articleId: string): Promise<ArticleComment[]> {
+export async function fetchCommentsPage(
+  articleId: string,
+  offset: number = 0,
+  limit: number = COMMENTS_PAGE_SIZE,
+): Promise<CommentPageResult> {
+  const safeLimit = Math.max(1, Math.min(100, limit));
+  const safeOffset = Math.max(0, offset);
+
   const { data, error } = await supabaseAuth
     .from('article_comments')
-    .select('id, article_id, user_id, content, parent_id, created_at')
+    .select('id, article_id, user_id, content, parent_id, likes_count, created_at')
     .eq('article_id', articleId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .range(safeOffset, safeOffset + safeLimit - 1);
 
   if (error) throw error;
-  return data ?? [];
+  const comments = data ?? [];
+  return { comments, hasMore: comments.length === safeLimit };
 }
 
 /**
@@ -29,42 +46,43 @@ export async function fetchComments(articleId: string): Promise<ArticleComment[]
  */
 export async function addComment(
   articleId: string,
+  userId: string,
   content: string,
   parentId: string | null = null,
-): Promise<void> {
+  createdAt: string = new Date().toISOString(),
+): Promise<ArticleComment> {
+  if (!content || !content.trim()) {
+    throw new Error('Comment content is required.');
+  }
+
   const trimmedContent = content.trim();
+
+  if (!articleId || !userId) {
+    console.log('[Comments] Invalid insert payload input:', {
+      article_id: articleId,
+      user_id: userId,
+      content: trimmedContent,
+      parent_id: parentId,
+      created_at: createdAt,
+    });
+    throw new Error('Comment requires valid article ID, user ID, and content.');
+  }
+
   const {
     data: { session },
     error: sessionError,
   } = await supabaseAuth.auth.getSession();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabaseAuth.auth.getUser();
-
-  if (sessionError) {
-    console.log('[Comments] Failed to fetch session before insert:', sessionError);
-    throw new InteractionAuthRequiredError();
-  }
-
-  console.log('[Comments] Pre-insert auth context:', {
-    user,
-    session,
-    article_id: articleId,
-    commentText: trimmedContent,
-    parent_id: parentId,
-  });
-
-  if (!session || userError || !user || !user.id) {
+  if (sessionError || !session) {
+    console.log('[Comments] Missing auth session before insert:', { sessionError, hasSession: !!session });
     throw new InteractionAuthRequiredError();
   }
 
   const payload = {
     article_id: articleId,
-    user_id: user.id,
+    user_id: userId,
     content: trimmedContent,
     parent_id: parentId,
-    created_at: new Date().toISOString(),
+    created_at: createdAt,
   };
 
   console.log('[Comments] Insert payload:', payload);
@@ -72,7 +90,8 @@ export async function addComment(
   const { data, error } = await supabaseAuth
     .from('article_comments')
     .insert(payload)
-    .select('id, article_id, user_id, content, parent_id, created_at');
+    .select('id, article_id, user_id, content, parent_id, likes_count, created_at')
+    .single();
 
   console.log('[Comments] Supabase insert response:', { data, error });
 
@@ -83,4 +102,10 @@ export async function addComment(
     }
     throw error;
   }
+
+  if (!data) {
+    throw new Error('Comment insert did not return a row.');
+  }
+
+  return data;
 }

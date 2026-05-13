@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  Animated,
   Alert,
+  Easing,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -28,7 +30,12 @@ import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
 import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
-import { fetchComments, addComment, ArticleComment } from '../services/commentService';
+import {
+  fetchCommentsPage,
+  addComment,
+  ArticleComment,
+  COMMENTS_PAGE_SIZE,
+} from '../services/commentService';
 import { fetchSimilarArticlesPage } from '../services/newsServicePublic';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
@@ -49,6 +56,9 @@ const SIMILAR_PAGE_SIZE = 10;
 const STICKY_BAR_CLEARANCE = 8;
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
+const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
+const APPROX_HEADER_HEIGHT = 56;
+let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const sanitizedSnippet = sanitizeArticleContent(snippet);
@@ -122,6 +132,50 @@ const buildExpandedRepliesMap = (flat: ArticleComment[]): Record<string, boolean
   return expanded;
 };
 
+const formatRelativeTime = (dateInput: string | null | undefined): string => {
+  if (!dateInput) return 'now';
+  const value = new Date(dateInput);
+  if (Number.isNaN(value.getTime())) return 'now';
+
+  const diffMs = Math.max(0, Date.now() - value.getTime());
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return value.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const getCommentAuthorLabel = (
+  comment: ArticleComment,
+  currentUserId?: string | null,
+  currentUserEmail?: string | null,
+): string => {
+  if (currentUserId && comment.user_id === currentUserId) {
+    return currentUserEmail ?? 'You';
+  }
+  return `User ${comment.user_id.slice(0, 8)}`;
+};
+
+const sortCommentsAscending = (items: ArticleComment[]): ArticleComment[] => (
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+);
+
+const generateOptimisticCommentId = (): string => {
+  optimisticCommentSequence += 1;
+  return `optimistic-${Date.now()}-${optimisticCommentSequence}`;
+};
+
+const upsertComment = (items: ArticleComment[], incoming: ArticleComment): ArticleComment[] => {
+  const index = items.findIndex((item) => item.id === incoming.id);
+  if (index === -1) return sortCommentsAscending([...items, incoming]);
+  const next = [...items];
+  next[index] = incoming;
+  return sortCommentsAscending(next);
+};
+
 const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { article } = route.params;
   const { user } = useAuth();
@@ -145,11 +199,17 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [likeLoading, setLikeLoading] = useState(false);
 
   const [comments, setComments] = useState<ArticleComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
+  const [commentsHasMore, setCommentsHasMore] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const commentsOffsetRef = useRef(0);
+  const commentsRequestIdRef = useRef(0);
+  const shimmerOpacity = useRef(new Animated.Value(0.35)).current;
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
   const [similarHasMore, setSimilarHasMore] = useState(true);
@@ -182,6 +242,39 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    const shimmerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerOpacity, {
+          toValue: 0.95,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerOpacity, {
+          toValue: 0.35,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    shimmerLoop.start();
+    return () => {
+      shimmerLoop.stop();
+    };
+  }, [shimmerOpacity]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      Keyboard.dismiss();
+      setCommentText('');
+      setReplyingToCommentId(null);
+      setCommentSubmitting(false);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // Load bookmark state for authenticated users
   useEffect(() => {
@@ -237,32 +330,97 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   }, [article.id]);
 
-  const loadComments = useCallback(async () => {
-    fetchComments(article.id)
-      .then((loaded) => {
-        setComments(loaded);
-        setExpandedReplies(buildExpandedRepliesMap(loaded));
-      })
-      .catch(() => {});
+  const loadInitialComments = useCallback(async () => {
+    const requestId = commentsRequestIdRef.current + 1;
+    commentsRequestIdRef.current = requestId;
+    setCommentsLoading(true);
+    setCommentsLoadingMore(false);
+    setCommentsHasMore(true);
+    commentsOffsetRef.current = 0;
+
+    try {
+      const { comments: loaded, hasMore } = await fetchCommentsPage(article.id, 0, COMMENT_PAGINATION_SIZE);
+      if (commentsRequestIdRef.current !== requestId) return;
+      setComments(loaded);
+      setExpandedReplies(buildExpandedRepliesMap(loaded));
+      setCommentsHasMore(hasMore);
+      commentsOffsetRef.current = loaded.length;
+    } catch (err) {
+      console.log('[Comments] Failed to load initial comments:', err);
+      if (commentsRequestIdRef.current === requestId) {
+        setComments([]);
+        setCommentsHasMore(false);
+      }
+    } finally {
+      if (commentsRequestIdRef.current === requestId) {
+        setCommentsLoading(false);
+      }
+    }
   }, [article.id]);
+
+  const loadMoreComments = useCallback(async () => {
+    if (commentsLoading || commentsLoadingMore || !commentsHasMore) return;
+    setCommentsLoadingMore(true);
+    try {
+      const { comments: loaded, hasMore } = await fetchCommentsPage(
+        article.id,
+        commentsOffsetRef.current,
+        COMMENT_PAGINATION_SIZE,
+      );
+      let nextCommentsSnapshot: ArticleComment[] = [];
+      setComments((prev) => {
+        const existing = new Set(prev.map((item) => item.id));
+        const deduped = loaded.filter((item) => !existing.has(item.id));
+        const next = sortCommentsAscending([...prev, ...deduped]);
+        nextCommentsSnapshot = next;
+        return next;
+      });
+      setExpandedReplies((current) => ({ ...buildExpandedRepliesMap(nextCommentsSnapshot), ...current }));
+      commentsOffsetRef.current += loaded.length;
+      setCommentsHasMore(hasMore);
+    } catch (err) {
+      console.log('[Comments] Failed to load more comments:', err);
+    } finally {
+      setCommentsLoadingMore(false);
+    }
+  }, [article.id, commentsHasMore, commentsLoading, commentsLoadingMore]);
 
   // Load comments
   useEffect(() => {
-    void loadComments();
-  }, [loadComments]);
+    void loadInitialComments();
+  }, [loadInitialComments]);
 
   // Near real-time comments updates (singleton-managed subscription)
   useEffect(() => {
     return subscribeToArticleCommentEvents(article.id, (payload) => {
-      if (
-        payload.eventType === 'INSERT'
-        || payload.eventType === 'UPDATE'
-        || payload.eventType === 'DELETE'
-      ) {
-        void loadComments();
+      console.log('[Comments] Realtime event:', payload.eventType, payload);
+
+      if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (!deletedId) return;
+        setComments((prev) => prev.filter((item) => item.id !== deletedId));
+        return;
+      }
+
+      const row = payload.new;
+      if (!row?.id || !row.article_id || !row.user_id || !row.content || !row.created_at) return;
+
+      const incoming: ArticleComment = {
+        id: row.id,
+        article_id: row.article_id,
+        user_id: row.user_id,
+        content: row.content,
+        parent_id: row.parent_id ?? null,
+        likes_count: row.likes_count ?? 0,
+        created_at: row.created_at,
+      };
+
+      setComments((prev) => upsertComment(prev, incoming));
+      if (incoming.parent_id) {
+        setExpandedReplies((prev) => ({ ...prev, [incoming.parent_id!]: true }));
       }
     });
-  }, [article.id, loadComments]);
+  }, [article.id]);
 
   // Load "Read More Like This" recommendations — initial page
   useEffect(() => {
@@ -326,29 +484,57 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleAddComment = useCallback(async () => {
     const text = commentText.trim();
     if (!text) return;
+    if (!user?.id) {
+      promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
+      return;
+    }
+
+    const parentId = replyingToCommentId;
+    const createdAt = new Date().toISOString();
+    const optimisticId = generateOptimisticCommentId();
+    const optimisticComment: ArticleComment = {
+      id: optimisticId,
+      article_id: article.id,
+      user_id: user.id,
+      content: text,
+      parent_id: parentId,
+      likes_count: 0,
+      created_at: createdAt,
+    };
 
     setCommentSubmitting(true);
+    setCommentText('');
+    setReplyingToCommentId(null);
+    setComments((prev) => upsertComment(prev, optimisticComment));
+    if (parentId) {
+      setExpandedReplies((prev) => ({ ...prev, [parentId]: true }));
+    }
+
     try {
-      await addComment(article.id, text, replyingToCommentId);
-      setCommentText('');
-      setReplyingToCommentId(null);
-      const updated = await fetchComments(article.id);
-      setComments(updated);
-      setExpandedReplies(buildExpandedRepliesMap(updated));
+      const inserted = await addComment(article.id, user.id, text, parentId, createdAt);
+      setComments((prev) => {
+        const withoutOptimistic = prev.filter((comment) => comment.id !== optimisticId);
+        return upsertComment(withoutOptimistic, inserted);
+      });
     } catch (err) {
+      setComments((prev) => prev.filter((comment) => comment.id !== optimisticId));
       if (err instanceof InteractionAuthRequiredError) {
-        promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
+        setCommentText(text);
+        setReplyingToCommentId(parentId);
+        promptSignInForInteraction(parentId ? 'reply' : 'comment');
       } else {
         console.log('[Comments] Failed to post comment:', err);
         if (err && typeof err === 'object' && 'message' in err) {
           console.log('[Comments] Supabase error message:', (err as { message?: string }).message);
         }
+        setCommentText(text);
+        setReplyingToCommentId(parentId);
         Alert.alert('Error', 'Failed to post comment. Please try again.');
       }
     } finally {
       setCommentSubmitting(false);
     }
-  }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction]);
+  }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction, user]);
 
   const toggleReplies = useCallback((commentId: string) => {
     setExpandedReplies((prev) => ({
@@ -490,29 +676,54 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setSimilarLoadingMore(false);
     loadingMoreRef.current = false;
   }, [article.id, article.category_id, article.source_id, similarHasMore]);
+
+  const handleEndReached = useCallback(() => {
+    void loadMoreSimilar();
+    void loadMoreComments();
+  }, [loadMoreComments, loadMoreSimilar]);
+
   const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
 
   const renderCommentNode = (comment: ThreadedComment, depth: number = 0): React.ReactNode => {
     const hasReplies = comment.replies.length > 0;
     const repliesExpanded = expandedReplies[comment.id] ?? true;
     const indent = Math.min(depth * REPLY_INDENT_PER_LEVEL, MAX_REPLY_INDENT);
+    const authorLabel = getCommentAuthorLabel(comment, user?.id, user?.email);
+    const avatarSeed = authorLabel.trim()[0]?.toUpperCase() || 'U';
 
     return (
       <View key={comment.id} style={{ marginLeft: indent }}>
         <View style={[styles.commentItem, depth > 0 && styles.replyCommentItem]}>
           <View style={styles.commentHeader}>
-            <Text style={styles.commentUser}>Guest</Text>
-            <Text style={styles.commentDate}>
-              {new Date(comment.created_at).toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </Text>
+            <View style={styles.commentIdentityRow}>
+              <View style={styles.commentAvatar}>
+                <Text style={styles.commentAvatarText}>{avatarSeed}</Text>
+              </View>
+              <View style={styles.commentMeta}>
+                <Text style={styles.commentUser}>{authorLabel}</Text>
+                <Text style={styles.commentDate}>{formatRelativeTime(comment.created_at)}</Text>
+              </View>
+            </View>
           </View>
           <Text style={styles.commentContent}>{comment.content}</Text>
           <View style={styles.commentActionsRow}>
-            <TouchableOpacity onPress={() => setReplyingToCommentId(comment.id)} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => {
+                if (!user?.id) {
+                  promptSignInForInteraction('reply');
+                  return;
+                }
+                setReplyingToCommentId(comment.id);
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.commentActionText}>Reply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Coming soon', 'Comment likes will be available soon.')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.commentActionText}>Like</Text>
             </TouchableOpacity>
             {hasReplies ? (
               <TouchableOpacity onPress={() => toggleReplies(comment.id)} activeOpacity={0.7}>
@@ -575,7 +786,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* ── Main scrollable area + sticky comment bar ── */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? APPROX_HEADER_HEIGHT : 0}
       >
         <FlatList
           data={similarArticles}
@@ -586,7 +798,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             { paddingBottom: COMMENT_BAR_HEIGHT + insets.bottom + STICKY_BAR_CLEARANCE },
           ]}
           showsVerticalScrollIndicator={false}
-          onEndReached={loadMoreSimilar}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           removeClippedSubviews
           ListHeaderComponent={
@@ -753,11 +965,31 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   Comments{comments.length > 0 ? ` (${comments.length})` : ''}
                 </Text>
 
-                {comments.length === 0 ? (
+                {commentsLoading ? (
+                  <View style={styles.commentSkeletonList}>
+                    {[0, 1, 2].map((index) => (
+                      <Animated.View
+                        key={`comment-skeleton-${index}`}
+                        style={[styles.commentSkeletonItem, { opacity: shimmerOpacity }]}
+                      >
+                        <View style={styles.commentSkeletonAvatar} />
+                        <View style={styles.commentSkeletonContent}>
+                          <View style={styles.commentSkeletonLineShort} />
+                          <View style={styles.commentSkeletonLineLong} />
+                          <View style={styles.commentSkeletonLineMedium} />
+                        </View>
+                      </Animated.View>
+                    ))}
+                  </View>
+                ) : comments.length === 0 ? (
                   <Text style={styles.noComments}>No comments yet. Be the first!</Text>
                 ) : (
                   threadedComments.map((comment) => renderCommentNode(comment))
                 )}
+
+                {commentsLoadingMore ? (
+                  <Text style={styles.commentsLoadingMore}>Loading more comments…</Text>
+                ) : null}
               </View>
             </>
           }
@@ -1144,8 +1376,32 @@ const styles = StyleSheet.create({
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
+  },
+  commentIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  commentAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e7e7e7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentAvatarText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
+  commentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   commentUser: {
     fontSize: 13,
@@ -1164,12 +1420,58 @@ const styles = StyleSheet.create({
   commentActionsRow: {
     marginTop: 8,
     flexDirection: 'row',
-    gap: 14,
+    gap: 16,
   },
   commentActionText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#6f6f6f',
+  },
+  commentSkeletonList: {
+    gap: 10,
+  },
+  commentSkeletonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f7f7f7',
+    borderRadius: 10,
+    padding: 12,
+  },
+  commentSkeletonAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e4e4e4',
+    marginRight: 10,
+  },
+  commentSkeletonContent: {
+    flex: 1,
+    gap: 6,
+  },
+  commentSkeletonLineShort: {
+    width: '35%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ececec',
+  },
+  commentSkeletonLineLong: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ececec',
+  },
+  commentSkeletonLineMedium: {
+    width: '72%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ececec',
+  },
+  commentsLoadingMore: {
+    fontSize: 12,
+    color: '#8a8a8a',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 6,
   },
   // ── Sticky Comment Bar ──
   stickyBar: {

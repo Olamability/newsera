@@ -9,8 +9,24 @@ type LikeEventPayload = {
 
 type CommentEventPayload = {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  new: { article_id?: string | null } | null;
-  old: { article_id?: string | null } | null;
+  new: {
+    id?: string | null;
+    article_id?: string | null;
+    user_id?: string | null;
+    content?: string | null;
+    parent_id?: string | null;
+    likes_count?: number | null;
+    created_at?: string | null;
+  } | null;
+  old: {
+    id?: string | null;
+    article_id?: string | null;
+    user_id?: string | null;
+    content?: string | null;
+    parent_id?: string | null;
+    likes_count?: number | null;
+    created_at?: string | null;
+  } | null;
 };
 
 type SubscriberEntry<TPayload> = {

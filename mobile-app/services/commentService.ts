@@ -57,7 +57,7 @@ export async function addComment(
 
   const trimmedContent = content.trim();
 
-  if (!articleId || !userId || !trimmedContent) {
+  if (!articleId || !userId) {
     console.log('[Comments] Invalid insert payload input:', {
       article_id: articleId,
       user_id: userId,

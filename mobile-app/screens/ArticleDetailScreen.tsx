@@ -57,6 +57,7 @@ const STICKY_BAR_CLEARANCE = 8;
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
+const IOS_KEYBOARD_OFFSET = 14;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
   const sanitizedSnippet = sanitizeArticleContent(snippet);
@@ -686,7 +687,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     const repliesExpanded = expandedReplies[comment.id] ?? true;
     const indent = Math.min(depth * REPLY_INDENT_PER_LEVEL, MAX_REPLY_INDENT);
     const authorLabel = getCommentAuthorLabel(comment, user?.id, user?.email);
-    const avatarSeed = authorLabel.trim().charAt(0).toUpperCase() || 'U';
+    const avatarSeed = authorLabel.trim()[0]?.toUpperCase() || 'U';
 
     return (
       <View key={comment.id} style={{ marginLeft: indent }}>
@@ -784,7 +785,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 14 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_KEYBOARD_OFFSET : 0}
       >
         <FlatList
           data={similarArticles}

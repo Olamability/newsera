@@ -75,17 +75,17 @@ const formatPublishedTime = (publishedAt: string | null | undefined): string | n
 
   if (diffMinutes < 60) {
     const mins = Math.max(1, diffMinutes);
-    return `Published ${mins} min ago`;
+    return `${mins}m ago`;
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    return `Published ${diffHours} hr ago`;
+    return `${diffHours}h ago`;
   }
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays <= 7) {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    return `${diffDays}d ago`;
   }
 
   return publishedDate.toLocaleDateString(undefined, {
@@ -131,6 +131,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const sourceLogo = article.sources?.logo_url ?? null;
   const previewText = useMemo(() => buildArticlePreview(article.snippet, article.content), [article.content, article.snippet]);
   const publishedTimeText = useMemo(() => formatPublishedTime(article.published_at), [article.published_at]);
+  const estimatedReadingTime = useMemo(() => {
+    if (!previewText) return null;
+    const wordCount = previewText.trim().split(/\s+/).length;
+    const minutes = Math.max(1, Math.round(wordCount / 200));
+    return `${minutes} min read`;
+  }, [previewText]);
 
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -575,35 +581,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           onEndReachedThreshold={0.5}
           removeClippedSubviews
           ListHeaderComponent={
-            <View style={styles.body}>
-              {/* 1. Article Title */}
-              <Text style={styles.title}>{article.title}</Text>
-
-              {/* 2. Source Row: logo + stacked name/time */}
-              <View style={styles.sourceRow}>
-                {sourceLogo ? (
-                  <Image
-                    source={{ uri: sourceLogo }}
-                    style={styles.sourceLogo}
-                    contentFit="contain"
-                    transition={200}
-                  />
-                ) : (
-                  <View style={styles.sourceLogoPlaceholder}>
-                    <Text style={styles.sourceLogoPlaceholderText}>
-                      {sourceName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.sourceMetaWrap}>
-                  <Text style={styles.source}>{sourceName}</Text>
-                  {publishedTimeText ? (
-                    <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* 3. Featured Image */}
+            <>
+              {/* 1. Featured Image — full-bleed at top */}
               {article.image_url ? (
                 <Image
                   source={{ uri: article.image_url }}
@@ -613,76 +592,115 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
               ) : null}
 
-              {/* 4. Article Snippet / Content */}
-              {previewText ? (
-                <Text style={styles.articleContent}>{previewText}</Text>
-              ) : null}
+              <View style={styles.body}>
+                {/* 2. Headline */}
+                <Text style={styles.title}>{article.title}</Text>
 
-              {/* 5. Read on Source Website (tight to snippet) */}
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={handleReadFull}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.buttonText}>Read on Source Website</Text>
-                </TouchableOpacity>
-
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.bookmarkBtn,
-                      bookmarked && styles.bookmarkBtnActive,
-                      bookmarkLoading && styles.bookmarkBtnDisabled,
-                    ]}
-                    onPress={handleBookmark}
-                    disabled={bookmarkLoading}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
-                      {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.likeBtn,
-                      liked && styles.likeBtnActive,
-                      likeLoading && styles.likeBtnDisabled,
-                    ]}
-                    onPress={handleLike}
-                    disabled={likeLoading}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.likeText, liked && styles.likeTextActive]}>
-                      {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.shareBtn}
-                    onPress={handleShare}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.shareText}>↗ Share</Text>
-                  </TouchableOpacity>
+                {/* 3. Metadata Row: source+logo left · timestamp+reading-time right */}
+                <View style={styles.metaRow}>
+                  <View style={styles.metaLeft}>
+                    {sourceLogo ? (
+                      <Image
+                        source={{ uri: sourceLogo }}
+                        style={styles.sourceLogo}
+                        contentFit="contain"
+                        transition={200}
+                      />
+                    ) : (
+                      <View style={styles.sourceLogoPlaceholder}>
+                        <Text style={styles.sourceLogoPlaceholderText}>
+                          {sourceName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.source} numberOfLines={1}>{sourceName}</Text>
+                  </View>
+                  <View style={styles.metaRight}>
+                    {publishedTimeText ? (
+                      <Text style={styles.sourceMetaText}>{publishedTimeText}</Text>
+                    ) : null}
+                    {estimatedReadingTime ? (
+                      <Text style={styles.readingTime}>{estimatedReadingTime}</Text>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
 
-              {/* 6. "Read More Like This" section header */}
-              <View style={styles.similarSection}>
-                <Text style={styles.similarTitle}>Read More Like This</Text>
-              </View>
+                <View style={styles.contentDivider} />
 
-              {/* Skeleton placeholder while first page loads */}
-              {similarLoadingMore && similarArticles.length === 0 ? (
-                <>
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
-                </>
-              ) : null}
-            </View>
+                {/* 4. Article Snippet / Content */}
+                {previewText ? (
+                  <Text style={styles.articleContent}>{previewText}</Text>
+                ) : null}
+
+                {/* 5. Read on Source Website */}
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={handleReadFull}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.buttonInner}>
+                      <Ionicons name="open-outline" size={17} color="#fff" />
+                      <Text style={styles.buttonText}>Read on Source Website</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.bookmarkBtn,
+                        bookmarked && styles.bookmarkBtnActive,
+                        bookmarkLoading && styles.bookmarkBtnDisabled,
+                      ]}
+                      onPress={handleBookmark}
+                      disabled={bookmarkLoading}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.bookmarkText, bookmarked && styles.bookmarkTextActive]}>
+                        {bookmarked ? '🔖 Saved' : '🔖 Bookmark'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.likeBtn,
+                        liked && styles.likeBtnActive,
+                        likeLoading && styles.likeBtnDisabled,
+                      ]}
+                      onPress={handleLike}
+                      disabled={likeLoading}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.likeText, liked && styles.likeTextActive]}>
+                        {liked ? '❤️' : '🤍'} {likeCount > 0 ? likeCount : ''}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.shareBtn}
+                      onPress={handleShare}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.shareText}>↗ Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 6. "Read More Like This" section header */}
+                <View style={styles.similarSection}>
+                  <Text style={styles.similarTitle}>Read More Like This</Text>
+                </View>
+
+                {/* Skeleton placeholder while first page loads */}
+                {similarLoadingMore && similarArticles.length === 0 ? (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
+                ) : null}
+              </View>
+            </>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -845,38 +863,62 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   body: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#1a1a1a',
-    lineHeight: 36,
-    marginBottom: 12,
+    color: '#111',
+    lineHeight: 34,
+    letterSpacing: -0.3,
+    marginBottom: 14,
   },
-  // ── Source row ──
-  sourceRow: {
+  // ── Metadata Row ──
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
+    gap: 8,
+  },
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  metaRight: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  readingTime: {
+    fontSize: 11,
+    color: '#aaa',
+    marginTop: 2,
+  },
+  contentDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 18,
   },
   sourceLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f2f2f2',
   },
   sourceLogoPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f2f2f2',
   },
   sourceLogoPlaceholderText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     fontWeight: '700',
   },
@@ -885,37 +927,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   source: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#303030',
     fontWeight: '700',
+    flexShrink: 1,
   },
   sourceMetaText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#7a7a7a',
-    marginTop: 2,
   },
   featuredImage: {
     width: '100%',
     height: 240,
-    borderRadius: 16,
     backgroundColor: '#f1f1f1',
-    marginTop: 4,
-    marginBottom: 16,
   },
   articleContent: {
     fontSize: 17,
     color: '#242424',
-    lineHeight: 30,
-    marginBottom: 10,
+    lineHeight: 29,
+    letterSpacing: 0.1,
+    marginBottom: 24,
   },
   actions: {
-    gap: 8,
+    gap: 10,
+    marginBottom: 4,
   },
   button: {
     backgroundColor: '#e63946',
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#e63946',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   buttonText: {
     color: '#fff',

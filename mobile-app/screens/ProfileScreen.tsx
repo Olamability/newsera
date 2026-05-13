@@ -40,7 +40,7 @@ const ProfileScreen: React.FC = () => {
           setLoading(true);
           try {
             await signOut();
-            navigation.replace('Login');
+            navigation.replace('MainTabs');
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Failed to sign out.';
             Alert.alert('Error', message);

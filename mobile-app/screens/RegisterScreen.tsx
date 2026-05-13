@@ -25,22 +25,20 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [awaitingAuthSync, setAwaitingAuthSync] = useState(false);
 
-  const redirectTo = route.params?.redirectTo ?? 'MainTabs';
-  const redirectParams = route.params?.redirectParams;
-
   const completePostAuthNavigation = useCallback(() => {
-    if (redirectTo === 'MainTabs') {
+    const redirect = route.params;
+    if (!redirect?.redirectTo || redirect.redirectTo === 'MainTabs') {
       navigation.replace('MainTabs');
       return;
     }
 
-    if (redirectParams) {
-      navigation.replace(redirectTo as never, redirectParams as never);
+    if (redirect.redirectTo === 'ArticleDetail') {
+      navigation.replace('ArticleDetail', redirect.redirectParams);
       return;
     }
 
-    navigation.replace(redirectTo as never);
-  }, [navigation, redirectTo, redirectParams]);
+    navigation.replace(redirect.redirectTo);
+  }, [navigation, route.params]);
 
   const handleRegister = async () => {
     if (!email.trim() || !password || !confirmPassword) {

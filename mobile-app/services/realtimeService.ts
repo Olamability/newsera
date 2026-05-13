@@ -22,6 +22,18 @@ const articleLikeEntries = new Map<string, SubscriberEntry<LikeEventPayload>>();
 const articleCommentEntries = new Map<string, SubscriberEntry<CommentEventPayload>>();
 let trendingEntry: { channel: RealtimeChannel; callbacks: Set<() => void> } | null = null;
 
+const isLikeEventPayload = (payload: unknown): payload is LikeEventPayload => {
+  if (!payload || typeof payload !== 'object') return false;
+  const eventType = (payload as { eventType?: unknown }).eventType;
+  return eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE';
+};
+
+const isCommentEventPayload = (payload: unknown): payload is CommentEventPayload => {
+  if (!payload || typeof payload !== 'object') return false;
+  const eventType = (payload as { eventType?: unknown }).eventType;
+  return eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE';
+};
+
 const removeLikeChannel = async (key: string): Promise<void> => {
   const entry = articleLikeEntries.get(key);
   if (!entry) return;
@@ -56,7 +68,8 @@ export const subscribeToArticleLikeEvents = (
           filter: `article_id=eq.${articleId}`,
         },
         (payload) => {
-          callbacks.forEach((callback) => callback(payload as unknown as LikeEventPayload));
+          if (!isLikeEventPayload(payload)) return;
+          callbacks.forEach((callback) => callback(payload));
         },
       )
       .subscribe();
@@ -97,7 +110,8 @@ export const subscribeToArticleCommentEvents = (
           filter: `article_id=eq.${articleId}`,
         },
         (payload) => {
-          callbacks.forEach((callback) => callback(payload as unknown as CommentEventPayload));
+          if (!isCommentEventPayload(payload)) return;
+          callbacks.forEach((callback) => callback(payload));
         },
       )
       .subscribe();

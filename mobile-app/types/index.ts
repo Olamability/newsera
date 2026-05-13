@@ -44,17 +44,12 @@ export interface Bookmark {
   created_at: string;
 }
 
-export type AuthRedirectRouteName =
-  | 'MainTabs'
-  | 'ArticleDetail'
-  | 'Bookmarks'
-  | 'ReadLater'
-  | 'Rewards';
-
-export type AuthRedirectParams = {
-  redirectTo?: AuthRedirectRouteName;
-  redirectParams?: Record<string, unknown>;
-};
+export type AuthRedirectParams =
+  | { redirectTo?: 'MainTabs' }
+  | { redirectTo: 'ArticleDetail'; redirectParams: { article: NewsArticle } }
+  | { redirectTo: 'Bookmarks' }
+  | { redirectTo: 'ReadLater' }
+  | { redirectTo: 'Rewards' };
 
 export type MainTabParamList = {
   Home: undefined;

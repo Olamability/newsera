@@ -151,12 +151,11 @@ export const subscribeToTrendingEngagementEvents = (onEvent: () => void): (() =>
     trendingEntry = { channel, callbacks };
   }
 
-  const callback = onEvent;
-  trendingEntry.callbacks.add(callback);
+  trendingEntry.callbacks.add(onEvent);
 
   return () => {
     if (!trendingEntry) return;
-    trendingEntry.callbacks.delete(callback);
+    trendingEntry.callbacks.delete(onEvent);
     if (trendingEntry.callbacks.size === 0) {
       const stale = trendingEntry;
       trendingEntry = null;

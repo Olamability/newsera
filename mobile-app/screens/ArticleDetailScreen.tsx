@@ -34,14 +34,13 @@ import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 import { sanitizeArticleContent } from '../services/articleUtils';
 import { InteractionAuthRequiredError } from '../services/interactionErrors';
+import {
+  subscribeToArticleCommentEvents,
+  subscribeToArticleLikeEvents,
+} from '../services/realtimeService';
 import SkeletonCard from '../components/SkeletonCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
-type LikeRealtimePayload = {
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  new: { user_id?: string | null } | null;
-  old: { user_id?: string | null } | null;
-};
 type ThreadedComment = ArticleComment & { replies: ThreadedComment[] };
 const MAX_PREVIEW_CHARS = 1400;
 const COMMENT_BAR_HEIGHT = 62;
@@ -198,10 +197,16 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       `You need to be logged in to ${action}.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        {
+          text: 'Sign In',
+          onPress: () => navigation.navigate('Login', {
+            redirectTo: 'ArticleDetail',
+            redirectParams: { article },
+          }),
+        },
       ]
     );
-  }, [navigation]);
+  }, [navigation, article]);
 
   // Load like state and count
   useEffect(() => {
@@ -219,39 +224,20 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .catch(() => {});
   }, [article.id, user]);
 
-  // Near real-time like count refresh
+  // Near real-time like count refresh (singleton-managed subscription)
   useEffect(() => {
-    const channel = supabasePublic
-      .channel(`article_likes_changes:${article.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'article_likes',
-          filter: `article_id=eq.${article.id}`,
-        },
-        (payload) => {
-          const typedPayload = payload as unknown as LikeRealtimePayload;
-
-          if (typedPayload.eventType === 'INSERT') {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setLikeCount((prev) => prev + 1);
-          } else if (typedPayload.eventType === 'DELETE') {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setLikeCount((prev) => Math.max(0, prev - 1));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabasePublic.removeChannel(channel);
-    };
+    return subscribeToArticleLikeEvents(article.id, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setLikeCount((prev) => prev + 1);
+      } else if (payload.eventType === 'DELETE') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setLikeCount((prev) => Math.max(0, prev - 1));
+      }
+    });
   }, [article.id]);
 
-  // Load comments
-  useEffect(() => {
+  const loadComments = useCallback(async () => {
     fetchComments(article.id)
       .then((loaded) => {
         setComments(loaded);
@@ -259,6 +245,24 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       })
       .catch(() => {});
   }, [article.id]);
+
+  // Load comments
+  useEffect(() => {
+    void loadComments();
+  }, [loadComments]);
+
+  // Near real-time comments updates (singleton-managed subscription)
+  useEffect(() => {
+    return subscribeToArticleCommentEvents(article.id, (payload) => {
+      if (
+        payload.eventType === 'INSERT'
+        || payload.eventType === 'UPDATE'
+        || payload.eventType === 'DELETE'
+      ) {
+        void loadComments();
+      }
+    });
+  }, [article.id, loadComments]);
 
   // Load "Read More Like This" recommendations — initial page
   useEffect(() => {
@@ -361,7 +365,13 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         'Please sign in to bookmark articles.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+          {
+            text: 'Sign In',
+            onPress: () => navigation.navigate('Login', {
+              redirectTo: 'ArticleDetail',
+              redirectParams: { article },
+            }),
+          },
         ]
       );
       return;
@@ -377,7 +387,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setBookmarkLoading(false);
     }
-  }, [user, article.id, navigation]);
+  }, [user, article.id, navigation, article]);
 
   const handleShare = useCallback(async () => {
     try {

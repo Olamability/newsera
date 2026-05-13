@@ -11,9 +11,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
 import { fetchTrendingArticles } from '../services/newsServicePublic';
-import { supabasePublic } from '../services/supabase';
 import { NewsArticle, RootStackParamList } from '../types';
 import { isAuthError } from '../services/publicDataErrors';
+import { subscribeToTrendingEngagementEvents } from '../services/realtimeService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -93,18 +93,13 @@ const TrendingScreen: React.FC = () => {
       }, REALTIME_REFRESH_DEBOUNCE_MS);
     };
 
-    const channel = supabasePublic
-      .channel('trending_engagement_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_likes' }, scheduleRealtimeRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_comments' }, scheduleRealtimeRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_clicks' }, scheduleRealtimeRefresh)
-      .subscribe();
+    const unsubscribe = subscribeToTrendingEngagementEvents(scheduleRealtimeRefresh);
 
     return () => {
       if (realtimeRefreshTimerRef.current) {
         clearTimeout(realtimeRefreshTimerRef.current);
       }
-      void supabasePublic.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 

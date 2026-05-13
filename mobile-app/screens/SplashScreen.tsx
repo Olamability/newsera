@@ -8,11 +8,13 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Splash'>;
 
 const SplashScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -21,17 +23,17 @@ const SplashScreen: React.FC = () => {
       // Show splash for at least 2 seconds for branding
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      if (cancelled) return;
+      if (cancelled || authLoading) return;
 
       navigation.replace('MainTabs');
     };
 
-    checkSession();
+    void checkSession();
 
     return () => {
       cancelled = true;
     };
-  }, [navigation]);
+  }, [navigation, authLoading]);
 
   return (
     <View style={styles.container}>

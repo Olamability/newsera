@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,24 +11,39 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-const LoginScreen: React.FC = () => {
-  const navigation = useNavigation<Nav>();
-  const { signIn } = useAuth();
+const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { signIn, user, loading: authLoading } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [awaitingAuthSync, setAwaitingAuthSync] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const completePostAuthNavigation = useCallback(() => {
+    const redirect = route.params;
+    if (!redirect?.redirectTo || redirect.redirectTo === 'MainTabs') {
+      navigation.replace('MainTabs');
+      return;
+    }
+
+    if (redirect.redirectTo === 'ArticleDetail') {
+      navigation.replace('ArticleDetail', redirect.redirectParams);
+      return;
+    }
+
+    navigation.replace(redirect.redirectTo);
+  }, [navigation, route.params]);
 
   // Android hardware back button → go to Home instead of exiting the app
   useFocusEffect(
@@ -53,7 +68,7 @@ const LoginScreen: React.FC = () => {
     setLoading(true);
     try {
       await signIn(email.trim(), password);
-      navigation.replace('MainTabs');
+      setAwaitingAuthSync(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
       Alert.alert('Login failed', message);
@@ -61,6 +76,19 @@ const LoginScreen: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!awaitingAuthSync || authLoading) return;
+
+    if (user) {
+      setAwaitingAuthSync(false);
+      completePostAuthNavigation();
+      return;
+    }
+
+    setAwaitingAuthSync(false);
+    Alert.alert('Login failed', 'Unable to complete sign in. Please try again.');
+  }, [awaitingAuthSync, authLoading, user, completePostAuthNavigation]);
 
   return (
     <KeyboardAvoidingView
@@ -117,10 +145,10 @@ const LoginScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || awaitingAuthSync}
           activeOpacity={0.85}
         >
-          {loading ? (
+          {loading || awaitingAuthSync ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Sign In</Text>
@@ -130,7 +158,7 @@ const LoginScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.skipBtn}
           onPress={goToHome}
-          disabled={loading}
+          disabled={loading || awaitingAuthSync}
           activeOpacity={0.8}
         >
           <Text style={styles.skipText}>Continue to Home</Text>
@@ -138,7 +166,7 @@ const LoginScreen: React.FC = () => {
 
         <View style={styles.row}>
           <Text style={styles.rowText}>Don&apos;t have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Register', route.params)}>
             <Text style={styles.link}>Sign Up</Text>
           </TouchableOpacity>
         </View>

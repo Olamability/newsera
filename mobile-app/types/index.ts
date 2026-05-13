@@ -44,6 +44,18 @@ export interface Bookmark {
   created_at: string;
 }
 
+export type AuthRedirectRouteName =
+  | 'MainTabs'
+  | 'ArticleDetail'
+  | 'Bookmarks'
+  | 'ReadLater'
+  | 'Rewards';
+
+export type AuthRedirectParams = {
+  redirectTo?: AuthRedirectRouteName;
+  redirectParams?: Record<string, unknown>;
+};
+
 export type MainTabParamList = {
   Home: undefined;
   Search: undefined;
@@ -53,8 +65,8 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Splash: undefined;
-  Login: undefined;
-  Register: undefined;
+  Login: AuthRedirectParams | undefined;
+  Register: AuthRedirectParams | undefined;
   ForgotPassword: undefined;
   MainTabs: undefined;
   ArticleDetail: { article: NewsArticle };

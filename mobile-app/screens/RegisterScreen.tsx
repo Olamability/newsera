@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,21 +10,37 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Register'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-const RegisterScreen: React.FC = () => {
-  const navigation = useNavigation<Nav>();
-  const { signUp, signIn } = useAuth();
+const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { signUp, signIn, user, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [awaitingAuthSync, setAwaitingAuthSync] = useState(false);
+
+  const redirectTo = route.params?.redirectTo ?? 'MainTabs';
+  const redirectParams = route.params?.redirectParams;
+
+  const completePostAuthNavigation = useCallback(() => {
+    if (redirectTo === 'MainTabs') {
+      navigation.replace('MainTabs');
+      return;
+    }
+
+    if (redirectParams) {
+      navigation.replace(redirectTo as never, redirectParams as never);
+      return;
+    }
+
+    navigation.replace(redirectTo as never);
+  }, [navigation, redirectTo, redirectParams]);
 
   const handleRegister = async () => {
     if (!email.trim() || !password || !confirmPassword) {
@@ -46,13 +62,13 @@ const RegisterScreen: React.FC = () => {
       // Auto-login after successful registration
       try {
         await signIn(email.trim(), password);
-        navigation.replace('MainTabs');
+        setAwaitingAuthSync(true);
       } catch {
         // Sign-up succeeded but auto-login failed (e.g. email confirmation required)
         Alert.alert(
           'Account created',
           'Your account has been created. Please check your email to confirm, then sign in.',
-          [{ text: 'OK', onPress: () => navigation.replace('Login') }]
+          [{ text: 'OK', onPress: () => navigation.replace('Login', route.params) }]
         );
       }
     } catch (err: unknown) {
@@ -62,6 +78,21 @@ const RegisterScreen: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!awaitingAuthSync || authLoading) return;
+
+    if (user) {
+      setAwaitingAuthSync(false);
+      completePostAuthNavigation();
+      return;
+    }
+
+    setAwaitingAuthSync(false);
+    Alert.alert('Sign in required', 'Please sign in to continue.', [
+      { text: 'OK', onPress: () => navigation.replace('Login', route.params) },
+    ]);
+  }, [awaitingAuthSync, authLoading, user, completePostAuthNavigation, navigation, route.params]);
 
   return (
     <KeyboardAvoidingView
@@ -107,10 +138,10 @@ const RegisterScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleRegister}
-          disabled={loading}
+          disabled={loading || awaitingAuthSync}
           activeOpacity={0.85}
         >
-          {loading ? (
+          {loading || awaitingAuthSync ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Create Account</Text>
@@ -119,7 +150,7 @@ const RegisterScreen: React.FC = () => {
 
         <View style={styles.row}>
           <Text style={styles.rowText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Login', route.params)}>
             <Text style={styles.link}>Sign In</Text>
           </TouchableOpacity>
         </View>

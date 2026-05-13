@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { supabaseAuth } from '../services/supabase';
 
@@ -24,28 +24,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const authEventReceivedRef = useRef(false);
+
+  const applySession = (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+  };
 
   useEffect(() => {
-    // Restore persisted session from AsyncStorage. Always resolve loading so
-    // the rest of the app is never blocked by an auth failure.
-    supabaseAuth.auth.getSession()
-      .then(({ data: { session: currentSession } }) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      })
-      .catch((err) => {
-        console.warn('[Auth] Failed to restore session:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    let mounted = true;
 
-    // Subscribe to auth state changes (login, logout, token refresh)
+    // Subscribe to auth state changes globally (login, logout, token refresh)
     const {
       data: { subscription },
     } = supabaseAuth.auth.onAuthStateChange((event: AuthChangeEvent, updatedSession) => {
-      setSession(updatedSession);
-      setUser(updatedSession?.user ?? null);
+      authEventReceivedRef.current = true;
+      if (!mounted) return;
+      applySession(updatedSession);
+      setLoading(false);
 
       if (event === 'TOKEN_REFRESHED') {
         console.log('[Auth] Token refreshed successfully.');
@@ -56,22 +52,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Restore persisted session from AsyncStorage. If an auth event already
+    // updated state, skip applying this result to avoid stale-session races.
+    supabaseAuth.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        if (!mounted || authEventReceivedRef.current) return;
+        applySession(currentSession);
+      })
+      .catch((err) => {
+        console.warn('[Auth] Failed to restore session:', err);
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string): Promise<void> => {
-    const { error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    applySession(data.session ?? null);
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
-    const { error } = await supabaseAuth.auth.signUp({ email, password });
+    const { data, error } = await supabaseAuth.auth.signUp({ email, password });
     if (error) throw error;
+    applySession(data.session ?? null);
   };
 
   const signOut = async (): Promise<void> => {
     const { error } = await supabaseAuth.auth.signOut();
     if (error) throw error;
+    applySession(null);
   };
 
   return (

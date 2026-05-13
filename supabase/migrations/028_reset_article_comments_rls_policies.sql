@@ -36,7 +36,6 @@ BEGIN
 END $$;
 
 ALTER TABLE public.article_comments
-  ALTER COLUMN user_id TYPE uuid USING user_id::uuid,
   ALTER COLUMN user_id SET NOT NULL;
 
 ALTER TABLE public.article_comments ENABLE ROW LEVEL SECURITY;

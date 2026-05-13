@@ -71,11 +71,7 @@ export async function addComment(
     error: sessionError,
   } = await supabaseAuth.auth.getSession();
   const sessionUserId = session?.user?.id ?? null;
-  const authRole =
-    session?.user?.role ??
-    (session?.user?.app_metadata && typeof session.user.app_metadata.role === 'string'
-      ? session.user.app_metadata.role
-      : null);
+  const authRole = session?.user?.role ?? null;
 
   console.log('[Comments] Session before insert:', {
     hasSession: !!session,
@@ -107,7 +103,6 @@ export async function addComment(
   console.log('[Comments] Insert payload:', {
     payload,
     authRole,
-    sessionUserId,
     hasAccessToken: !!session.access_token,
   });
 

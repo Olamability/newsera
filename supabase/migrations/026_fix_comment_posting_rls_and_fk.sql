@@ -107,6 +107,6 @@ DO $$ BEGIN
       ON comments
       FOR INSERT
       TO authenticated
-      WITH CHECK (auth.uid() = user_id);
+      WITH CHECK (auth.uid()::text = user_id::text);
   END IF;
 END $$;

@@ -22,16 +22,18 @@ const articleLikeEntries = new Map<string, SubscriberEntry<LikeEventPayload>>();
 const articleCommentEntries = new Map<string, SubscriberEntry<CommentEventPayload>>();
 let trendingEntry: { channel: RealtimeChannel; callbacks: Set<() => void> } | null = null;
 
-const isLikeEventPayload = (payload: unknown): payload is LikeEventPayload => {
+const isRealtimeEventPayload = (payload: unknown): payload is { eventType: unknown } => {
   if (!payload || typeof payload !== 'object') return false;
   const eventType = (payload as { eventType?: unknown }).eventType;
   return eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE';
 };
 
+const isLikeEventPayload = (payload: unknown): payload is LikeEventPayload => {
+  return isRealtimeEventPayload(payload);
+};
+
 const isCommentEventPayload = (payload: unknown): payload is CommentEventPayload => {
-  if (!payload || typeof payload !== 'object') return false;
-  const eventType = (payload as { eventType?: unknown }).eventType;
-  return eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE';
+  return isRealtimeEventPayload(payload);
 };
 
 const removeLikeChannel = async (key: string): Promise<void> => {

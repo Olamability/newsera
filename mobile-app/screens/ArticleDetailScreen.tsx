@@ -254,7 +254,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   // Near real-time comments updates (singleton-managed subscription)
   useEffect(() => {
     return subscribeToArticleCommentEvents(article.id, (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+      if (
+        payload.eventType === 'INSERT'
+        || payload.eventType === 'UPDATE'
+        || payload.eventType === 'DELETE'
+      ) {
         void loadComments();
       }
     });

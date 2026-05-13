@@ -24,7 +24,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, NewsArticle } from '../types';
-import { supabasePublic } from '../services/supabase';
+import { supabaseAuth, supabasePublic } from '../services/supabase';
 import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
@@ -484,18 +484,32 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleAddComment = useCallback(async () => {
     const text = commentText.trim();
     if (!text) return;
-    if (!user?.id) {
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabaseAuth.auth.getSession();
+
+    console.log('[Comments] UI session check before submit:', {
+      session,
+      sessionUserId: session?.user?.id ?? null,
+      hasAccessToken: !!session?.access_token,
+      sessionError,
+    });
+
+    if (sessionError || !session?.user) {
       promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
       return;
     }
 
+    const sessionUserId = session.user.id;
     const parentId = replyingToCommentId;
     const createdAt = new Date().toISOString();
     const optimisticId = generateOptimisticCommentId();
     const optimisticComment: ArticleComment = {
       id: optimisticId,
       article_id: article.id,
-      user_id: user.id,
+      user_id: sessionUserId,
       content: text,
       parent_id: parentId,
       likes_count: 0,
@@ -511,7 +525,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     try {
-      const inserted = await addComment(article.id, user.id, text, parentId, createdAt);
+      const inserted = await addComment(article.id, text, parentId, createdAt);
       setComments((prev) => {
         const withoutOptimistic = prev.filter((comment) => comment.id !== optimisticId);
         return upsertComment(withoutOptimistic, inserted);
@@ -534,7 +548,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setCommentSubmitting(false);
     }
-  }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction, user]);
+  }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction]);
 
   const toggleReplies = useCallback((commentId: string) => {
     setExpandedReplies((prev) => ({

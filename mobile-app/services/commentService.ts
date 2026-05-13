@@ -46,7 +46,6 @@ export async function fetchCommentsPage(
  */
 export async function addComment(
   articleId: string,
-  userId: string,
   content: string,
   parentId: string | null = null,
   createdAt: string = new Date().toISOString(),
@@ -57,35 +56,59 @@ export async function addComment(
 
   const trimmedContent = content.trim();
 
-  if (!articleId || !userId) {
+  if (!articleId) {
     console.log('[Comments] Invalid insert payload input:', {
       article_id: articleId,
-      user_id: userId,
       content: trimmedContent,
       parent_id: parentId,
       created_at: createdAt,
     });
-    throw new Error('Comment requires valid article ID, user ID, and content.');
+    throw new Error('Comment requires valid article ID and content.');
   }
 
   const {
     data: { session },
     error: sessionError,
   } = await supabaseAuth.auth.getSession();
-  if (sessionError || !session) {
-    console.log('[Comments] Missing auth session before insert:', { sessionError, hasSession: !!session });
+  const sessionUserId = session?.user?.id ?? null;
+  const authRole =
+    session?.user?.role ??
+    (session?.user?.app_metadata && typeof session.user.app_metadata.role === 'string'
+      ? session.user.app_metadata.role
+      : null);
+
+  console.log('[Comments] Session before insert:', {
+    session,
+    sessionUserId,
+    hasAccessToken: !!session?.access_token,
+    authRole,
+    sessionError,
+  });
+
+  if (sessionError || !session?.user) {
+    console.log('[Comments] Missing auth session before insert:', {
+      sessionError,
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      hasAccessToken: !!session?.access_token,
+    });
     throw new InteractionAuthRequiredError();
   }
 
   const payload = {
     article_id: articleId,
-    user_id: userId,
+    user_id: session.user.id,
     content: trimmedContent,
     parent_id: parentId,
     created_at: createdAt,
   };
 
-  console.log('[Comments] Insert payload:', payload);
+  console.log('[Comments] Insert payload:', {
+    payload,
+    authRole,
+    sessionUserId,
+    hasAccessToken: !!session.access_token,
+  });
 
   const { data, error } = await supabaseAuth
     .from('article_comments')
@@ -93,7 +116,13 @@ export async function addComment(
     .select('id, article_id, user_id, content, parent_id, likes_count, created_at')
     .single();
 
-  console.log('[Comments] Supabase insert response:', { data, error });
+  console.log('[Comments] Supabase insert response:', {
+    data,
+    error,
+    authRole,
+    sessionUserId,
+    hasAccessToken: !!session.access_token,
+  });
 
   if (error) {
     console.log('[Comments] Supabase insert error message:', error.message);

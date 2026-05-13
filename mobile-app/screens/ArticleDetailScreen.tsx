@@ -161,6 +161,10 @@ const sortCommentsAscending = (items: ArticleComment[]): ArticleComment[] => (
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 );
 
+const generateOptimisticCommentId = (): string => (
+  `optimistic-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
+);
+
 const upsertComment = (items: ArticleComment[], incoming: ArticleComment): ArticleComment[] => {
   const index = items.findIndex((item) => item.id === incoming.id);
   if (index === -1) return sortCommentsAscending([...items, incoming]);
@@ -484,7 +488,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const parentId = replyingToCommentId;
     const createdAt = new Date().toISOString();
-    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    const optimisticId = generateOptimisticCommentId();
     const optimisticComment: ArticleComment = {
       id: optimisticId,
       article_id: article.id,

@@ -51,6 +51,10 @@ export async function addComment(
   parentId: string | null = null,
   createdAt: string = new Date().toISOString(),
 ): Promise<ArticleComment> {
+  if (!content || !content.trim()) {
+    throw new Error('Comment content is required.');
+  }
+
   const trimmedContent = content.trim();
 
   if (!articleId || !userId || !trimmedContent) {

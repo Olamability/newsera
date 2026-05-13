@@ -324,11 +324,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [user, liked, likeCount, article.id, promptSignInForInteraction]);
 
   const handleAddComment = useCallback(async () => {
-    if (!user) {
-      promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
-      return;
-    }
-
     const text = commentText.trim();
     if (!text) return;
 
@@ -344,12 +339,16 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       if (err instanceof InteractionAuthRequiredError) {
         promptSignInForInteraction(replyingToCommentId ? 'reply' : 'comment');
       } else {
+        console.log('[Comments] Failed to post comment:', err);
+        if (err && typeof err === 'object' && 'message' in err) {
+          console.log('[Comments] Supabase error message:', (err as { message?: string }).message);
+        }
         Alert.alert('Error', 'Failed to post comment. Please try again.');
       }
     } finally {
       setCommentSubmitting(false);
     }
-  }, [user, article.id, commentText, replyingToCommentId, promptSignInForInteraction]);
+  }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction]);
 
   const toggleReplies = useCallback((commentId: string) => {
     setExpandedReplies((prev) => ({

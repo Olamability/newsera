@@ -29,6 +29,12 @@ type CommentEventPayload = {
   } | null;
 };
 
+type ReactionEventPayload = {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: { reaction_type?: 'like' | 'dislike' | null } | null;
+  old: { reaction_type?: 'like' | 'dislike' | null } | null;
+};
+
 type SubscriberEntry<TPayload> = {
   channel: RealtimeChannel;
   callbacks: Set<(payload: TPayload) => void>;
@@ -36,6 +42,7 @@ type SubscriberEntry<TPayload> = {
 
 const articleLikeEntries = new Map<string, SubscriberEntry<LikeEventPayload>>();
 const articleCommentEntries = new Map<string, SubscriberEntry<CommentEventPayload>>();
+const articleReactionEntries = new Map<string, SubscriberEntry<ReactionEventPayload>>();
 let trendingEntry: { channel: RealtimeChannel; callbacks: Set<() => void> } | null = null;
 
 const isRealtimeEventPayload = (payload: unknown): payload is { eventType: unknown } => {
@@ -52,6 +59,10 @@ const isCommentEventPayload = (payload: unknown): payload is CommentEventPayload
   return isRealtimeEventPayload(payload);
 };
 
+const isReactionEventPayload = (payload: unknown): payload is ReactionEventPayload => {
+  return isRealtimeEventPayload(payload);
+};
+
 const removeLikeChannel = async (key: string): Promise<void> => {
   const entry = articleLikeEntries.get(key);
   if (!entry) return;
@@ -63,6 +74,13 @@ const removeCommentChannel = async (key: string): Promise<void> => {
   const entry = articleCommentEntries.get(key);
   if (!entry) return;
   articleCommentEntries.delete(key);
+  await supabasePublic.removeChannel(entry.channel);
+};
+
+const removeReactionChannel = async (key: string): Promise<void> => {
+  const entry = articleReactionEntries.get(key);
+  if (!entry) return;
+  articleReactionEntries.delete(key);
   await supabasePublic.removeChannel(entry.channel);
 };
 
@@ -146,6 +164,48 @@ export const subscribeToArticleCommentEvents = (
     current.callbacks.delete(onEvent);
     if (current.callbacks.size === 0) {
       void removeCommentChannel(key);
+    }
+  };
+};
+
+export const subscribeToArticleReactionEvents = (
+  articleId: string,
+  onEvent: (payload: ReactionEventPayload) => void,
+): (() => void) => {
+  const key = `article_reactions:${articleId}`;
+  let entry = articleReactionEntries.get(key);
+
+  if (!entry) {
+    const callbacks = new Set<(payload: ReactionEventPayload) => void>();
+    const channel = supabasePublic
+      .channel(`article_reactions_changes:${articleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'article_reactions',
+          filter: `article_id=eq.${articleId}`,
+        },
+        (payload) => {
+          if (!isReactionEventPayload(payload)) return;
+          callbacks.forEach((callback) => callback(payload));
+        },
+      )
+      .subscribe();
+
+    entry = { channel, callbacks };
+    articleReactionEntries.set(key, entry);
+  }
+
+  entry.callbacks.add(onEvent);
+
+  return () => {
+    const current = articleReactionEntries.get(key);
+    if (!current) return;
+    current.callbacks.delete(onEvent);
+    if (current.callbacks.size === 0) {
+      void removeReactionChannel(key);
     }
   };
 };

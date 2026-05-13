@@ -9,7 +9,9 @@ import {
   KeyboardAvoidingView,
   LayoutAnimation,
   Linking,
+  Modal,
   Platform,
+  Pressable,
   Share,
   StyleSheet,
   Text,
@@ -29,7 +31,11 @@ import { getDeviceId } from '../services/deviceId';
 import { saveRecentlyViewed } from '../services/recentlyViewedService';
 import { checkAndNotifyBreakingNews } from '../services/notificationService';
 import { isBookmarked, toggleBookmark } from '../services/bookmarkService';
-import { isLiked, getLikeCount, toggleLike } from '../services/likeService';
+import {
+  ArticleReactionType,
+  getArticleReactionSummary,
+  toggleArticleReaction,
+} from '../services/articleReactionService';
 import {
   fetchCommentsPage,
   addComment,
@@ -43,7 +49,7 @@ import { sanitizeArticleContent } from '../services/articleUtils';
 import { InteractionAuthRequiredError } from '../services/interactionErrors';
 import {
   subscribeToArticleCommentEvents,
-  subscribeToArticleLikeEvents,
+  subscribeToArticleReactionEvents,
 } from '../services/realtimeService';
 import SkeletonCard from '../components/SkeletonCard';
 
@@ -54,6 +60,7 @@ const COMMENT_BAR_HEIGHT = 62;
 const SIMILAR_PAGE_SIZE = 10;
 // Extra clearance so content isn't hidden behind the sticky comment bar
 const STICKY_BAR_CLEARANCE = 8;
+const COMMENTS_SHEET_MAX_HEIGHT = '88%';
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
@@ -196,20 +203,27 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [disliked, setDisliked] = useState(false);
+  const [dislikeCount, setDislikeCount] = useState(0);
   const [likeLoading, setLikeLoading] = useState(false);
+  const [dislikeLoading, setDislikeLoading] = useState(false);
 
   const [comments, setComments] = useState<ArticleComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentCount, setCommentCount] = useState(0);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
   const [commentsHasMore, setCommentsHasMore] = useState(true);
+  const [commentsSheetVisible, setCommentsSheetVisible] = useState(false);
+  const [commentsInitialized, setCommentsInitialized] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const commentsOffsetRef = useRef(0);
   const commentsRequestIdRef = useRef(0);
   const shimmerOpacity = useRef(new Animated.Value(0.35)).current;
+  const likeScale = useRef(new Animated.Value(1)).current;
+  const dislikeScale = useRef(new Animated.Value(1)).current;
 
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
   const [similarHasMore, setSimilarHasMore] = useState(true);
@@ -228,20 +242,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     saveRecentlyViewed(article);
     checkAndNotifyBreakingNews(article);
   }, [article]);
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-    });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
 
   useEffect(() => {
     const shimmerLoop = Animated.loop(
@@ -272,6 +272,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setCommentText('');
       setReplyingToCommentId(null);
       setCommentSubmitting(false);
+      setCommentsSheetVisible(false);
     });
     return unsubscribe;
   }, [navigation]);
@@ -301,34 +302,33 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }, [navigation, article]);
 
-  // Load like state and count
-  useEffect(() => {
-    getLikeCount(article.id)
-      .then(setLikeCount)
-      .catch(() => {});
-
-    if (!user) {
+  const loadReactionSummary = useCallback(async () => {
+    try {
+      const summary = await getArticleReactionSummary(article.id);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setLikeCount(summary.likeCount);
+      setDislikeCount(summary.dislikeCount);
+      setLiked(summary.userReaction === 'like');
+      setDisliked(summary.userReaction === 'dislike');
+    } catch {
+      setLikeCount(0);
+      setDislikeCount(0);
       setLiked(false);
-      return;
+      setDisliked(false);
     }
-
-    isLiked(article.id)
-      .then(setLiked)
-      .catch(() => {});
-  }, [article.id, user]);
-
-  // Near real-time like count refresh (singleton-managed subscription)
-  useEffect(() => {
-    return subscribeToArticleLikeEvents(article.id, (payload) => {
-      if (payload.eventType === 'INSERT') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setLikeCount((prev) => prev + 1);
-      } else if (payload.eventType === 'DELETE') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setLikeCount((prev) => Math.max(0, prev - 1));
-      }
-    });
   }, [article.id]);
+
+  // Load reaction state and count
+  useEffect(() => {
+    void loadReactionSummary();
+  }, [loadReactionSummary, user]);
+
+  // Near real-time reaction count refresh (singleton-managed subscription)
+  useEffect(() => {
+    return subscribeToArticleReactionEvents(article.id, () => {
+      void loadReactionSummary();
+    });
+  }, [article.id, loadReactionSummary]);
 
   const loadInitialComments = useCallback(async () => {
     const requestId = commentsRequestIdRef.current + 1;
@@ -345,17 +345,27 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setExpandedReplies(buildExpandedRepliesMap(loaded));
       setCommentsHasMore(hasMore);
       commentsOffsetRef.current = loaded.length;
+      setCommentsInitialized(true);
     } catch (err) {
       console.log('[Comments] Failed to load initial comments:', err);
       if (commentsRequestIdRef.current === requestId) {
         setComments([]);
         setCommentsHasMore(false);
+        setCommentsInitialized(true);
       }
     } finally {
       if (commentsRequestIdRef.current === requestId) {
         setCommentsLoading(false);
       }
     }
+  }, [article.id]);
+
+  const loadCommentCount = useCallback(async () => {
+    const { count } = await supabasePublic
+      .from('article_comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('article_id', article.id);
+    setCommentCount(count ?? 0);
   }, [article.id]);
 
   const loadMoreComments = useCallback(async () => {
@@ -385,10 +395,9 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [article.id, commentsHasMore, commentsLoading, commentsLoadingMore]);
 
-  // Load comments
   useEffect(() => {
-    void loadInitialComments();
-  }, [loadInitialComments]);
+    void loadCommentCount();
+  }, [loadCommentCount]);
 
   // Near real-time comments updates (singleton-managed subscription)
   useEffect(() => {
@@ -398,6 +407,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       if (payload.eventType === 'DELETE') {
         const deletedId = payload.old?.id;
         if (!deletedId) return;
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setCommentCount((prev) => Math.max(0, prev - 1));
         setComments((prev) => prev.filter((item) => item.id !== deletedId));
         return;
       }
@@ -415,12 +426,18 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         created_at: row.created_at,
       };
 
+      if (payload.eventType === 'INSERT') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setCommentCount((prev) => prev + 1);
+      }
+
+      if (!commentsInitialized) return;
       setComments((prev) => upsertComment(prev, incoming));
       if (incoming.parent_id) {
         setExpandedReplies((prev) => ({ ...prev, [incoming.parent_id!]: true }));
       }
     });
-  }, [article.id]);
+  }, [article.id, commentsInitialized]);
 
   // Load "Read More Like This" recommendations — initial page
   useEffect(() => {
@@ -447,39 +464,87 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     })();
   }, [article.id, article.category_id, article.source_id]);
 
-  const handleLike = useCallback(async () => {
+  const triggerTapFeedback = useCallback((value: Animated.Value) => {
+    Animated.sequence([
+      Animated.spring(value, {
+        toValue: 0.9,
+        useNativeDriver: true,
+        speed: 30,
+        bounciness: 8,
+      }),
+      Animated.spring(value, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 30,
+        bounciness: 12,
+      }),
+    ]).start();
+  }, []);
+
+  const handleReaction = useCallback(async (reaction: ArticleReactionType) => {
     if (!user) {
       promptSignInForInteraction('like');
       return;
     }
 
+    if (reaction === 'like') {
+      triggerTapFeedback(likeScale);
+    } else {
+      triggerTapFeedback(dislikeScale);
+    }
+
     const previousLiked = liked;
-    const previousCount = likeCount;
-    const nextLiked = !previousLiked;
-    setLikeLoading(true);
+    const previousDisliked = disliked;
+    const previousLikeCount = likeCount;
+    const previousDislikeCount = dislikeCount;
+    const nextLiked = reaction === 'like' ? !liked : false;
+    const nextDisliked = reaction === 'dislike' ? !disliked : false;
+
+    if (reaction === 'like') {
+      setLikeLoading(true);
+    } else {
+      setDislikeLoading(true);
+    }
+
     setLiked(nextLiked);
+    setDisliked(nextDisliked);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)));
+    setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1) + (previousDisliked && nextLiked ? 1 : 0)));
+    setDislikeCount((prev) => Math.max(0, prev + (nextDisliked ? 1 : -1) + (previousLiked && nextDisliked ? 1 : 0)));
 
     try {
-      const confirmed = await toggleLike(article.id);
-      setLiked(confirmed);
-      const authoritativeCount = await getLikeCount(article.id);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setLikeCount(authoritativeCount);
+      const confirmed = await toggleArticleReaction(article.id, reaction);
+      setLiked(confirmed === 'like');
+      setDisliked(confirmed === 'dislike');
+      await loadReactionSummary();
     } catch (err) {
       setLiked(previousLiked);
+      setDisliked(previousDisliked);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setLikeCount(previousCount);
+      setLikeCount(previousLikeCount);
+      setDislikeCount(previousDislikeCount);
       if (err instanceof InteractionAuthRequiredError) {
         promptSignInForInteraction('like');
       } else {
-        Alert.alert('Error', 'Failed to update like. Please try again.');
+        Alert.alert('Error', 'Failed to update reaction. Please try again.');
       }
     } finally {
       setLikeLoading(false);
+      setDislikeLoading(false);
     }
-  }, [user, liked, likeCount, article.id, promptSignInForInteraction]);
+  }, [
+    user,
+    promptSignInForInteraction,
+    likeScale,
+    dislikeScale,
+    liked,
+    disliked,
+    likeCount,
+    dislikeCount,
+    article.id,
+    loadReactionSummary,
+    triggerTapFeedback,
+  ]);
 
   const handleAddComment = useCallback(async () => {
     const text = commentText.trim();
@@ -535,6 +600,19 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setCommentSubmitting(false);
     }
   }, [article.id, commentText, replyingToCommentId, promptSignInForInteraction, user]);
+
+  const openCommentsSheet = useCallback(() => {
+    setCommentsSheetVisible(true);
+    if (!commentsInitialized && !commentsLoading) {
+      void loadInitialComments();
+    }
+  }, [commentsInitialized, commentsLoading, loadInitialComments]);
+
+  const closeCommentsSheet = useCallback(() => {
+    Keyboard.dismiss();
+    setCommentsSheetVisible(false);
+    setReplyingToCommentId(null);
+  }, []);
 
   const toggleReplies = useCallback((commentId: string) => {
     setExpandedReplies((prev) => ({
@@ -679,8 +757,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleEndReached = useCallback(() => {
     void loadMoreSimilar();
-    void loadMoreComments();
-  }, [loadMoreComments, loadMoreSimilar]);
+  }, [loadMoreSimilar]);
 
   const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
 
@@ -888,7 +965,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                         liked && styles.likeBtnActive,
                         likeLoading && styles.likeBtnDisabled,
                       ]}
-                      onPress={handleLike}
+                      onPress={() => void handleReaction('like')}
                       disabled={likeLoading}
                       activeOpacity={0.85}
                     >
@@ -958,88 +1035,152 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <SkeletonCard />
                 </>
               ) : null}
-
-              {/* 7. Comments section */}
-              <View style={styles.commentsSection}>
-                <Text style={styles.commentsTitle}>
-                  Comments{comments.length > 0 ? ` (${comments.length})` : ''}
-                </Text>
-
-                {commentsLoading ? (
-                  <View style={styles.commentSkeletonList}>
-                    {[0, 1, 2].map((index) => (
-                      <Animated.View
-                        key={`comment-skeleton-${index}`}
-                        style={[styles.commentSkeletonItem, { opacity: shimmerOpacity }]}
-                      >
-                        <View style={styles.commentSkeletonAvatar} />
-                        <View style={styles.commentSkeletonContent}>
-                          <View style={styles.commentSkeletonLineShort} />
-                          <View style={styles.commentSkeletonLineLong} />
-                          <View style={styles.commentSkeletonLineMedium} />
-                        </View>
-                      </Animated.View>
-                    ))}
-                  </View>
-                ) : comments.length === 0 ? (
-                  <Text style={styles.noComments}>No comments yet. Be the first!</Text>
-                ) : (
-                  threadedComments.map((comment) => renderCommentNode(comment))
-                )}
-
-                {commentsLoadingMore ? (
-                  <Text style={styles.commentsLoadingMore}>Loading more comments…</Text>
-                ) : null}
-              </View>
             </>
           }
         />
 
-        {/* ── Sticky Comment Bar (fixed above Android nav) ── */}
+        {/* ── Sticky Engagement Bar (fixed above Android nav) ── */}
         <View
           style={[
             styles.stickyBar,
             { paddingBottom: Math.max(insets.bottom, STICKY_BAR_CLEARANCE) },
           ]}
         >
-          <Ionicons
-            name={replyingToCommentId ? 'return-up-forward-outline' : 'chatbubble-outline'}
-            size={18}
-            color="#888"
-            style={styles.stickyBarIcon}
-          />
-          <TextInput
-            style={[styles.stickyInput, keyboardVisible && styles.stickyInputFocused]}
-            placeholder={replyingToCommentId ? 'Write a reply…' : 'Write a comment…'}
-            placeholderTextColor="#aaa"
-            value={commentText}
-            onChangeText={setCommentText}
-            maxLength={500}
-            editable={!commentSubmitting}
-            returnKeyType="send"
-            onSubmitEditing={handleAddComment}
-          />
           <TouchableOpacity
-            style={[
-              styles.stickyPostBtn,
-              (!commentText.trim() || commentSubmitting) && styles.stickyPostBtnDisabled,
-            ]}
-            onPress={handleAddComment}
-            disabled={!commentText.trim() || commentSubmitting}
+            style={styles.stickyInputButton}
+            onPress={openCommentsSheet}
             activeOpacity={0.85}
           >
-            <Text style={styles.stickyPostText}>{replyingToCommentId ? 'Reply' : 'Post'}</Text>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color="#8b8b8b" />
+            <Text style={styles.stickyInputButtonText}>Write a comment...</Text>
           </TouchableOpacity>
-          {replyingToCommentId ? (
-            <TouchableOpacity
-              style={styles.stickyCancelReplyBtn}
-              onPress={() => setReplyingToCommentId(null)}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.stickyCancelReplyText}>Cancel</Text>
+
+          <View style={styles.stickyActionRow}>
+            <TouchableOpacity style={styles.stickyActionBtn} onPress={openCommentsSheet} activeOpacity={0.8}>
+              <Text style={styles.stickyActionText}>💬 {commentCount}</Text>
             </TouchableOpacity>
-          ) : null}
+
+            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+              <TouchableOpacity
+                style={[styles.stickyActionBtn, liked && styles.stickyActionBtnActive]}
+                onPress={() => void handleReaction('like')}
+                disabled={likeLoading}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.stickyActionText, liked && styles.stickyActionTextActive]}>
+                  👍 {likeCount > 0 ? likeCount : ''}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View style={{ transform: [{ scale: dislikeScale }] }}>
+              <TouchableOpacity
+                style={[styles.stickyActionBtn, disliked && styles.stickyActionBtnActive]}
+                onPress={() => void handleReaction('dislike')}
+                disabled={dislikeLoading}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.stickyActionText, disliked && styles.stickyActionTextActive]}>
+                  👎 {dislikeCount > 0 ? dislikeCount : ''}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <TouchableOpacity style={styles.stickyActionBtn} onPress={handleShare} activeOpacity={0.8}>
+              <Text style={styles.stickyActionText}>↗ Share</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        <Modal
+          visible={commentsSheetVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={closeCommentsSheet}
+        >
+          <Pressable style={styles.commentsSheetBackdrop} onPress={closeCommentsSheet} />
+          <View style={[styles.commentsSheetContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <View style={styles.commentsSheetHandle} />
+            <View style={styles.commentsSheetHeader}>
+              <Text style={styles.commentsSheetTitle}>Comments</Text>
+              <Text style={styles.commentsSheetCount}>{commentCount}</Text>
+            </View>
+
+            <View style={styles.commentsSheetBody}>
+              {commentsLoading ? (
+                <View style={styles.commentSkeletonList}>
+                  {[0, 1, 2].map((index) => (
+                    <Animated.View
+                      key={`comment-skeleton-${index}`}
+                      style={[styles.commentSkeletonItem, { opacity: shimmerOpacity }]}
+                    >
+                      <View style={styles.commentSkeletonAvatar} />
+                      <View style={styles.commentSkeletonContent}>
+                        <View style={styles.commentSkeletonLineShort} />
+                        <View style={styles.commentSkeletonLineLong} />
+                        <View style={styles.commentSkeletonLineMedium} />
+                      </View>
+                    </Animated.View>
+                  ))}
+                </View>
+              ) : comments.length === 0 ? (
+                <Text style={styles.noComments}>No comments yet. Be the first!</Text>
+              ) : (
+                <FlatList
+                  data={threadedComments}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => <>{renderCommentNode(item)}</>}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.commentsSheetListContent}
+                  onEndReached={() => void loadMoreComments()}
+                  onEndReachedThreshold={0.4}
+                  keyboardShouldPersistTaps="handled"
+                  ListFooterComponent={commentsLoadingMore ? (
+                    <Text style={styles.commentsLoadingMore}>Loading more comments…</Text>
+                  ) : null}
+                />
+              )}
+            </View>
+
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? APPROX_HEADER_HEIGHT : 0}
+            >
+              {replyingToCommentId ? (
+                <View style={styles.replyingBanner}>
+                  <Text style={styles.replyingBannerText}>Replying in thread</Text>
+                  <TouchableOpacity onPress={() => setReplyingToCommentId(null)} activeOpacity={0.75}>
+                    <Text style={styles.replyingBannerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              <View style={styles.commentsComposer}>
+                <TextInput
+                  style={styles.commentsComposerInput}
+                  placeholder={replyingToCommentId ? 'Write a reply…' : 'Write a comment…'}
+                  placeholderTextColor="#9a9a9a"
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  editable={!commentSubmitting}
+                  maxLength={500}
+                  multiline
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.commentsComposerSendBtn,
+                    (!commentText.trim() || commentSubmitting) && styles.stickyPostBtnDisabled,
+                  ]}
+                  onPress={() => void handleAddComment()}
+                  disabled={!commentText.trim() || commentSubmitting}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.commentsComposerSendText}>Send</Text>
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1343,24 +1484,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   // ── Comments ──
-  commentsSection: {
-    marginTop: 24,
-    marginHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 20,
-    paddingBottom: 8,
-  },
-  commentsTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    marginBottom: 14,
-  },
   noComments: {
     fontSize: 14,
     color: '#aaa',
-    marginBottom: 16,
+    marginTop: 20,
     textAlign: 'center',
   },
   commentItem: {
@@ -1473,71 +1600,174 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 6,
   },
-  // ── Sticky Comment Bar ──
-  stickyBar: {
+  commentsSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.24)',
+  },
+  commentsSheetContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: COMMENTS_SHEET_MAX_HEIGHT,
+    minHeight: '58%',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
+  commentsSheetHandle: {
+    alignSelf: 'center',
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#ddd',
+    marginBottom: 12,
+  },
+  commentsSheetHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  commentsSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1c1c1c',
+  },
+  commentsSheetCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#777',
+  },
+  commentsSheetBody: {
+    flex: 1,
+    paddingTop: 12,
+  },
+  commentsSheetListContent: {
+    paddingBottom: 10,
+  },
+  replyingBanner: {
+    marginTop: 8,
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#f7f7f7',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  replyingBannerText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  replyingBannerCancel: {
+    color: '#7d7d7d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  commentsComposer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingTop: 8,
+  },
+  commentsComposerInput: {
+    flex: 1,
+    minHeight: 42,
+    maxHeight: 110,
+    borderWidth: 1,
+    borderColor: '#e2e2e2',
+    borderRadius: 20,
+    backgroundColor: '#fafafa',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1a1a1a',
+    textAlignVertical: 'top',
+  },
+  commentsComposerSendBtn: {
+    backgroundColor: '#e63946',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  commentsComposerSendText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  // ── Sticky Engagement Bar ──
+  stickyBar: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e8e8e8',
+    borderTopColor: '#efefef',
     paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
     gap: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
       },
-      android: { elevation: 8 },
+      android: { elevation: 10 },
     }),
   },
-  stickyBarIcon: {
-    marginRight: 2,
-  },
-  stickyInput: {
-    flex: 1,
-    minHeight: 40,
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#1a1a1a',
+  stickyInputButton: {
+    minHeight: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: '#e4e4e4',
     backgroundColor: '#fafafa',
-    textAlignVertical: 'center', // Android-only; iOS centers text via paddingVertical
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  stickyInputFocused: {
-    borderColor: '#d0d0d0',
-    backgroundColor: '#fff',
+  stickyInputButtonText: {
+    color: '#8b8b8b',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  stickyPostBtn: {
-    backgroundColor: '#e63946',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  stickyActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stickyActionBtn: {
+    minHeight: 34,
+    minWidth: 66,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#f8f8f8',
+    borderWidth: 1,
+    borderColor: '#eeeeee',
+  },
+  stickyActionBtnActive: {
+    backgroundColor: '#fff1f3',
+    borderColor: '#ffd8dd',
+  },
+  stickyActionText: {
+    color: '#4a4a4a',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stickyActionTextActive: {
+    color: '#d6313f',
   },
   stickyPostBtnDisabled: {
     opacity: 0.5,
-  },
-  stickyPostText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  stickyCancelReplyBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  stickyCancelReplyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7a7a7a',
   },
 });
 

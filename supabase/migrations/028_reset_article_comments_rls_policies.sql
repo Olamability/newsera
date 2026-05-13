@@ -23,7 +23,7 @@ BEGIN
 
     UPDATE public.article_comments
     SET user_id_uuid = CASE
-      WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f][0-9a-f]{3}-[0-9a-f][0-9a-f]{3}-[0-9a-f]{12}$'
+      WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN user_id::text::uuid
       ELSE NULL
     END;

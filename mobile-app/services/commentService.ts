@@ -78,8 +78,9 @@ export async function addComment(
       : null);
 
   console.log('[Comments] Session before insert:', {
-    session,
+    hasSession: !!session,
     sessionUserId,
+    sessionExpiresAt: session?.expires_at ?? null,
     hasAccessToken: !!session?.access_token,
     authRole,
     sessionError,

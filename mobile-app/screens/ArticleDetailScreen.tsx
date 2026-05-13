@@ -491,8 +491,9 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } = await supabaseAuth.auth.getSession();
 
     console.log('[Comments] UI session check before submit:', {
-      session,
+      hasSession: !!session,
       sessionUserId: session?.user?.id ?? null,
+      sessionExpiresAt: session?.expires_at ?? null,
       hasAccessToken: !!session?.access_token,
       sessionError,
     });

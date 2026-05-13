@@ -32,25 +32,51 @@ export async function addComment(
   content: string,
   parentId: string | null = null,
 ): Promise<void> {
+  const trimmedContent = content.trim();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabaseAuth.auth.getSession();
   const {
     data: { user },
     error: userError,
   } = await supabaseAuth.auth.getUser();
 
-  if (userError || !user) {
+  if (sessionError) {
+    console.log('[Comments] Failed to fetch session before insert:', sessionError);
+  }
+
+  console.log('[Comments] Pre-insert auth context:', {
+    user,
+    session,
+    article_id: articleId,
+    commentText: trimmedContent,
+    parent_id: parentId,
+  });
+
+  if (userError || !user || !user.id) {
     throw new InteractionAuthRequiredError();
   }
 
-  const { error } = await supabaseAuth
+  const payload = {
+    article_id: articleId,
+    user_id: user.id,
+    content: trimmedContent,
+    parent_id: parentId,
+    created_at: new Date().toISOString(),
+  };
+
+  console.log('[Comments] Insert payload:', payload);
+
+  const { data, error } = await supabaseAuth
     .from('article_comments')
-    .insert({
-      article_id: articleId,
-      user_id: user.id,
-      content,
-      parent_id: parentId,
-    });
+    .insert(payload)
+    .select('id, article_id, user_id, content, parent_id, created_at');
+
+  console.log('[Comments] Supabase insert response:', { data, error });
 
   if (error) {
+    console.log('[Comments] Supabase insert error message:', error.message);
     if (isAuthRequiredInteractionError(error)) {
       throw new InteractionAuthRequiredError();
     }

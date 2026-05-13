@@ -972,7 +972,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  buttonIcon: {},
   buttonText: {
     color: '#fff',
     fontSize: 16,

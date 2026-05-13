@@ -44,6 +44,7 @@ export async function addComment(
 
   if (sessionError) {
     console.log('[Comments] Failed to fetch session before insert:', sessionError);
+    throw new InteractionAuthRequiredError();
   }
 
   console.log('[Comments] Pre-insert auth context:', {
@@ -54,7 +55,7 @@ export async function addComment(
     parent_id: parentId,
   });
 
-  if (userError || !user || !user.id) {
+  if (!session || userError || !user || !user.id) {
     throw new InteractionAuthRequiredError();
   }
 

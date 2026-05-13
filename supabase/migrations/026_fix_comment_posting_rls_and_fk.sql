@@ -75,7 +75,7 @@ DO $$ BEGIN
       TO authenticated
       WITH CHECK (
         auth.uid() IS NOT NULL
-        AND auth.uid()::text = user_id
+        AND auth.uid()::text = user_id::text
       );
   END IF;
 END $$;

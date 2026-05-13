@@ -358,19 +358,19 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!user) {
       Alert.alert(
         'Sign in required',
-          'Please sign in to bookmark articles.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Sign In',
-              onPress: () => navigation.navigate('Login', {
-                redirectTo: 'ArticleDetail',
-                redirectParams: { article },
-              }),
-            },
-          ]
-        );
-        return;
+        'Please sign in to bookmark articles.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign In',
+            onPress: () => navigation.navigate('Login', {
+              redirectTo: 'ArticleDetail',
+              redirectParams: { article },
+            }),
+          },
+        ]
+      );
+      return;
     }
 
     setBookmarkLoading(true);

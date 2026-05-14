@@ -18,6 +18,7 @@ const CONCURRENCY = Math.max(
 );
 const BATCH_DELAY_MS = parseInt(process.env.RSS_BATCH_DELAY_MS || '300', 10);
 const DEBUG = process.env.RSS_DEBUG === 'true';
+let preferredLogPayloadIndex = 0;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,10 +68,15 @@ async function writeIngestionLog(source, metrics) {
     },
   ];
 
-  for (const payload of payloads) {
+  const orderedIndexes = [preferredLogPayloadIndex, ...payloads.map((_, idx) => idx).filter((idx) => idx !== preferredLogPayloadIndex)];
+  for (const payloadIndex of orderedIndexes) {
+    const payload = payloads[payloadIndex];
     try {
       const { error } = await supabase.from('rss_ingestion_log').insert([payload]);
-      if (!error) return;
+      if (!error) {
+        preferredLogPayloadIndex = payloadIndex;
+        return;
+      }
       if (DEBUG) {
         console.warn(`  [DEBUG] Ingestion log attempt failed for "${source.name}": ${error.message}`);
       }
@@ -80,6 +86,8 @@ async function writeIngestionLog(source, metrics) {
       }
     }
   }
+
+  console.warn(`  [WARN] Failed to write ingestion log for "${source.name}"`);
 }
 
 async function processSource(source) {

@@ -34,15 +34,14 @@ async function saveArticles(articles) {
     // onConflict: 'url'  →  ON CONFLICT (url) DO NOTHING
     // ignoreDuplicates: true prevents any fields from being overwritten on
     // conflict, and suppresses errors for rows that already exist.
-    const { error, data } = await supabase
+    const { error, count } = await supabase
       .from('articles')
-      .upsert(rows, { onConflict: 'url', ignoreDuplicates: true })
-      .select('url');
+      .upsert(rows, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
 
     if (error) {
       console.error(`  [ERROR] Insert batch failed: ${error.message}`);
     } else {
-      const insertedInBatch = data?.length ?? 0;
+      const insertedInBatch = count ?? 0;
       inserted += insertedInBatch;
       skippedDuplicates += Math.max(rows.length - insertedInBatch, 0);
       if (DEBUG) {

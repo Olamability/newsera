@@ -14,6 +14,9 @@ const FETCH_TIMEOUT_MS = Math.max(
 // Minimum image dimension threshold to filter out tracking pixels / icons.
 const MIN_IMAGE_DIMENSION = 100;
 const DEBUG = process.env.RSS_DEBUG === 'true';
+// Matches og:image meta tags where attributes can appear in either order:
+// property="og:image" ... content="..." OR content="..." ... property="og:image".
+const OG_IMAGE_META_REGEX = /<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i;
 // Known path segments that indicate non-content images.
 const SKIP_IMAGE_PATTERNS = [
   /tracking/i,
@@ -140,7 +143,7 @@ function extractImage(item) {
   const ogImage =
     pickImageFromField(item?.ogImage) ||
     (() => {
-      const match = contentRaw.match(/<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i);
+      const match = contentRaw.match(OG_IMAGE_META_REGEX);
       const candidate = match?.[1] || match?.[2];
       return candidate && !isLowQualityImage(candidate) ? candidate : null;
     })();
@@ -201,26 +204,40 @@ async function fetchRSS(source) {
   let feed;
   const ingestionTime = new Date().toISOString();
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const canAbort = typeof fetch === 'function' && typeof AbortController === 'function';
+  const controller = canAbort ? new AbortController() : null;
+  const timeoutId = canAbort ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
   try {
-    const response = await fetch(source.rss_url, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'newsera-rss-engine/1.0',
-        Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
-      },
-    });
+    if (typeof fetch === 'function') {
+      const response = await fetch(source.rss_url, {
+        signal: controller?.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'newsera-rss-engine/1.0',
+          Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const xml = await response.text();
+      feed = await parser.parseString(xml);
+    } else {
+      let legacyTimeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        legacyTimeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
+      });
+      feed = await Promise.race([
+        parser.parseURL(source.rss_url).then((result) => {
+          return result;
+        }),
+        timeoutPromise,
+      ]).finally(() => clearTimeout(legacyTimeoutId));
     }
-
-    const xml = await response.text();
-    feed = await parser.parseString(xml);
   } catch (err) {
-    const isTimeout = err?.name === 'AbortError';
+    const isTimeout = err?.name === 'AbortError' || String(err?.message || '').startsWith('Timed out after');
     if (isTimeout) {
       console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
     } else {
@@ -228,7 +245,7 @@ async function fetchRSS(source) {
     }
     return [];
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 
   return (feed.items || []).map((item) => {

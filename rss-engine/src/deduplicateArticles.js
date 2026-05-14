@@ -1,8 +1,8 @@
-const supabase = require('../config/supabase');
-
 /**
- * Removes articles whose URLs already exist in the `articles` table.
- * @param {Array} articles - Candidate articles to check.
+ * Removes duplicate URLs within the same ingestion batch only.
+ * Database-level duplicate protection is handled atomically at insert time
+ * via ON CONFLICT (url) DO NOTHING in saveArticles().
+ * @param {Array} articles
  * @returns {Promise<{ fresh: Array, duplicateCount: number }>}
  */
 async function deduplicateArticles(articles) {
@@ -10,23 +10,23 @@ async function deduplicateArticles(articles) {
     return { fresh: [], duplicateCount: 0 };
   }
 
-  const urls = articles.map((a) => a.url);
+  const seen = new Set();
+  const fresh = [];
+  let duplicateCount = 0;
 
-  const { data, error } = await supabase
-    .from('articles')
-    .select('url')
-    .in('url', urls);
-
-  if (error) {
-    throw new Error(`Failed to check for duplicate URLs: ${error.message}`);
+  for (const article of articles) {
+    if (!article?.url) continue;
+    if (seen.has(article.url)) {
+      duplicateCount += 1;
+      continue;
+    }
+    seen.add(article.url);
+    fresh.push(article);
   }
-
-  const existingUrls = new Set((data || []).map((row) => row.url));
-  const fresh = articles.filter((a) => !existingUrls.has(a.url));
 
   return {
     fresh,
-    duplicateCount: articles.length - fresh.length,
+    duplicateCount,
   };
 }
 

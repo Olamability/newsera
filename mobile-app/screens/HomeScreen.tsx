@@ -218,6 +218,15 @@ export default function HomeScreen() {
     resetAndLoad(selectedCategory);
   }, [selectedCategory, resetAndLoad]);
 
+  const renderItem = useCallback(({ item }: { item: NewsArticle }) => (
+    <ArticleCard
+      article={item}
+      onPress={openArticle}
+      onSwipeLeft={handleSwipeLeft}
+      onSwipeRight={handleSwipeRight}
+    />
+  ), [openArticle, handleSwipeLeft, handleSwipeRight]);
+
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -288,14 +297,7 @@ export default function HomeScreen() {
         ref={flatListRef}
         data={displayedArticles}
         keyExtractor={(item) => item.id}
-        renderItem={useCallback(({ item }: { item: NewsArticle }) => (
-          <ArticleCard
-            article={item}
-            onPress={openArticle}
-            onSwipeLeft={handleSwipeLeft}
-            onSwipeRight={handleSwipeRight}
-          />
-        ), [openArticle, handleSwipeLeft, handleSwipeRight])}
+        renderItem={renderItem}
         ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

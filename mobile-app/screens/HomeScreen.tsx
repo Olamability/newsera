@@ -176,9 +176,9 @@ export default function HomeScreen() {
     }
   }, [loading, hasMore, loadingMore, page, selectedCategory, loadArticles]);
 
-  const openArticle = (article: NewsArticle) => {
+  const openArticle = useCallback((article: NewsArticle) => {
     navigation.navigate('ArticleDetail', { article });
-  };
+  }, [navigation]);
 
   // Filter articles by search query (case-insensitive title match)
   const displayedArticles = useMemo(() => {
@@ -288,14 +288,14 @@ export default function HomeScreen() {
         ref={flatListRef}
         data={displayedArticles}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+        renderItem={useCallback(({ item }: { item: NewsArticle }) => (
           <ArticleCard
             article={item}
             onPress={openArticle}
             onSwipeLeft={handleSwipeLeft}
             onSwipeRight={handleSwipeRight}
           />
-        )}
+        ), [openArticle, handleSwipeLeft, handleSwipeRight])}
         ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

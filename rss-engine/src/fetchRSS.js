@@ -2,6 +2,25 @@ const RSSParser = require('rss-parser');
 
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
+// Maximum time (ms) to wait for a single RSS feed before giving up.
+const FETCH_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || '30000', 10);
+// Minimum image dimension threshold to filter out tracking pixels / icons.
+const MIN_IMAGE_DIMENSION = 100;
+// Known path segments that indicate non-content images.
+const SKIP_IMAGE_PATTERNS = [
+  /tracking/i,
+  /pixel/i,
+  /beacon/i,
+  /icon/i,
+  /logo/i,
+  /avatar/i,
+  /badge/i,
+  /button/i,
+  /sprite/i,
+  /banner/i,
+  /ad[_-]/i,
+  /\/ads\//i,
+];
 
 const parser = new RSSParser({
   customFields: {
@@ -43,27 +62,51 @@ function extractContent(raw) {
 }
 
 /**
+ * Returns true if the URL looks like a tracking pixel, icon, or other
+ * non-article image that should be ignored.
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isLowQualityImage(url) {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    const path = u.pathname + u.search;
+    if (SKIP_IMAGE_PATTERNS.some((re) => re.test(path))) return true;
+    // Reject tiny GIF/PNG beacons (1x1 px) sometimes encoded in the URL
+    if (/[?&](w|h|width|height)=1(&|$)/i.test(u.search)) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Tries to find an image URL from an RSS feed item.
+ * Priority order:
+ *   1. media:content (WordPress preferred)
+ *   2. media:thumbnail
+ *   3. enclosure (image/* only)
+ *   4. og:image / first meaningful <img> in content
+ * Skips tracking pixels, icons, logos, and other low-quality images.
  * @param {Object} item
  * @returns {string|null}
  */
 function extractImage(item) {
-  // 1. media:content (WordPress preferred)
-  if (item?.mediaContent?.$?.url) {
-    return item.mediaContent.$.url;
-  }
+  // 1. media:content
+  const mcUrl = item?.mediaContent?.$?.url;
+  if (mcUrl && !isLowQualityImage(mcUrl)) return mcUrl;
 
   // 2. media:thumbnail
-  if (item?.mediaThumbnail?.$?.url) {
-    return item.mediaThumbnail.$.url;
-  }
+  const mtUrl = item?.mediaThumbnail?.$?.url;
+  if (mtUrl && !isLowQualityImage(mtUrl)) return mtUrl;
 
-  // 3. enclosure
+  // 3. enclosure (must be an image MIME type)
   if (item?.enclosure?.url && item.enclosure.type?.startsWith('image/')) {
-    return item.enclosure.url;
+    if (!isLowQualityImage(item.enclosure.url)) return item.enclosure.url;
   }
 
-  // 4. OpenGraph-style images inside content
+  // 4. Scan content HTML for a meaningful image
   const contentRaw =
     item['content:encoded'] ||
     item.content ||
@@ -71,23 +114,40 @@ function extractImage(item) {
     item.description ||
     '';
 
-  // Try multiple image patterns
-  const patterns = [
-    /<img[^>]+src=["']([^"']+)["']/i,
-    /<image[^>]+src=["']([^"']+)["']/i,
-    /https?:\/\/[^"' >]+\.(jpg|jpeg|png|webp)/i,
+  // Try src from <img> tags — pick the first one that passes the quality check.
+  // Use two separate patterns (double-quoted / single-quoted) to avoid
+  // incorrectly matching across mismatched quote types.
+  const imgTagPatterns = [
+    /<img[^>]+src="([^"]+)"[^>]*>/gi,
+    /<img[^>]+src='([^']+)'[^>]*>/gi,
   ];
+  let match;
+  for (const imgTagRe of imgTagPatterns) {
+    imgTagRe.lastIndex = 0;
+    while ((match = imgTagRe.exec(contentRaw)) !== null) {
+      const url = match[1];
+      const tagStr = match[0];
+      const widthMatch = /width=["']?(\d+)/i.exec(tagStr);
+      const heightMatch = /height=["']?(\d+)/i.exec(tagStr);
+      if (widthMatch && parseInt(widthMatch[1], 10) < MIN_IMAGE_DIMENSION) continue;
+      if (heightMatch && parseInt(heightMatch[1], 10) < MIN_IMAGE_DIMENSION) continue;
+      if (!isLowQualityImage(url)) return url;
+    }
+  }
 
-  for (const pattern of patterns) {
-    const match = contentRaw.match(pattern);
-    if (match) return match[1];
+  // Fallback: bare image URL in content (WordPress / CDN style)
+  const bareRe = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)(?:[?#][^\s"'<>]*)?/gi;
+  while ((match = bareRe.exec(contentRaw)) !== null) {
+    const url = match[0];
+    if (!isLowQualityImage(url)) return url;
   }
 
   return null;
 }
 
 /**
- * Fetches and parses an RSS feed for a given source.
+ * Fetches and parses an RSS feed for a given source with a configurable timeout.
+ * One failed/slow source never blocks the rest of the ingestion pipeline.
  * @param {{ id: string, name: string, rss_url: string, category_id: string }} source
  * @returns {Promise<Array>} Array of normalised article objects.
  */
@@ -98,15 +158,48 @@ async function fetchRSS(source) {
   }
 
   let feed;
+  const ingestionTime = new Date().toISOString();
+
   try {
-    feed = await parser.parseURL(source.rss_url);
+    // parseURL does not natively support AbortController, so we race it against
+    // a rejection timer to enforce the configurable timeout.
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)),
+        FETCH_TIMEOUT_MS,
+      );
+    });
+    feed = await Promise.race([
+      parser.parseURL(source.rss_url).then((result) => {
+        clearTimeout(timeoutId);
+        return result;
+      }),
+      timeoutPromise,
+    ]);
   } catch (err) {
-    console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
+    const isTimeout = err.message && err.message.startsWith('Timed out');
+    if (isTimeout) {
+      console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
+    } else {
+      console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
+    }
     return [];
   }
 
   return (feed.items || []).map((item) => {
     const rawContent = item['content:encoded'] || item.content || item.summary || '';
+
+    // Task 9: fall back to the ingestion timestamp when pubDate is absent or
+    // unparseable so that articles without a date never float to the top of
+    // feeds ordered by published_at DESC.
+    let publishedAt = ingestionTime;
+    if (item.pubDate) {
+      const parsed = new Date(item.pubDate);
+      if (!Number.isNaN(parsed.getTime())) {
+        publishedAt = parsed.toISOString();
+      }
+    }
 
     return {
       source_id: source.id,
@@ -116,7 +209,7 @@ async function fetchRSS(source) {
       snippet: extractSnippet(rawContent),
       content: extractContent(rawContent),
       image_url: extractImage(item),
-      published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
+      published_at: publishedAt,
     };
   }).filter((a) => a.url && a.title);
 }

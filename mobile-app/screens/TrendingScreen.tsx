@@ -35,21 +35,23 @@ const TrendingScreen: React.FC = () => {
   const fetchGenerationRef = useRef(0);
   const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadArticles = useCallback(async (pageNum: number, append: boolean) => {
-    if (isFetchingRef.current) return;
+  const loadArticles = useCallback(async (pageNum: number, append: boolean): Promise<boolean> => {
+    if (isFetchingRef.current) return false;
     isFetchingRef.current = true;
     const generation = fetchGenerationRef.current;
 
     try {
       const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(pageNum);
-      if (fetchGenerationRef.current !== generation) return;
+      if (fetchGenerationRef.current !== generation) return false;
       setHasMore(moreAvailable);
       setArticles(prev => (append ? [...prev, ...data] : data));
+      return true;
     } catch (err) {
-      if (fetchGenerationRef.current !== generation) return;
+      if (fetchGenerationRef.current !== generation) return false;
       if (isAuthError(err)) {
         setHasMore(false);
       }
+      return false;
     } finally {
       if (fetchGenerationRef.current === generation) {
         isFetchingRef.current = false;
@@ -117,9 +119,9 @@ const TrendingScreen: React.FC = () => {
     if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
     const nextPage = page + 1;
     setLoadingMore(true);
-    setPage(nextPage);
     try {
-      await loadArticles(nextPage, true);
+      const ok = await loadArticles(nextPage, true);
+      if (ok) setPage(nextPage);
     } finally {
       setLoadingMore(false);
     }
@@ -171,6 +173,10 @@ const TrendingScreen: React.FC = () => {
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

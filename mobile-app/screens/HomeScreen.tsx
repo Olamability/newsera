@@ -57,8 +57,8 @@ export default function HomeScreen() {
   // any in-flight fetch from the previous feed is silently discarded.
   const fetchGenerationRef = useRef(0);
 
-  const loadArticles = useCallback(async (categoryId: string, pageNum: number, append: boolean) => {
-    if (isFetchingRef.current) return;
+  const loadArticles = useCallback(async (categoryId: string, pageNum: number, append: boolean): Promise<boolean> => {
+    if (isFetchingRef.current) return false;
     isFetchingRef.current = true;
     const generation = fetchGenerationRef.current;
 
@@ -81,7 +81,7 @@ export default function HomeScreen() {
       }
 
       // Discard stale results if the category changed or a refresh fired mid-flight.
-      if (fetchGenerationRef.current !== generation) return;
+      if (fetchGenerationRef.current !== generation) return false;
 
       setFetchError(false);
       setHasMore(moreAvailable);
@@ -94,8 +94,9 @@ export default function HomeScreen() {
         );
         return unique;
       });
+      return true;
     } catch (err) {
-      if (fetchGenerationRef.current !== generation) return;
+      if (fetchGenerationRef.current !== generation) return false;
       if (isAuthError(err)) {
         setHasMore(false);
       }
@@ -104,6 +105,7 @@ export default function HomeScreen() {
         setFetchError(true);
         setArticles([]);
       }
+      return false;
     } finally {
       // Only release the lock when it still belongs to this fetch.
       if (fetchGenerationRef.current === generation) {
@@ -168,9 +170,9 @@ export default function HomeScreen() {
 
     const nextPage = page + 1;
     setLoadingMore(true);
-    setPage(nextPage);
     try {
-      await loadArticles(selectedCategory, nextPage, true);
+      const ok = await loadArticles(selectedCategory, nextPage, true);
+      if (ok) setPage(nextPage);
     } finally {
       setLoadingMore(false);
     }

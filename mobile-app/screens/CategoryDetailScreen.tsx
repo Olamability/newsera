@@ -32,18 +32,20 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
   const isFetchingRef = useRef(false);
 
   const loadPage = useCallback(
-    async (pageNum: number, append: boolean) => {
-      if (isFetchingRef.current) return;
+    async (pageNum: number, append: boolean): Promise<boolean> => {
+      if (isFetchingRef.current) return false;
       isFetchingRef.current = true;
       try {
         const { articles: data, hasMore: more } = await fetchArticles(pageNum, categoryId);
         setHasMore(more);
         setArticles((prev) => (append ? [...prev, ...data] : data));
+        return true;
       } catch (err) {
         if (isAuthError(err)) {
           setHasMore(false);
         }
         console.warn('[CategoryDetail] Failed to load:', err);
+        return false;
       } finally {
         isFetchingRef.current = false;
       }
@@ -63,9 +65,12 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
     if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
     const next = page + 1;
     setLoadingMore(true);
-    setPage(next);
-    await loadPage(next, true);
-    setLoadingMore(false);
+    try {
+      const ok = await loadPage(next, true);
+      if (ok) setPage(next);
+    } finally {
+      setLoadingMore(false);
+    }
   }, [loading, loadingMore, hasMore, page, loadPage]);
 
   const openArticle = useCallback(
@@ -121,6 +126,10 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
         ListFooterComponent={renderFooter}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

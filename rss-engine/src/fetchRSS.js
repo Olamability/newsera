@@ -3,9 +3,11 @@ const RSSParser = require('rss-parser');
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
 // Maximum time (ms) to wait for a single RSS feed before giving up.
-const FETCH_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || '30000', 10);
+const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || '12000', 10);
+const FETCH_TIMEOUT_MS = Math.max(10000, Math.min(Number.isNaN(RAW_TIMEOUT_MS) ? 12000 : RAW_TIMEOUT_MS, 15000));
 // Minimum image dimension threshold to filter out tracking pixels / icons.
 const MIN_IMAGE_DIMENSION = 100;
+const DEBUG = process.env.RSS_DEBUG === 'true';
 // Known path segments that indicate non-content images.
 const SKIP_IMAGE_PATTERNS = [
   /tracking/i,
@@ -25,9 +27,13 @@ const SKIP_IMAGE_PATTERNS = [
 const parser = new RSSParser({
   customFields: {
     item: [
-      ['media:content', 'mediaContent', { keepArray: false }],
-      ['media:thumbnail', 'mediaThumbnail', { keepArray: false }],
+      ['media:content', 'mediaContent', { keepArray: true }],
+      ['media:thumbnail', 'mediaThumbnail', { keepArray: true }],
       ['enclosure', 'enclosure', { keepArray: false }],
+      ['wp:featured_image', 'wpFeaturedImage', { keepArray: true }],
+      ['featured_image', 'featuredImage', { keepArray: true }],
+      ['post-thumbnail', 'postThumbnail', { keepArray: true }],
+      ['og:image', 'ogImage', { keepArray: false }],
     ],
   },
 });
@@ -81,32 +87,66 @@ function isLowQualityImage(url) {
   }
 }
 
+function toArray(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function pickImageFromField(value) {
+  for (const entry of toArray(value)) {
+    if (!entry) continue;
+    const url = typeof entry === 'string'
+      ? entry
+      : entry.url || entry.href || entry.$?.url || entry.$?.href || entry._;
+    if (url && !isLowQualityImage(url)) {
+      return url;
+    }
+  }
+  return null;
+}
+
 /**
  * Tries to find an image URL from an RSS feed item.
  * Priority order:
- *   1. media:content (WordPress preferred)
- *   2. media:thumbnail
- *   3. enclosure (image/* only)
- *   4. og:image / first meaningful <img> in content
+ *   1. media:content
+ *   2. enclosure (image/* only)
+ *   3. og:image
+ *   4. WordPress featured-image style fields
+ *   5. HTML <img> fallback
  * Skips tracking pixels, icons, logos, and other low-quality images.
  * @param {Object} item
  * @returns {string|null}
  */
 function extractImage(item) {
   // 1. media:content
-  const mcUrl = item?.mediaContent?.$?.url;
-  if (mcUrl && !isLowQualityImage(mcUrl)) return mcUrl;
+  const mcUrl = pickImageFromField(item?.mediaContent);
+  if (mcUrl) return mcUrl;
 
-  // 2. media:thumbnail
-  const mtUrl = item?.mediaThumbnail?.$?.url;
-  if (mtUrl && !isLowQualityImage(mtUrl)) return mtUrl;
-
-  // 3. enclosure (must be an image MIME type)
+  // 2. enclosure (must be an image MIME type)
   if (item?.enclosure?.url && item.enclosure.type?.startsWith('image/')) {
     if (!isLowQualityImage(item.enclosure.url)) return item.enclosure.url;
   }
 
-  // 4. Scan content HTML for a meaningful image
+  // 3. og:image
+  const ogImage =
+    pickImageFromField(item?.ogImage) ||
+    (() => {
+      const raw = item['content:encoded'] || item.content || item.summary || item.description || '';
+      const match = raw.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+        || raw.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+      return match?.[1] && !isLowQualityImage(match[1]) ? match[1] : null;
+    })();
+  if (ogImage) return ogImage;
+
+  // 4. WordPress featured image style fields (+ media thumbnail fallback)
+  const wpImage =
+    pickImageFromField(item?.wpFeaturedImage)
+    || pickImageFromField(item?.featuredImage)
+    || pickImageFromField(item?.postThumbnail)
+    || pickImageFromField(item?.mediaThumbnail);
+  if (wpImage) return wpImage;
+
+  // 5. Scan content HTML for a meaningful image
   const contentRaw =
     item['content:encoded'] ||
     item.content ||
@@ -160,31 +200,34 @@ async function fetchRSS(source) {
   let feed;
   const ingestionTime = new Date().toISOString();
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    // parseURL does not natively support AbortController, so we race it against
-    // a rejection timer to enforce the configurable timeout.
-    let timeoutId;
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(
-        () => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)),
-        FETCH_TIMEOUT_MS,
-      );
+    const response = await fetch(source.rss_url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'newsera-rss-engine/1.0',
+        Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+      },
     });
-    feed = await Promise.race([
-      parser.parseURL(source.rss_url).then((result) => {
-        clearTimeout(timeoutId);
-        return result;
-      }),
-      timeoutPromise,
-    ]);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const xml = await response.text();
+    feed = await parser.parseString(xml);
   } catch (err) {
-    const isTimeout = err.message && err.message.startsWith('Timed out');
+    const isTimeout = err?.name === 'AbortError';
     if (isTimeout) {
       console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
     } else {
       console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
     }
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return (feed.items || []).map((item) => {
@@ -201,6 +244,11 @@ async function fetchRSS(source) {
       }
     }
 
+    const imageUrl = extractImage(item);
+    if (DEBUG) {
+      console.log(`  [DEBUG] ${source.name} image extracted: ${imageUrl || 'none'} (${(item.title || '').trim() || 'untitled'})`);
+    }
+
     return {
       source_id: source.id,
       category_id: source.category_id,
@@ -208,7 +256,7 @@ async function fetchRSS(source) {
       url: (item.link || item.guid || '').trim(),
       snippet: extractSnippet(rawContent),
       content: extractContent(rawContent),
-      image_url: extractImage(item),
+      image_url: imageUrl,
       published_at: publishedAt,
     };
   }).filter((a) => a.url && a.title);

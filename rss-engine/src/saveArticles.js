@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 
 const BATCH_SIZE = parseInt(process.env.INSERT_BATCH_SIZE || '50', 10);
+const DEBUG = process.env.RSS_DEBUG === 'true';
 
 /**
  * Inserts an array of articles into the `articles` table.
@@ -8,12 +9,13 @@ const BATCH_SIZE = parseInt(process.env.INSERT_BATCH_SIZE || '50', 10);
  * crash on duplicate-URL constraint violations (Task 7 — deduplication race).
  * Articles are inserted in batches to stay within Supabase limits.
  * @param {Array} articles
- * @returns {Promise<number>} Number of articles successfully inserted.
+ * @returns {Promise<{ inserted: number, skippedDuplicates: number }>}
  */
 async function saveArticles(articles) {
-  if (!articles.length) return 0;
+  if (!articles.length) return { inserted: 0, skippedDuplicates: 0 };
 
   let inserted = 0;
+  let skippedDuplicates = 0;
 
   for (let i = 0; i < articles.length; i += BATCH_SIZE) {
     const batch = articles.slice(i, i + BATCH_SIZE);
@@ -32,18 +34,24 @@ async function saveArticles(articles) {
     // onConflict: 'url'  →  ON CONFLICT (url) DO NOTHING
     // ignoreDuplicates: true prevents any fields from being overwritten on
     // conflict, and suppresses errors for rows that already exist.
-    const { error, count } = await supabase
+    const { error, data } = await supabase
       .from('articles')
-      .upsert(rows, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
+      .upsert(rows, { onConflict: 'url', ignoreDuplicates: true })
+      .select('url');
 
     if (error) {
       console.error(`  [ERROR] Insert batch failed: ${error.message}`);
     } else {
-      inserted += count ?? 0;
+      const insertedInBatch = data?.length ?? 0;
+      inserted += insertedInBatch;
+      skippedDuplicates += Math.max(rows.length - insertedInBatch, 0);
+      if (DEBUG) {
+        console.log(`  [DEBUG] Batch insert attempted=${rows.length} inserted=${insertedInBatch} duplicates=${Math.max(rows.length - insertedInBatch, 0)}`);
+      }
     }
   }
 
-  return inserted;
+  return { inserted, skippedDuplicates };
 }
 
 module.exports = { saveArticles };

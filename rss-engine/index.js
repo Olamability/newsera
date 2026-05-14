@@ -1,31 +1,133 @@
 require('dotenv').config();
 
 const pLimit = require('p-limit');
+const supabase = require('./config/supabase');
 const { fetchSources } = require('./src/fetchSources');
 const { fetchRSS } = require('./src/fetchRSS');
 const { deduplicateArticles } = require('./src/deduplicateArticles');
 const { saveArticles } = require('./src/saveArticles');
 
-// Maximum number of RSS sources processed concurrently.
-const CONCURRENCY = parseInt(process.env.RSS_CONCURRENCY || '5', 10);
+const RAW_CONCURRENCY = parseInt(process.env.RSS_CONCURRENCY || '3', 10);
+// Process at least 3 and at most 5 feeds at once (safe bounded concurrency).
+const CONCURRENCY = Math.max(3, Math.min(Number.isNaN(RAW_CONCURRENCY) ? 3 : RAW_CONCURRENCY, 5));
+const BATCH_DELAY_MS = parseInt(process.env.RSS_BATCH_DELAY_MS || '300', 10);
+const DEBUG = process.env.RSS_DEBUG === 'true';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function writeIngestionLog(source, metrics) {
+  const imageSuccessRate = metrics.fetched > 0
+    ? Number((metrics.imageCount / metrics.fetched).toFixed(4))
+    : 0;
+
+  const payloads = [
+    {
+      source_id: source.id,
+      source_name: source.name,
+      success: metrics.success,
+      status: metrics.success ? 'success' : 'error',
+      articles_fetched: metrics.fetched,
+      articles_inserted: metrics.inserted,
+      articles_skipped: metrics.duplicates,
+      image_success_rate: imageSuccessRate,
+      error_message: metrics.error,
+      started_at: metrics.startedAt,
+      finished_at: metrics.finishedAt,
+    },
+    {
+      feed_id: source.id,
+      feed_url: source.rss_url || '',
+      started_at: metrics.startedAt,
+      finished_at: metrics.finishedAt,
+      articles_found: metrics.fetched,
+      articles_saved: metrics.inserted,
+      articles_skipped: metrics.duplicates,
+      error: metrics.error,
+      status: metrics.success ? 'success' : 'error',
+    },
+    {
+      feed_url: source.rss_url || '',
+      started_at: metrics.startedAt,
+      finished_at: metrics.finishedAt,
+      articles_found: metrics.fetched,
+      articles_saved: metrics.inserted,
+      articles_skipped: metrics.duplicates,
+      error: metrics.error,
+      status: metrics.success ? 'success' : 'error',
+    },
+  ];
+
+  for (const payload of payloads) {
+    try {
+      const { error } = await supabase.from('rss_ingestion_log').insert([payload]);
+      if (!error) return;
+      if (DEBUG) {
+        console.warn(`  [DEBUG] Ingestion log attempt failed for "${source.name}": ${error.message}`);
+      }
+    } catch (error) {
+      if (DEBUG) {
+        console.warn(`  [DEBUG] Ingestion log exception for "${source.name}": ${error.message}`);
+      }
+    }
+  }
+}
 
 async function processSource(source) {
   console.log(`Processing source: "${source.name}" (${source.rss_url})`);
 
-  const articles = await fetchRSS(source);
-  console.log(`  [${source.name}] Fetched ${articles.length} article(s) from feed.`);
+  const metrics = {
+    success: false,
+    fetched: 0,
+    inserted: 0,
+    duplicates: 0,
+    imageCount: 0,
+    error: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  };
 
-  if (!articles.length) return { inserted: 0, duplicates: 0 };
+  try {
+    const articles = await fetchRSS(source);
+    metrics.fetched = articles.length;
+    metrics.imageCount = articles.filter((article) => !!article.image_url).length;
+    console.log(`  [${source.name}] Fetched ${articles.length} article(s) from feed.`);
 
-  const { fresh, duplicateCount } = await deduplicateArticles(articles);
-  console.log(`  [${source.name}] ${duplicateCount} duplicate(s) skipped, ${fresh.length} new article(s) to insert.`);
+    if (!articles.length) {
+      metrics.success = true;
+      return metrics;
+    }
 
-  if (!fresh.length) return { inserted: 0, duplicates: duplicateCount };
+    const { fresh, duplicateCount } = await deduplicateArticles(articles);
+    metrics.duplicates += duplicateCount;
+    if (DEBUG) {
+      console.log(`  [DEBUG] ${source.name} in-feed duplicate check: skipped=${duplicateCount} remaining=${fresh.length}`);
+    }
 
-  const inserted = await saveArticles(fresh);
-  console.log(`  [${source.name}] Inserted ${inserted} article(s).`);
+    if (!fresh.length) {
+      metrics.success = true;
+      return metrics;
+    }
 
-  return { inserted, duplicates: duplicateCount };
+    const saved = await saveArticles(fresh);
+    metrics.inserted = saved.inserted;
+    metrics.duplicates += saved.skippedDuplicates;
+    console.log(`  [${source.name}] Inserted ${saved.inserted} article(s), skipped ${metrics.duplicates} duplicate(s).`);
+    if (DEBUG) {
+      console.log(`  [DEBUG] ${source.name} dedup decisions: inserted=${saved.inserted} skipped=${metrics.duplicates}`);
+    }
+
+    metrics.success = true;
+    return metrics;
+  } catch (error) {
+    metrics.error = error?.message ?? String(error);
+    console.error(`  [ERROR] Source "${source.name}" failed: ${metrics.error}`);
+    return metrics;
+  } finally {
+    metrics.finishedAt = new Date().toISOString();
+    await writeIngestionLog(source, metrics);
+  }
 }
 
 async function run() {
@@ -35,14 +137,23 @@ async function run() {
   // 1. Fetch active sources
   console.log('Fetching active sources…');
   const sources = await fetchSources();
-  console.log(`Found ${sources.length} active source(s). Concurrency: ${CONCURRENCY}\n`);
+  console.log(`Found ${sources.length} active source(s). Concurrency: ${CONCURRENCY}, batch delay: ${BATCH_DELAY_MS}ms\n`);
 
   const limit = pLimit(CONCURRENCY);
 
   // 2. Process all sources in parallel (up to CONCURRENCY at a time).
   //    Promise.allSettled ensures one failed source never stops the others.
   const results = await Promise.allSettled(
-    sources.map((source) => limit(() => processSource(source))),
+    sources.map((source, index) => limit(async () => {
+      const batchIndex = Math.floor(index / CONCURRENCY);
+      if (batchIndex > 0 && BATCH_DELAY_MS > 0) {
+        await sleep(batchIndex * BATCH_DELAY_MS);
+      }
+      if (DEBUG) {
+        console.log(`  [DEBUG] Starting source "${source.name}" in batch ${batchIndex + 1}`);
+      }
+      return processSource(source);
+    })),
   );
 
   // 3. Aggregate metrics
@@ -55,6 +166,7 @@ async function run() {
     if (result.status === 'fulfilled') {
       totalInserted += result.value.inserted;
       totalDuplicates += result.value.duplicates;
+      if (!result.value.success) totalFailed += 1;
     } else {
       totalFailed += 1;
       console.error(`  [ERROR] Source "${sources[i].name}" failed: ${result.reason?.message ?? result.reason}`);

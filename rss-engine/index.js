@@ -7,9 +7,15 @@ const { fetchRSS } = require('./src/fetchRSS');
 const { deduplicateArticles } = require('./src/deduplicateArticles');
 const { saveArticles } = require('./src/saveArticles');
 
-const RAW_CONCURRENCY = parseInt(process.env.RSS_CONCURRENCY || '3', 10);
+const MIN_CONCURRENCY = 3;
+const DEFAULT_CONCURRENCY = 3;
+const MAX_CONCURRENCY = 5;
+const RAW_CONCURRENCY = parseInt(process.env.RSS_CONCURRENCY || String(DEFAULT_CONCURRENCY), 10);
 // Process at least 3 and at most 5 feeds at once (safe bounded concurrency).
-const CONCURRENCY = Math.max(3, Math.min(Number.isNaN(RAW_CONCURRENCY) ? 3 : RAW_CONCURRENCY, 5));
+const CONCURRENCY = Math.max(
+  MIN_CONCURRENCY,
+  Math.min(Number.isNaN(RAW_CONCURRENCY) ? DEFAULT_CONCURRENCY : RAW_CONCURRENCY, MAX_CONCURRENCY),
+);
 const BATCH_DELAY_MS = parseInt(process.env.RSS_BATCH_DELAY_MS || '300', 10);
 const DEBUG = process.env.RSS_DEBUG === 'true';
 
@@ -22,6 +28,8 @@ async function writeIngestionLog(source, metrics) {
     ? Number((metrics.imageCount / metrics.fetched).toFixed(4))
     : 0;
 
+  // Supports both the current `rss_ingestion_log` shape and older/newer
+  // schema variants without changing database structure.
   const payloads = [
     {
       source_id: source.id,
@@ -147,6 +155,8 @@ async function run() {
     sources.map((source, index) => limit(async () => {
       const batchIndex = Math.floor(index / CONCURRENCY);
       if (batchIndex > 0 && BATCH_DELAY_MS > 0) {
+        // Each batch is offset by BATCH_DELAY_MS, producing a fixed delay
+        // between consecutive batches (0ms, 300ms, 600ms, ... by default).
         await sleep(batchIndex * BATCH_DELAY_MS);
       }
       if (DEBUG) {

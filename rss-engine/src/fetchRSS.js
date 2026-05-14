@@ -2,9 +2,15 @@ const RSSParser = require('rss-parser');
 
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
+const MIN_TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 12000;
+const MAX_TIMEOUT_MS = 15000;
 // Maximum time (ms) to wait for a single RSS feed before giving up.
-const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || '12000', 10);
-const FETCH_TIMEOUT_MS = Math.max(10000, Math.min(Number.isNaN(RAW_TIMEOUT_MS) ? 12000 : RAW_TIMEOUT_MS, 15000));
+const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
+const FETCH_TIMEOUT_MS = Math.max(
+  MIN_TIMEOUT_MS,
+  Math.min(Number.isNaN(RAW_TIMEOUT_MS) ? DEFAULT_TIMEOUT_MS : RAW_TIMEOUT_MS, MAX_TIMEOUT_MS),
+);
 // Minimum image dimension threshold to filter out tracking pixels / icons.
 const MIN_IMAGE_DIMENSION = 100;
 const DEBUG = process.env.RSS_DEBUG === 'true';
@@ -95,6 +101,8 @@ function toArray(value) {
 function pickImageFromField(value) {
   for (const entry of toArray(value)) {
     if (!entry) continue;
+    // Handles common RSS/XML shapes: plain URL strings, { url/href }, and
+    // namespaced parser objects like { $: { url } } or text nodes under "_".
     const url = typeof entry === 'string'
       ? entry
       : entry.url || entry.href || entry.$?.url || entry.$?.href || entry._;
@@ -128,13 +136,13 @@ function extractImage(item) {
   }
 
   // 3. og:image
+  const contentRaw = item['content:encoded'] || item.content || item.summary || item.description || '';
   const ogImage =
     pickImageFromField(item?.ogImage) ||
     (() => {
-      const raw = item['content:encoded'] || item.content || item.summary || item.description || '';
-      const match = raw.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-        || raw.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-      return match?.[1] && !isLowQualityImage(match[1]) ? match[1] : null;
+      const match = contentRaw.match(/<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i);
+      const candidate = match?.[1] || match?.[2];
+      return candidate && !isLowQualityImage(candidate) ? candidate : null;
     })();
   if (ogImage) return ogImage;
 
@@ -147,13 +155,6 @@ function extractImage(item) {
   if (wpImage) return wpImage;
 
   // 5. Scan content HTML for a meaningful image
-  const contentRaw =
-    item['content:encoded'] ||
-    item.content ||
-    item.summary ||
-    item.description ||
-    '';
-
   // Try src from <img> tags — pick the first one that passes the quality check.
   // Use two separate patterns (double-quoted / single-quoted) to avoid
   // incorrectly matching across mismatched quote types.

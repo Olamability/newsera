@@ -14,8 +14,9 @@ const FETCH_TIMEOUT_MS = Math.max(
 // Minimum image dimension threshold to filter out tracking pixels / icons.
 const MIN_IMAGE_DIMENSION = 100;
 const DEBUG = process.env.RSS_DEBUG === 'true';
-// Matches og:image meta tags where attributes can appear in either order:
-// property="og:image" ... content="..." OR content="..." ... property="og:image".
+// Matches og:image meta tags with two attribute orders:
+// (1) property="og:image" ... content="..."
+// (2) content="..." ... property="og:image"
 const OG_IMAGE_META_REGEX = /<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i;
 // Known path segments that indicate non-content images.
 const SKIP_IMAGE_PATTERNS = [
@@ -114,6 +115,10 @@ function pickImageFromField(value) {
     }
   }
   return null;
+}
+
+function isTimeoutError(err) {
+  return err?.name === 'AbortError' || String(err?.message || '').startsWith('Timed out after');
 }
 
 /**
@@ -235,7 +240,7 @@ async function fetchRSS(source) {
       ]).finally(() => clearTimeout(legacyTimeoutId));
     }
   } catch (err) {
-    const isTimeout = err?.name === 'AbortError' || String(err?.message || '').startsWith('Timed out after');
+    const isTimeout = isTimeoutError(err);
     if (isTimeout) {
       console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
     } else {

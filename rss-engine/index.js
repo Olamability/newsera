@@ -15,7 +15,8 @@ const CONCURRENCY = Math.max(
   MIN_CONCURRENCY,
   Math.min(Number.isNaN(RAW_CONCURRENCY) ? DEFAULT_CONCURRENCY : RAW_CONCURRENCY, MAX_CONCURRENCY),
 );
-const BATCH_DELAY_MS = parseInt(process.env.RSS_BATCH_DELAY_MS || '300', 10);
+const RAW_BATCH_DELAY_MS = parseInt(process.env.RSS_BATCH_DELAY_MS || '300', 10);
+const BATCH_DELAY_MS = Number.isNaN(RAW_BATCH_DELAY_MS) ? 300 : Math.max(0, RAW_BATCH_DELAY_MS);
 const DEBUG = process.env.RSS_DEBUG === 'true';
 let preferredLogPayloadIndex = 0;
 

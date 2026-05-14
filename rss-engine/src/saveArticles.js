@@ -3,7 +3,9 @@ const supabase = require('../config/supabase');
 const BATCH_SIZE = parseInt(process.env.INSERT_BATCH_SIZE || '50', 10);
 
 /**
- * Inserts an array of new articles into the `articles` table.
+ * Inserts an array of articles into the `articles` table.
+ * Uses upsert with ignoreDuplicates so that concurrent ingestion runs cannot
+ * crash on duplicate-URL constraint violations (Task 7 — deduplication race).
  * Articles are inserted in batches to stay within Supabase limits.
  * @param {Array} articles
  * @returns {Promise<number>} Number of articles successfully inserted.
@@ -27,15 +29,17 @@ async function saveArticles(articles) {
       published_at: a.published_at || null,
     }));
 
+    // onConflict: 'url'  →  ON CONFLICT (url) DO NOTHING
+    // ignoreDuplicates: true prevents any fields from being overwritten on
+    // conflict, and suppresses errors for rows that already exist.
     const { error, count } = await supabase
       .from('articles')
-      .insert(rows, { count: 'exact' });
+      .upsert(rows, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
 
     if (error) {
-      // Log but continue with next batch
       console.error(`  [ERROR] Insert batch failed: ${error.message}`);
     } else {
-      inserted += count ?? batch.length;
+      inserted += count ?? 0;
     }
   }
 

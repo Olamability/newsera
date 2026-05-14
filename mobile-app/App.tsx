@@ -28,7 +28,6 @@ import InboxScreen from './screens/InboxScreen';
 import RewardsScreen from './screens/RewardsScreen';
 import BlockedUsersScreen from './screens/BlockedUsersScreen';
 import { RootStackParamList, MainTabParamList } from './types';
-import { CategoryProvider } from './context/CategoryContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -245,9 +244,7 @@ export default function App() {
       <ThemeProvider>
         <SettingsProvider>
           <AuthProvider>
-            <CategoryProvider>
-              <AppNavigator />
-            </CategoryProvider>
+            <AppNavigator />
           </AuthProvider>
         </SettingsProvider>
       </ThemeProvider>

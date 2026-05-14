@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../services/supabase'
+import { validateRssUrl } from '../services/urlValidation'
 
 const STATUS_BADGE = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -24,14 +25,21 @@ function EditModal({ source, categories, onClose, onSaved }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setSaving(true)
     setError('')
+
+    const rssValidationError = validateRssUrl(form.rss_url)
+    if (rssValidationError) {
+      setError(rssValidationError)
+      return
+    }
+
+    setSaving(true)
     const { error } = await supabase
       .from('sources')
       .update({
         name: form.name,
         website_url: form.website_url,
-        rss_url: form.rss_url,
+        rss_url: form.rss_url.trim(),
         category_id: form.category_id || null,
         status: form.status,
       })

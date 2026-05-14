@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
-
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
@@ -20,7 +18,11 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const isAdmin = session?.user?.email === ADMIN_EMAIL
+  // Admin access is determined by a server-side role claim stored in
+  // app_metadata (set via the Supabase Dashboard or a trusted server function).
+  // app_metadata is signed into the JWT and cannot be modified by the user,
+  // making this far more secure than a client-side email comparison.
+  const isAdmin = session?.user?.app_metadata?.role === 'admin'
 
   const signIn = (email, password) =>
     supabase.auth.signInWithPassword({ email, password })

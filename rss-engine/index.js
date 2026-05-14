@@ -1,6 +1,5 @@
 require('dotenv').config();
 
-const pLimit = require('p-limit');
 const supabase = require('./config/supabase');
 const { fetchSources } = require('./src/fetchSources');
 const { fetchRSS } = require('./src/fetchRSS');
@@ -155,24 +154,21 @@ async function run() {
   const sources = await fetchSources();
   console.log(`Found ${sources.length} active source(s). Concurrency: ${CONCURRENCY}, batch delay: ${BATCH_DELAY_MS}ms\n`);
 
-  const limit = pLimit(CONCURRENCY);
-
-  // 2. Process all sources in parallel (up to CONCURRENCY at a time).
+  // 2. Process sources in bounded parallel batches.
   //    Promise.allSettled ensures one failed source never stops the others.
-  const results = await Promise.allSettled(
-    sources.map((source, index) => limit(async () => {
-      const batchIndex = Math.floor(index / CONCURRENCY);
-      if (batchIndex > 0 && BATCH_DELAY_MS > 0) {
-        // Each batch is offset by BATCH_DELAY_MS, producing a fixed delay
-        // between consecutive batches (0ms, 300ms, 600ms, ... by default).
-        await sleep(batchIndex * BATCH_DELAY_MS);
-      }
-      if (DEBUG) {
-        console.log(`  [DEBUG] Starting source "${source.name}" in batch ${batchIndex + 1}`);
-      }
-      return processSource(source);
-    })),
-  );
+  const results = [];
+  for (let i = 0; i < sources.length; i += CONCURRENCY) {
+    const batch = sources.slice(i, i + CONCURRENCY);
+    const batchIndex = Math.floor(i / CONCURRENCY) + 1;
+    if (DEBUG) {
+      console.log(`  [DEBUG] Starting batch ${batchIndex} (${batch.length} source(s))`);
+    }
+    const batchResults = await Promise.allSettled(batch.map((source) => processSource(source)));
+    results.push(...batchResults);
+    if (i + CONCURRENCY < sources.length && BATCH_DELAY_MS > 0) {
+      await sleep(BATCH_DELAY_MS);
+    }
+  }
 
   // 3. Aggregate metrics
   let totalInserted = 0;

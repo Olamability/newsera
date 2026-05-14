@@ -230,9 +230,7 @@ async function fetchRSS(source) {
         legacyTimeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
       });
       feed = await Promise.race([
-        parser.parseURL(source.rss_url).then((result) => {
-          return result;
-        }),
+        parser.parseURL(source.rss_url),
         timeoutPromise,
       ]).finally(() => clearTimeout(legacyTimeoutId));
     }

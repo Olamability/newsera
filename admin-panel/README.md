@@ -30,10 +30,23 @@ Edit `.env`:
 ```
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
-VITE_ADMIN_EMAIL=admin@yourdomain.com
 ```
 
-> `VITE_ADMIN_EMAIL` is the **only** email address that will be granted access to the dashboard. Any other authenticated user will see an "Access Denied" screen.
+Admin access is controlled by `session.user.app_metadata.role === "admin"` (not by email string matching).
+Promote a user to admin from Supabase SQL Editor:
+
+```sql
+UPDATE auth.users
+SET app_metadata = jsonb_set(
+  COALESCE(app_metadata, '{}'::jsonb),
+  '{role}',
+  '"admin"'::jsonb,
+  true
+)
+WHERE email = 'admin@example.com';
+```
+
+After running the SQL, sign out and sign back in so the JWT contains the new claim.
 
 ### 3. Start the dev server
 

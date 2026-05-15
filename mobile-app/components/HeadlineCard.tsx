@@ -137,17 +137,17 @@ const styles = StyleSheet.create({
   gradientOverlayTop: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.03)',
   },
   gradientOverlayBottom: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: CARD_HEIGHT * 0.65,
+    height: CARD_HEIGHT * 0.45,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   content: {
     padding: 14,
@@ -172,11 +172,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.65)',
     fontWeight: '400',
+    textShadowColor: 'rgba(0,0,0,0.22)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   title: {
     fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
     lineHeight: 21,
+    textShadowColor: 'rgba(0,0,0,0.32)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

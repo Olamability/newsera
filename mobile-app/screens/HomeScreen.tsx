@@ -49,6 +49,7 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [fetchError, setFetchError] = useState(false);
+  const [headlineRefreshSignal, setHeadlineRefreshSignal] = useState(0);
 
   const flatListRef = useRef<FlatList<NewsArticle>>(null);
   // Prevents duplicate concurrent fetches within the same feed/page.
@@ -155,6 +156,7 @@ export default function HomeScreen() {
     isFetchingRef.current = false;
 
     setRefreshing(true);
+    setHeadlineRefreshSignal((prev) => prev + 1);
     setPage(1);
     setHasMore(true);
     try {
@@ -300,7 +302,7 @@ export default function HomeScreen() {
         data={displayedArticles}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection />}
+        ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection refreshSignal={headlineRefreshSignal} />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

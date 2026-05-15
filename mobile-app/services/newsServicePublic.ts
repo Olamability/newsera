@@ -38,6 +38,7 @@ const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(
 const loggedErrors = new Set<string>();
 const MAX_LOGGED_ERRORS = 200;
 const FEED_CACHE_TTL_MS = 90000;
+const HEADLINES_CACHE_TTL_MS = 60000;
 
 type FeedCacheEntry<T> = {
   value: T;
@@ -188,38 +189,33 @@ export async function fetchHeadlinesPublic(): Promise<NewsArticle[]> {
   const cached = readFeedCache<NewsArticle[]>(cacheKey);
   if (cached) return cached;
 
-  const { data: imageRows, error: imageError } = await supabasePublic
+  const { data, error } = await supabasePublic
     .from('articles')
     .select(ARTICLE_SELECT)
     .not('image_url', 'is', null)
-    .order('published_at', { ascending: false })
+    .neq('image_url', '')
+    .order('published_at', { ascending: false, nullsFirst: false })
     .limit(HEADLINES_LIMIT);
 
-  if (imageError) {
-    logPublicErrorOnce('fetchHeadlinesPublic:withImages', imageError);
-    throw imageError;
+  if (error) {
+    logPublicErrorOnce('fetchHeadlinesPublic', error);
+    throw error;
   }
 
-  const withImages = ((imageRows as ArticleRow[]) ?? []).map(mapArticle);
-  if (withImages.length >= HEADLINES_LIMIT) {
-    return writeFeedCache(cacheKey, withImages.slice(0, HEADLINES_LIMIT));
+  const headlines = ((data as ArticleRow[]) ?? []).map(mapArticle).slice(0, HEADLINES_LIMIT);
+  feedCache.set(cacheKey, {
+    value: headlines,
+    expiresAt: Date.now() + HEADLINES_CACHE_TTL_MS,
+  });
+  return headlines;
+}
+
+export function invalidateHeadlinesPublicCache(): void {
+  for (const key of feedCache.keys()) {
+    if (key.startsWith('headlines|')) {
+      feedCache.delete(key);
+    }
   }
-
-  const remainder = HEADLINES_LIMIT - withImages.length;
-  const { data: fallbackRows, error: fallbackError } = await supabasePublic
-    .from('articles')
-    .select(ARTICLE_SELECT)
-    .is('image_url', null)
-    .order('published_at', { ascending: false })
-    .limit(remainder);
-
-  if (fallbackError) {
-    logPublicErrorOnce('fetchHeadlinesPublic:withoutImages', fallbackError);
-    return writeFeedCache(cacheKey, withImages);
-  }
-
-  const withoutImages = ((fallbackRows as ArticleRow[]) ?? []).map(mapArticle);
-  return writeFeedCache(cacheKey, [...withImages, ...withoutImages].slice(0, HEADLINES_LIMIT));
 }
 
 export async function fetchTrendingArticlesPublic(

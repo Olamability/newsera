@@ -5,6 +5,7 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined) // undefined = loading
+  const user = session?.user ?? null
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -18,11 +19,16 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Admin access is determined by a server-side role claim stored in
-  // app_metadata (set via the Supabase Dashboard or a trusted server function).
-  // app_metadata is signed into the JWT and cannot be modified by the user,
-  // making this far more secure than a client-side email comparison.
-  const isAdmin = session?.user?.app_metadata?.role === 'admin'
+  const role = user?.app_metadata?.role
+  const isAdmin = role === 'admin'
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.log('[ADMIN AUTH]', {
+      email: user?.email,
+      role,
+    })
+  }, [user?.email, role])
 
   const signIn = (email, password) =>
     supabase.auth.signInWithPassword({ email, password })
@@ -30,7 +36,7 @@ export function AuthProvider({ children }) {
   const signOut = () => supabase.auth.signOut()
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, signIn, signOut, loading: session === undefined }}>
+    <AuthContext.Provider value={{ user, session, loading: session === undefined, isAdmin, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

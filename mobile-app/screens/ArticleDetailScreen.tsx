@@ -413,7 +413,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       commentsOffsetRef.current = loaded.length;
       setCommentsInitialized(true);
     } catch (err) {
-      console.log('[Comments] Failed to load initial comments:', err);
+      if (__DEV__) console.log('[Comments] Failed to load initial comments:', err);
       if (commentsRequestIdRef.current === requestId) {
         setComments([]);
         setCommentsHasMore(false);
@@ -431,7 +431,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const count = await fetchCommentCount(article.id);
       setCommentCount(count);
     } catch (err) {
-      console.log('[Comments] Failed to load comment count:', err);
+      if (__DEV__) console.log('[Comments] Failed to load comment count:', err);
       setCommentCount(0);
     }
   }, [article.id]);
@@ -457,7 +457,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       commentsOffsetRef.current += loaded.length;
       setCommentsHasMore(hasMore);
     } catch (err) {
-      console.log('[Comments] Failed to load more comments:', err);
+      if (__DEV__) console.log('[Comments] Failed to load more comments:', err);
     } finally {
       setCommentsLoadingMore(false);
     }
@@ -470,7 +470,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   // Near real-time comments updates (singleton-managed subscription)
   useEffect(() => {
     return subscribeToArticleCommentEvents(article.id, (payload) => {
-      console.log('[Comments] Realtime event:', payload.eventType, payload);
+      if (__DEV__) console.log('[Comments] Realtime event:', payload.eventType, payload);
 
       if (payload.eventType === 'DELETE') {
         const deletedId = payload.old?.id;
@@ -665,8 +665,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         setReplyingToCommentId(parentId);
         promptSignInForInteraction(parentId ? 'reply' : 'comment');
       } else {
-        console.log('[Comments] Failed to post comment:', err);
-        if (err && typeof err === 'object' && 'message' in err) {
+        if (__DEV__) console.log('[Comments] Failed to post comment:', err);
+        if (__DEV__ && err && typeof err === 'object' && 'message' in err) {
           console.log('[Comments] Supabase error message:', (err as { message?: string }).message);
         }
         setCommentText(text);

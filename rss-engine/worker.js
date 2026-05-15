@@ -2,7 +2,13 @@ require('dotenv').config();
 
 const { runIngestion } = require('./index');
 
-const INGESTION_INTERVAL_MS = 10 * 60 * 1000;
+const DEFAULT_INGESTION_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const INGESTION_INTERVAL_MS = (() => {
+  const raw = process.env.RSS_INGESTION_INTERVAL_MS;
+  if (!raw) return DEFAULT_INGESTION_INTERVAL_MS;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_INGESTION_INTERVAL_MS;
+})();
 
 let isRunning = false;
 let timer = null;

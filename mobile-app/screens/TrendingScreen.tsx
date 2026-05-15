@@ -129,9 +129,7 @@ const TrendingScreen: React.FC = () => {
               const settled = updatedRows[index];
               if (!settled || settled.status === 'rejected') return;
               const updated = settled.value;
-              if (!updated) {
-                next.splice(targetIndex, 1);
-              } else {
+              if (updated) {
                 next[targetIndex] = updated;
               }
             });

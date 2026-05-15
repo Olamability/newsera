@@ -9,6 +9,10 @@ CREATE INDEX IF NOT EXISTS idx_aef_engagement_published
     published_at DESC NULLS LAST
   );
 
+-- Required for REFRESH MATERIALIZED VIEW CONCURRENTLY.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_aef_id
+  ON articles_engagement_feed (id);
+
 CREATE OR REPLACE FUNCTION refresh_trending_feed()
 RETURNS void
 LANGUAGE plpgsql

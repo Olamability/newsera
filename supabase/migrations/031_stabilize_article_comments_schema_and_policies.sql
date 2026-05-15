@@ -29,6 +29,18 @@ ALTER TABLE article_comments
   ALTER COLUMN created_at SET DEFAULT now(),
   ALTER COLUMN created_at SET NOT NULL;
 
+-- Drop user_id-dependent policies before replacing a legacy non-uuid user_id column.
+DROP POLICY IF EXISTS article_comments_select_all ON article_comments;
+DROP POLICY IF EXISTS article_comments_select_public ON article_comments;
+DROP POLICY IF EXISTS article_comments_insert_authenticated ON article_comments;
+DROP POLICY IF EXISTS article_comments_update_owner ON article_comments;
+DROP POLICY IF EXISTS article_comments_delete_owner ON article_comments;
+DROP POLICY IF EXISTS "Allow authenticated users to insert comments" ON article_comments;
+DROP POLICY IF EXISTS "Allow authenticated insert comments" ON article_comments;
+DROP POLICY IF EXISTS "Allow public read comments" ON article_comments;
+DROP POLICY IF EXISTS "Allow users update own comments" ON article_comments;
+DROP POLICY IF EXISTS "Allow users delete own comments" ON article_comments;
+
 DO $$
 BEGIN
   IF EXISTS (

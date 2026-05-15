@@ -19,6 +19,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Props = {
   refreshSignal?: number;
 };
+type RefreshMode = 'normal' | 'force' | 'ifStale';
 const REFRESH_COOLDOWN_MS = 1200;
 const HEADLINES_STALE_MS = 60000;
 
@@ -50,12 +51,10 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
     }
   }, []);
 
-  const requestRefresh = useCallback((
-    forceRefresh: boolean = false,
-    onlyWhenStale: boolean = false,
-  ) => {
+  const requestRefresh = useCallback((mode: RefreshMode = 'normal') => {
+    const forceRefresh = mode === 'force' || mode === 'ifStale';
     if (
-      onlyWhenStale &&
+      mode === 'ifStale' &&
       lastUpdatedAtRef.current &&
       Date.now() - lastUpdatedAtRef.current < HEADLINES_STALE_MS
     ) {
@@ -73,19 +72,19 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
 
   useEffect(() => {
     if (refreshSignal <= 0) return;
-    requestRefresh(true, false);
+    requestRefresh('force');
   }, [refreshSignal, requestRefresh]);
 
   useFocusEffect(
     useCallback(() => {
-      requestRefresh(true, true);
+      requestRefresh('ifStale');
     }, [requestRefresh]),
   );
 
   useEffect(() => {
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        requestRefresh(true, true);
+        requestRefresh('ifStale');
       }
     };
     const subscription = AppState.addEventListener('change', onAppStateChange);
@@ -101,7 +100,7 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
         () => {
           if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
           refreshTimeoutRef.current = setTimeout(() => {
-            requestRefresh(true, false);
+            requestRefresh('force');
           }, 400);
         },
       )
@@ -132,7 +131,10 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
       {/* Carousel */}
       <HeadlineCarousel articles={headlines} loading={loading} />
       {lastUpdatedAt ? (
-        <Text style={styles.refreshMeta}>
+        <Text
+          style={styles.refreshMeta}
+          accessibilityLabel={`Headlines last updated at ${new Date(lastUpdatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+        >
           Updated {new Date(lastUpdatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
         </Text>
       ) : null}

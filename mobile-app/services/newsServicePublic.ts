@@ -64,10 +64,10 @@ const readFeedCache = <T>(key: string): T | null => {
   return hit.value as T;
 };
 
-const writeFeedCache = <T>(key: string, value: T): T => {
+const writeFeedCache = <T>(key: string, value: T, ttlMs: number = FEED_CACHE_TTL_MS): T => {
   feedCache.set(key, {
     value,
-    expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+    expiresAt: Date.now() + ttlMs,
   });
   return value;
 };
@@ -203,11 +203,7 @@ export async function fetchHeadlinesPublic(): Promise<NewsArticle[]> {
   }
 
   const headlines = ((data as ArticleRow[]) ?? []).map(mapArticle).slice(0, HEADLINES_LIMIT);
-  feedCache.set(cacheKey, {
-    value: headlines,
-    expiresAt: Date.now() + HEADLINES_CACHE_TTL_MS,
-  });
-  return headlines;
+  return writeFeedCache(cacheKey, headlines, HEADLINES_CACHE_TTL_MS);
 }
 
 export function invalidateHeadlinesPublicCache(): void {

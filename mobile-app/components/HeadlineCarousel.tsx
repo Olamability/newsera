@@ -73,7 +73,7 @@ const HeadlineCarousel: React.FC<Props> = ({ articles, loading }) => {
   const handleMomentumScrollEnd = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
     if (carouselItems.length === 0) return;
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / SNAP_INTERVAL);
-    const normalizedIndex = rawIndex % carouselItems.length;
+    const normalizedIndex = ((rawIndex % carouselItems.length) + carouselItems.length) % carouselItems.length;
     indexRef.current = normalizedIndex;
     setDotIndex(normalizedIndex);
   }, [carouselItems.length]);

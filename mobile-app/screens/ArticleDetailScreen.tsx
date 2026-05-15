@@ -6,7 +6,6 @@ import {
   Easing,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   LayoutAnimation,
   Linking,
   Modal,
@@ -20,6 +19,7 @@ import {
   TouchableOpacity,
   UIManager,
   View,
+  type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +39,7 @@ import {
 } from '../services/articleReactionService';
 import {
   fetchCommentsPage,
+  fetchCommentCount,
   addComment,
   ArticleComment,
   COMMENTS_PAGE_SIZE,
@@ -65,7 +66,6 @@ const COMMENTS_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
-const APPROX_HEADER_HEIGHT = 56;
 let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
@@ -176,10 +176,24 @@ const generateOptimisticCommentId = (): string => {
   return `optimistic-${Date.now()}-${optimisticCommentSequence}`;
 };
 
+const isOptimisticComment = (commentId: string): boolean => commentId.startsWith('optimistic-');
+
+const matchesOptimisticComment = (existing: ArticleComment, incoming: ArticleComment): boolean => (
+  isOptimisticComment(existing.id)
+  && existing.article_id === incoming.article_id
+  && existing.user_id === incoming.user_id
+  && existing.content === incoming.content
+  && existing.parent_id === incoming.parent_id
+  && existing.created_at === incoming.created_at
+);
+
 const upsertComment = (items: ArticleComment[], incoming: ArticleComment): ArticleComment[] => {
-  const index = items.findIndex((item) => item.id === incoming.id);
-  if (index === -1) return sortCommentsAscending([...items, incoming]);
-  const next = [...items];
+  const deduped = isOptimisticComment(incoming.id)
+    ? items
+    : items.filter((item) => item.id === incoming.id || !matchesOptimisticComment(item, incoming));
+  const index = deduped.findIndex((item) => item.id === incoming.id);
+  if (index === -1) return sortCommentsAscending([...deduped, incoming]);
+  const next = [...deduped];
   next[index] = incoming;
   return sortCommentsAscending(next);
 };
@@ -220,8 +234,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [commentsKeyboardInset, setCommentsKeyboardInset] = useState(0);
   const commentsOffsetRef = useRef(0);
   const commentsRequestIdRef = useRef(0);
+  const commentIdsRef = useRef<Set<string>>(new Set());
   const shimmerOpacity = useRef(new Animated.Value(0.35)).current;
   const likeScale = useRef(new Animated.Value(1)).current;
   const dislikeScale = useRef(new Animated.Value(1)).current;
@@ -232,6 +248,37 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const similarPageRef = useRef(1);
   const loadingMoreRef = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    commentIdsRef.current = new Set(comments.map((comment) => comment.id));
+  }, [comments]);
+
+  useEffect(() => {
+    if (!commentsSheetVisible) {
+      setCommentsKeyboardInset(0);
+      return undefined;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const handleKeyboardShow = (event: KeyboardEvent) => {
+      const keyboardHeight = Math.max(0, event.endCoordinates?.height ?? 0);
+      setCommentsKeyboardInset(Math.max(0, keyboardHeight - (Platform.OS === 'ios' ? insets.bottom : 0)));
+    };
+
+    const handleKeyboardHide = () => {
+      setCommentsKeyboardInset(0);
+    };
+
+    const showSubscription = Keyboard.addListener(showEvent, handleKeyboardShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [commentsSheetVisible, insets.bottom]);
+
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -362,11 +409,13 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [article.id]);
 
   const loadCommentCount = useCallback(async () => {
-    const { count } = await supabasePublic
-      .from('article_comments')
-      .select('id', { count: 'exact', head: true })
-      .eq('article_id', article.id);
-    setCommentCount(count ?? 0);
+    try {
+      const count = await fetchCommentCount(article.id);
+      setCommentCount(count);
+    } catch (err) {
+      console.log('[Comments] Failed to load comment count:', err);
+      setCommentCount(0);
+    }
   }, [article.id]);
 
   const loadMoreComments = useCallback(async () => {
@@ -428,8 +477,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       };
 
       if (payload.eventType === 'INSERT') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setCommentCount((prev) => prev + 1);
+        if (!commentIdsRef.current.has(incoming.id)) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setCommentCount((prev) => prev + 1);
+        }
       }
 
       if (!commentsInitialized) return;
@@ -583,7 +634,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     try {
-      const inserted = await addComment(article.id, user.id, text, parentId, createdAt);
+      const inserted = await addComment(article.id, text, parentId, createdAt);
       setComments((prev) => {
         const withoutOptimistic = prev.filter((comment) => comment.id !== optimisticId);
         return upsertComment(withoutOptimistic, inserted);
@@ -868,11 +919,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
 
       {/* ── Main scrollable area + sticky comment bar ── */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? APPROX_HEADER_HEIGHT : 0}
-      >
+      <View style={styles.flex}>
         <FlatList
           data={similarArticles}
           keyExtractor={(item) => item.id}
@@ -1103,10 +1150,19 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           visible={commentsSheetVisible}
           animationType="slide"
           transparent
+          statusBarTranslucent
           onRequestClose={closeCommentsSheet}
         >
           <Pressable style={styles.commentsSheetBackdrop} onPress={closeCommentsSheet} />
-          <View style={[styles.commentsSheetContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <View
+            style={[
+              styles.commentsSheetContainer,
+              {
+                bottom: commentsKeyboardInset,
+                paddingBottom: Math.max(insets.bottom, 10),
+              },
+            ]}
+          >
             <View style={styles.commentsSheetHandle} />
             <View style={styles.commentsSheetHeader}>
               <Text style={styles.commentsSheetTitle}>Comments</Text>
@@ -1149,10 +1205,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               )}
             </View>
 
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? APPROX_HEADER_HEIGHT : 0}
-            >
+            <View>
               {replyingToCommentId ? (
                 <View style={styles.replyingBanner}>
                   <Text style={styles.replyingBannerText}>Replying in thread</Text>
@@ -1185,10 +1238,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={styles.commentsComposerSendText}>Send</Text>
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
+            </View>
           </View>
         </Modal>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };

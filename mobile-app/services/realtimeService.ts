@@ -1,5 +1,5 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabasePublic } from './supabase';
+import { supabaseAuth, supabasePublic } from './supabase';
 
 type LikeEventPayload = {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -74,7 +74,8 @@ const removeCommentChannel = async (key: string): Promise<void> => {
   const entry = articleCommentEntries.get(key);
   if (!entry) return;
   articleCommentEntries.delete(key);
-  await supabasePublic.removeChannel(entry.channel);
+  await entry.channel.unsubscribe();
+  await supabaseAuth.removeChannel(entry.channel);
 };
 
 const removeReactionChannel = async (key: string): Promise<void> => {
@@ -135,7 +136,7 @@ export const subscribeToArticleCommentEvents = (
 
   if (!entry) {
     const callbacks = new Set<(payload: CommentEventPayload) => void>();
-    const channel = supabasePublic
+    const channel = supabaseAuth
       .channel(`article_comments_changes:${articleId}`)
       .on(
         'postgres_changes',

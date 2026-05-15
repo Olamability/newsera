@@ -10,6 +10,7 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
@@ -21,6 +22,7 @@ import {
   fetchCategories,
   fetchTrendingArticles,
   fetchPersonalizedArticles,
+  invalidatePublicFeedCaches,
   CATEGORY_ALL,
   CATEGORY_FOR_YOU,
   CATEGORY_TRENDING,
@@ -31,9 +33,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent } from '../services/shareService';
 import { isAuthError } from '../services/publicDataErrors';
+import { subscribeToHomeRefresh } from '../services/homeRefreshBus';
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
+const TAB_REFRESH_DEBOUNCE_MS = 1000;
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
@@ -57,6 +61,8 @@ export default function HomeScreen() {
   // Incremented whenever the category changes or a refresh is triggered so that
   // any in-flight fetch from the previous feed is silently discarded.
   const fetchGenerationRef = useRef(0);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const lastRefreshTriggerAtRef = useRef(0);
 
   const loadArticles = useCallback(async (categoryId: string, pageNum: number, append: boolean): Promise<boolean> => {
     if (isFetchingRef.current) return false;
@@ -151,20 +157,82 @@ export default function HomeScreen() {
     resetAndLoad(selectedCategory);
   }, [selectedCategory, resetAndLoad]);
 
-  const onRefresh = async () => {
-    fetchGenerationRef.current += 1;
-    isFetchingRef.current = false;
-
-    setRefreshing(true);
-    setHeadlineRefreshSignal((prev) => prev + 1);
-    setPage(1);
-    setHasMore(true);
-    try {
-      await loadArticles(selectedCategory, 1, false);
-    } finally {
-      setRefreshing(false);
+  const refreshHomeFeed = useCallback(async (origin: 'active-tab-press' | 'pull-to-refresh') => {
+    const now = Date.now();
+    const isTabPress = origin === 'active-tab-press';
+    if (isTabPress && now - lastRefreshTriggerAtRef.current < TAB_REFRESH_DEBOUNCE_MS) {
+      return;
     }
-  };
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    lastRefreshTriggerAtRef.current = now;
+
+    const runRefresh = (async () => {
+      if (isTabPress) {
+        try {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {
+          // Haptics can fail silently on unsupported devices.
+        }
+      }
+
+      fetchGenerationRef.current += 1;
+      isFetchingRef.current = false;
+
+      setRefreshing(true);
+      setFetchError(false);
+      setPage(1);
+      setHasMore(true);
+      setHeadlineRefreshSignal((prev) => prev + 1);
+      flatListRef.current?.scrollToOffset({ animated: true, offset: 0 });
+
+      invalidatePublicFeedCaches();
+
+      const prefetchTasks: Promise<unknown>[] = [
+        loadArticles(selectedCategory, 1, false),
+      ];
+
+      if (selectedCategory !== CATEGORY_ALL) {
+        prefetchTasks.push(fetchArticles(1, null).catch((err) => {
+          console.warn('[HomeScreen] Latest feed prefetch failed:', err);
+          return null;
+        }));
+      }
+      if (selectedCategory !== CATEGORY_TRENDING) {
+        prefetchTasks.push(fetchTrendingArticles(1).catch((err) => {
+          console.warn('[HomeScreen] Trending prefetch failed:', err);
+          return null;
+        }));
+      }
+      if (selectedCategory !== CATEGORY_FOR_YOU) {
+        prefetchTasks.push(fetchPersonalizedArticles(1).catch((err) => {
+          console.warn('[HomeScreen] Personalized prefetch failed:', err);
+          return null;
+        }));
+      }
+
+      try {
+        await Promise.all(prefetchTasks);
+      } finally {
+        setRefreshing(false);
+      }
+    })();
+
+    refreshInFlightRef.current = runRefresh.finally(() => {
+      refreshInFlightRef.current = null;
+    });
+    return refreshInFlightRef.current;
+  }, [selectedCategory, loadArticles]);
+
+  const onRefresh = useCallback(async () => {
+    await refreshHomeFeed('pull-to-refresh');
+  }, [refreshHomeFeed]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToHomeRefresh(() => {
+      void refreshHomeFeed('active-tab-press');
+    });
+    return unsubscribe;
+  }, [refreshHomeFeed]);
 
   const handleLoadMore = useCallback(async () => {
     // Guard: skip if already loading or no more pages

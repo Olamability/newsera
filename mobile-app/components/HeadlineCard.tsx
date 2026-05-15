@@ -15,9 +15,16 @@ const SMALL_SCREEN_THRESHOLD = 360;
 const MIN_CARD_HEIGHT = 196;
 const MAX_CARD_HEIGHT = 232;
 const CARD_HEIGHT_RATIO = 0.56;
+const PREMIUM_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)'] as const;
+const PREMIUM_GRADIENT_LOCATIONS = [0.1, 0.58, 1] as const;
+const TEXT_REGION_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)'] as const;
+const TEXT_REGION_GRADIENT_LOCATIONS = [0.35, 1] as const;
 
 export const CARD_WIDTH = SCREEN_WIDTH - 48;
-export const CARD_HEIGHT = Math.max(MIN_CARD_HEIGHT, Math.min(MAX_CARD_HEIGHT, Math.round(SCREEN_WIDTH * CARD_HEIGHT_RATIO)));
+const calculateCardHeight = (screenWidth: number): number =>
+  Math.max(MIN_CARD_HEIGHT, Math.min(MAX_CARD_HEIGHT, Math.round(screenWidth * CARD_HEIGHT_RATIO)));
+
+export const CARD_HEIGHT = calculateCardHeight(SCREEN_WIDTH);
 export const CARD_SPACING = 12;
 export const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
@@ -53,14 +60,14 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
     <View style={styles.card}>
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
-        locations={[0.1, 0.58, 1]}
+        colors={PREMIUM_GRADIENT_COLORS}
+        locations={PREMIUM_GRADIENT_LOCATIONS}
         style={styles.gradientOverlay}
       />
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)']}
-        locations={[0.35, 1]}
+        colors={TEXT_REGION_GRADIENT_COLORS}
+        locations={TEXT_REGION_GRADIENT_LOCATIONS}
         style={styles.textRegionBlend}
       />
 

@@ -40,6 +40,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ACTIVE_COLOR = '#e63946';
 const INACTIVE_COLOR = '#9e9e9e';
+const HOME_REFRESH_ROTATION_ANGLE = '180deg';
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
@@ -54,7 +55,7 @@ function MainTabs() {
       {
         rotate: homeRefreshSpin.interpolate({
           inputRange: [0, 1],
-          outputRange: ['0deg', '180deg'],
+          outputRange: ['0deg', HOME_REFRESH_ROTATION_ANGLE],
         }),
       },
     ],

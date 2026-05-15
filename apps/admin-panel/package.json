@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "corepack pnpm --dir ../../admin-panel run dev",
-    "build": "corepack pnpm --dir ../../admin-panel run build"
+    "build": "corepack pnpm --dir ../../admin-panel run build",
+    "typecheck": "corepack pnpm --dir ../../admin-panel run typecheck"
   }
 }

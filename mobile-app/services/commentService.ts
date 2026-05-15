@@ -67,12 +67,14 @@ export async function addComment(
   const trimmedContent = content.trim();
 
   if (!articleId) {
-    console.log('[Comments] Invalid insert payload input:', {
-      article_id: articleId,
-      content: trimmedContent,
-      parent_id: parentId,
-      created_at: createdAt,
-    });
+    if (__DEV__) {
+      console.log('[Comments] Invalid insert payload input:', {
+        article_id: articleId,
+        content: trimmedContent,
+        parent_id: parentId,
+        created_at: createdAt,
+      });
+    }
     throw new Error('Comment requires valid article ID and content.');
   }
 
@@ -82,11 +84,13 @@ export async function addComment(
   } = await supabaseAuth.auth.getSession();
   const sessionUser = session?.user;
   if (sessionError || !sessionUser) {
-    console.log('[Comments] Missing auth session before insert:', {
-      sessionError,
-      hasSession: !!session,
-      hasUser: !!sessionUser,
-    });
+    if (__DEV__) {
+      console.log('[Comments] Missing auth session before insert:', {
+        sessionError,
+        hasSession: !!session,
+        hasUser: !!sessionUser,
+      });
+    }
     throw new InteractionAuthRequiredError();
   }
 
@@ -98,7 +102,7 @@ export async function addComment(
     created_at: createdAt,
   };
 
-  console.log('[Comments] Insert payload:', payload);
+  if (__DEV__) console.log('[Comments] Insert payload:', payload);
 
   const { data, error } = await supabaseAuth
     .from('article_comments')
@@ -106,10 +110,10 @@ export async function addComment(
     .select('id, article_id, user_id, content, parent_id, likes_count, created_at')
     .single();
 
-  console.log('[Comments] Supabase insert response:', { data, error });
+  if (__DEV__) console.log('[Comments] Supabase insert response:', { data, error });
 
   if (error) {
-    console.log('[Comments] Supabase insert error message:', error.message);
+    if (__DEV__) console.log('[Comments] Supabase insert error message:', error.message);
     if (isAuthRequiredInteractionError(error)) {
       throw new InteractionAuthRequiredError();
     }

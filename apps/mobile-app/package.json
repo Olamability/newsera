@@ -6,6 +6,7 @@
     "start": "corepack pnpm --dir ../../mobile-app run start",
     "android": "corepack pnpm --dir ../../mobile-app run android",
     "ios": "corepack pnpm --dir ../../mobile-app run ios",
-    "web": "corepack pnpm --dir ../../mobile-app run web"
+    "web": "corepack pnpm --dir ../../mobile-app run web",
+    "typecheck": "corepack pnpm --dir ../../mobile-app run typecheck"
   }
 }

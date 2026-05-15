@@ -128,7 +128,7 @@ export async function registerForPushNotificationsAsync(): Promise<void> {
 
     if (upsertError) {
       console.warn('[Notifications] Failed to store push token:', upsertError.message);
-    } else {
+    } else if (__DEV__) {
       console.log('[Notifications] Push token registered:', pushToken);
     }
   } catch (err) {
@@ -188,7 +188,7 @@ export async function checkAndNotifyBreakingNews(article: NewsArticle): Promise<
     await storeNotification(article, message);
 
     // Simulated remote push — replace with actual Expo Push API call
-    console.log('[Notifications] Breaking news push (simulated):', message);
+    if (__DEV__) console.log('[Notifications] Breaking news push (simulated):', message);
   } catch (err) {
     console.warn('[Notifications] Breaking-news check failed:', err);
   }

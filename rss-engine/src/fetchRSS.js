@@ -1,28 +1,33 @@
 const RSSParser = require('rss-parser');
 const net = require('node:net');
+const pLimit = require('p-limit');
 
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
-const MIN_TIMEOUT_MS = 8000;
-const DEFAULT_TIMEOUT_MS = 10000;
-const MAX_TIMEOUT_MS = 12000;
-const RETRY_ATTEMPTS = parseInt(process.env.RSS_FETCH_RETRY_ATTEMPTS || '3', 10);
-const RETRY_BASE_DELAY_MS = parseInt(process.env.RSS_FETCH_RETRY_BASE_DELAY_MS || '500', 10);
-const RETRY_MAX_DELAY_MS = parseInt(process.env.RSS_FETCH_RETRY_MAX_DELAY_MS || '8000', 10);
-// Maximum time (ms) to wait for a single RSS feed before giving up.
-const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
-const FETCH_TIMEOUT_MS = Math.max(
-  MIN_TIMEOUT_MS,
-  Math.min(Number.isNaN(RAW_TIMEOUT_MS) ? DEFAULT_TIMEOUT_MS : RAW_TIMEOUT_MS, MAX_TIMEOUT_MS),
-);
-// Minimum image dimension threshold to filter out tracking pixels / icons.
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 1_000;
+const RETRY_MAX_DELAY_MS = 4_000;
 const MIN_IMAGE_DIMENSION = 100;
-const DEBUG = process.env.RSS_DEBUG === 'true';
-// Matches og:image meta tags with two attribute orders:
-// (1) property="og:image" ... content="..."
-// (2) content="..." ... property="og:image"
+const ARTICLE_IMAGE_LOOKUP_CONCURRENCY = 3;
+const ARTICLE_PAGE_TIMEOUT_MS = 8_000;
 const OG_IMAGE_META_REGEX = /<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i;
-// Known path segments that indicate non-content images.
+const IMG_TAG_REGEX = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+const NAMED_HTML_ENTITIES = {
+  nbsp: ' ',
+  amp: '&',
+  apos: "'",
+  quot: '"',
+  lt: '<',
+  gt: '>',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
+};
 const SKIP_IMAGE_PATTERNS = [
   /tracking/i,
   /pixel/i,
@@ -37,6 +42,7 @@ const SKIP_IMAGE_PATTERNS = [
   /ad[_-]/i,
   /\/ads\//i,
 ];
+const articleImageCache = new Map();
 
 const parser = new RSSParser({
   customFields: {
@@ -47,54 +53,84 @@ const parser = new RSSParser({
       ['wp:featured_image', 'wpFeaturedImage', { keepArray: true }],
       ['featured_image', 'featuredImage', { keepArray: true }],
       ['post-thumbnail', 'postThumbnail', { keepArray: true }],
-      ['og:image', 'ogImage', { keepArray: false }],
     ],
   },
 });
 
-/**
- * Extracts the first 2–3 paragraphs from an HTML/text string.
- * Returns plain text with no HTML tags.
- * @param {string} raw
- * @returns {string}
- */
-function extractSnippet(raw) {
-  if (!raw) return '';
-
-  // Strip HTML tags
-  const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
-
-  // Split into sentences / paragraphs and take ~500 chars
-  return text.length > SNIPPET_MAX_LENGTH ? text.slice(0, SNIPPET_MAX_LENGTH).replace(/\s\S*$/, '…') : text;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Extracts the first few paragraphs (up to ~1500 chars) as content.
- * @param {string} raw
- * @returns {string}
- */
-function extractContent(raw) {
-  if (!raw) return '';
-
-  const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
-
-  return text.length > CONTENT_MAX_LENGTH ? text.slice(0, CONTENT_MAX_LENGTH).replace(/\s\S*$/, '…') : text;
+function normalizeWhitespace(value) {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Returns true if the URL looks like a tracking pixel, icon, or other
- * non-article image that should be ignored.
- * @param {string} url
- * @returns {boolean}
- */
-function isLowQualityImage(url) {
-  if (!url) return true;
+function decodeHtmlEntities(value) {
+  if (!value) return '';
+
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity) => {
+    const normalized = String(entity).toLowerCase();
+    if (normalized.startsWith('#x')) {
+      const codePoint = parseInt(normalized.slice(2), 16);
+      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
+    }
+    if (normalized.startsWith('#')) {
+      const codePoint = parseInt(normalized.slice(1), 10);
+      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
+    }
+    return Object.prototype.hasOwnProperty.call(NAMED_HTML_ENTITIES, normalized)
+      ? NAMED_HTML_ENTITIES[normalized]
+      : match;
+  });
+}
+
+function stripHtml(value) {
+  return value
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ');
+}
+
+function sanitizeText(value, maxLength) {
+  if (!value) return '';
+  const cleaned = normalizeWhitespace(decodeHtmlEntities(stripHtml(value)));
+  if (!maxLength || cleaned.length <= maxLength) return cleaned;
+  return cleaned.slice(0, maxLength).replace(/\s\S*$/, '…');
+}
+
+function sanitizeMaybeUrl(value) {
+  if (!value) return null;
+  const cleaned = decodeHtmlEntities(String(value)).trim();
+  return cleaned || null;
+}
+
+function parseDimension(value) {
+  if (value == null) return null;
+  const parsed = parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function isLowQualityImage(url, dimensions = {}) {
+  const candidate = sanitizeMaybeUrl(url);
+  if (!candidate) return true;
+  if (candidate.startsWith('data:') || candidate.startsWith('javascript:')) return true;
+
   try {
-    const u = new URL(url);
-    const path = u.pathname + u.search;
-    if (SKIP_IMAGE_PATTERNS.some((re) => re.test(path))) return true;
-    // Reject tiny GIF/PNG beacons (1x1 px) sometimes encoded in the URL
-    if (/[?&](w|h|width|height)=1(&|$)/i.test(u.search)) return true;
+    const parsed = new URL(candidate);
+    const path = `${parsed.pathname}${parsed.search}`;
+    if (SKIP_IMAGE_PATTERNS.some((pattern) => pattern.test(path))) return true;
+
+    const width = parseDimension(dimensions.width ?? parsed.searchParams.get('w') ?? parsed.searchParams.get('width'));
+    const height = parseDimension(dimensions.height ?? parsed.searchParams.get('h') ?? parsed.searchParams.get('height'));
+
+    if ((width !== null && width < MIN_IMAGE_DIMENSION) || (height !== null && height < MIN_IMAGE_DIMENSION)) {
+      return true;
+    }
+
+    if ((width === 1 && height === 1) || /(^|[?&])(w|h|width|height)=1(&|$)/i.test(parsed.search)) {
+      return true;
+    }
+
     return false;
   } catch {
     return true;
@@ -106,27 +142,64 @@ function toArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
+function getImageCandidate(entry) {
+  if (!entry) return null;
+  if (typeof entry === 'string') {
+    return { url: sanitizeMaybeUrl(entry), width: null, height: null };
+  }
+
+  const metadata = entry.$ || entry;
+  return {
+    url: sanitizeMaybeUrl(metadata.url || metadata.href || entry._),
+    width: parseDimension(metadata.width),
+    height: parseDimension(metadata.height),
+    type: metadata.type,
+  };
+}
+
 function pickImageFromField(value) {
   for (const entry of toArray(value)) {
-    if (!entry) continue;
-    // Handles common RSS/XML shapes: plain URL strings, { url/href }, and
-    // namespaced parser objects like { $: { url } } or text nodes under "_".
-    const url = typeof entry === 'string'
-      ? entry
-      : entry.url || entry.href || entry.$?.url || entry.$?.href || entry._;
-    if (url && !isLowQualityImage(url)) {
-      return url;
+    const candidate = getImageCandidate(entry);
+    if (candidate?.url && !isLowQualityImage(candidate.url, candidate)) {
+      return candidate.url;
     }
   }
+
   return null;
 }
 
-function isTimeoutError(err) {
-  return err?.name === 'AbortError' || String(err?.message || '').startsWith('Timed out after');
+function pickEnclosureImage(value) {
+  for (const entry of toArray(value)) {
+    const candidate = getImageCandidate(entry);
+    if (!candidate?.url) continue;
+    if (candidate.type && !String(candidate.type).startsWith('image/')) continue;
+    if (!isLowQualityImage(candidate.url, candidate)) {
+      return candidate.url;
+    }
+  }
+
+  return null;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function pickImageFromHtml(contentRaw) {
+  IMG_TAG_REGEX.lastIndex = 0;
+  let match;
+
+  while ((match = IMG_TAG_REGEX.exec(contentRaw)) !== null) {
+    const imageTag = match[0];
+    const imageUrl = sanitizeMaybeUrl(match[1]);
+    const width = parseDimension(/width=["']?(\d+)/i.exec(imageTag)?.[1]);
+    const height = parseDimension(/height=["']?(\d+)/i.exec(imageTag)?.[1]);
+    if (imageUrl && !isLowQualityImage(imageUrl, { width, height })) {
+      return imageUrl;
+    }
+  }
+
+  return null;
+}
+
+function isTimeoutError(error) {
+  return error?.name === 'AbortError' || String(error?.message || '').startsWith('Timed out after');
 }
 
 function isPrivateIPv4(ip) {
@@ -192,13 +265,15 @@ function sanitizeUrlForLog(url) {
   }
 }
 
-function isTransientError(err) {
-  const status = err?.statusCode;
-  if (typeof status === 'number' && (status === 429 || status >= 500)) {
+function isTransientError(error) {
+  const statusCode = error?.statusCode;
+  if (typeof statusCode === 'number' && (statusCode === 429 || statusCode >= 500)) {
     return true;
   }
-  if (isTimeoutError(err)) return true;
-  const message = String(err?.message || '').toLowerCase();
+
+  if (isTimeoutError(error)) return true;
+
+  const message = String(error?.message || '').toLowerCase();
   return (
     message.includes('network')
     || message.includes('timed out')
@@ -208,190 +283,193 @@ function isTransientError(err) {
   );
 }
 
-/**
- * Tries to find an image URL from an RSS feed item.
- * Priority order:
- *   1. media:content
- *   2. enclosure (image/* only)
- *   3. og:image
- *   4. WordPress featured-image style fields
- *   5. HTML <img> fallback
- * Skips tracking pixels, icons, logos, and other low-quality images.
- * @param {Object} item
- * @returns {string|null}
- */
-function extractImage(item) {
-  // 1. media:content
-  const mcUrl = pickImageFromField(item?.mediaContent);
-  if (mcUrl) return mcUrl;
-
-  // 2. enclosure (must be an image MIME type)
-  if (item?.enclosure?.url && item.enclosure.type?.startsWith('image/')) {
-    if (!isLowQualityImage(item.enclosure.url)) return item.enclosure.url;
+async function fetchTextWithTimeout(url, timeoutMs, acceptHeader) {
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch is not available');
   }
 
-  // 3. og:image
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+
+  try {
+    const response = await fetch(url, {
+      signal: controller?.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'newsera-rss-engine/1.0',
+        Accept: acceptHeader,
+      },
+    });
+
+    const redirectedValidation = validateSourceUrl(response.url || url);
+    if (!redirectedValidation.valid) {
+      throw new Error(`Blocked redirected URL (${redirectedValidation.reason})`);
+    }
+
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status} ${response.statusText} for ${sanitizeUrlForLog(url)}`);
+      error.statusCode = response.status;
+      throw error;
+    }
+
+    return response.text();
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function fetchFeedDocument(source) {
+  if (typeof fetch === 'function') {
+    const xml = await fetchTextWithTimeout(
+      source.rss_url,
+      FETCH_TIMEOUT_MS,
+      'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+    );
+
+    return parser.parseString(xml);
+  }
+
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
+  });
+
+  return Promise.race([
+    parser.parseURL(source.rss_url),
+    timeoutPromise,
+  ]).finally(() => clearTimeout(timeoutId));
+}
+
+async function fetchOpenGraphImage(articleUrl) {
+  const sanitizedArticleUrl = sanitizeMaybeUrl(articleUrl);
+  if (!sanitizedArticleUrl) return null;
+
+  if (articleImageCache.has(sanitizedArticleUrl)) {
+    return articleImageCache.get(sanitizedArticleUrl);
+  }
+
+  const validation = validateSourceUrl(sanitizedArticleUrl);
+  if (!validation.valid || typeof fetch !== 'function') {
+    articleImageCache.set(sanitizedArticleUrl, null);
+    return null;
+  }
+
+  try {
+    const html = await fetchTextWithTimeout(
+      sanitizedArticleUrl,
+      ARTICLE_PAGE_TIMEOUT_MS,
+      'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    );
+    const decodedHtml = decodeHtmlEntities(html);
+    const match = decodedHtml.match(OG_IMAGE_META_REGEX);
+    const candidate = sanitizeMaybeUrl(match?.[1] || match?.[2]);
+    const resolved = candidate && !isLowQualityImage(candidate) ? candidate : null;
+    articleImageCache.set(sanitizedArticleUrl, resolved);
+    return resolved;
+  } catch {
+    articleImageCache.set(sanitizedArticleUrl, null);
+    return null;
+  }
+}
+
+async function extractImage(item, articleUrl) {
   const contentRaw = item['content:encoded'] || item.content || item.summary || item.description || '';
-  const ogImage =
-    pickImageFromField(item?.ogImage) ||
-    (() => {
-      const match = contentRaw.match(OG_IMAGE_META_REGEX);
-      const candidate = match?.[1] || match?.[2];
-      return candidate && !isLowQualityImage(candidate) ? candidate : null;
-    })();
-  if (ogImage) return ogImage;
 
-  // 4. WordPress featured image style fields (+ media thumbnail fallback)
-  const wpImage =
-    pickImageFromField(item?.wpFeaturedImage)
-    || pickImageFromField(item?.featuredImage)
-    || pickImageFromField(item?.postThumbnail)
-    || pickImageFromField(item?.mediaThumbnail);
-  if (wpImage) return wpImage;
+  const mediaContentImage = pickImageFromField(item?.mediaContent);
+  if (mediaContentImage) return mediaContentImage;
 
-  // 5. Scan content HTML for a meaningful image
-  // Try src from <img> tags — pick the first one that passes the quality check.
-  // Use two separate patterns (double-quoted / single-quoted) to avoid
-  // incorrectly matching across mismatched quote types.
-  const imgTagPatterns = [
-    /<img[^>]+src="([^"]+)"[^>]*>/gi,
-    /<img[^>]+src='([^']+)'[^>]*>/gi,
-  ];
-  let match;
-  for (const imgTagRe of imgTagPatterns) {
-    imgTagRe.lastIndex = 0;
-    while ((match = imgTagRe.exec(contentRaw)) !== null) {
-      const url = match[1];
-      const tagStr = match[0];
-      const widthMatch = /width=["']?(\d+)/i.exec(tagStr);
-      const heightMatch = /height=["']?(\d+)/i.exec(tagStr);
-      if (widthMatch && parseInt(widthMatch[1], 10) < MIN_IMAGE_DIMENSION) continue;
-      if (heightMatch && parseInt(heightMatch[1], 10) < MIN_IMAGE_DIMENSION) continue;
-      if (!isLowQualityImage(url)) return url;
+  const mediaThumbnailImage = pickImageFromField(item?.mediaThumbnail);
+  if (mediaThumbnailImage) return mediaThumbnailImage;
+
+  const enclosureImage = pickEnclosureImage(item?.enclosure);
+  if (enclosureImage) return enclosureImage;
+
+  const openGraphImage = await fetchOpenGraphImage(articleUrl);
+  if (openGraphImage) return openGraphImage;
+
+  return pickImageFromHtml(contentRaw);
+}
+
+function parsePublishedAt(item) {
+  const candidates = [item.isoDate, item.pubDate, item.published, item.updated, item['dc:date']];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
     }
   }
 
   return null;
 }
 
-/**
- * Fetches and parses an RSS feed for a given source with a configurable timeout.
- * One failed/slow source never blocks the rest of the ingestion pipeline.
- * @param {{ id: string, name: string, rss_url: string, category_id: string }} source
- * @returns {Promise<Array>} Array of normalised article objects.
- */
+async function normalizeArticle(item, source) {
+  const rawContent = item['content:encoded'] || item.content || item.summary || item.description || '';
+  const url = sanitizeMaybeUrl(item.link || item.guid || '');
+  const title = sanitizeText(item.title || '', 0);
+
+  if (!url || !title) {
+    return null;
+  }
+
+  return {
+    source_id: source.id,
+    category_id: source.category_id,
+    title,
+    url,
+    snippet: sanitizeText(rawContent, SNIPPET_MAX_LENGTH),
+    content: sanitizeText(rawContent, CONTENT_MAX_LENGTH),
+    image_url: await extractImage(item, url),
+    published_at: parsePublishedAt(item),
+  };
+}
+
 async function fetchRSS(source) {
   if (!source.rss_url) {
-    console.warn(`  [WARN] Source "${source.name}" has no rss_url — skipping.`);
-    return [];
+    throw new Error(`Source "${source.name}" has no rss_url`);
   }
 
   const urlValidation = validateSourceUrl(source.rss_url);
   if (!urlValidation.valid) {
-    console.warn(`  [WARN] Source "${source.name}" has unsafe rss_url (${urlValidation.reason}) — skipping.`);
-    return [];
+    throw new Error(`Source "${source.name}" has unsafe rss_url (${urlValidation.reason})`);
   }
 
-  let feed;
-  const ingestionTime = new Date().toISOString();
-  const maxAttempts = Number.isNaN(RETRY_ATTEMPTS) ? 3 : Math.max(1, RETRY_ATTEMPTS);
-  const baseDelayMs = Number.isNaN(RETRY_BASE_DELAY_MS) ? 500 : Math.max(100, RETRY_BASE_DELAY_MS);
+  let feed = null;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const canAbort = typeof fetch === 'function' && typeof AbortController === 'function';
-    const controller = canAbort ? new AbortController() : null;
-    const timeoutId = canAbort ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     try {
-      if (typeof fetch === 'function') {
-        const response = await fetch(source.rss_url, {
-          signal: controller?.signal,
-          redirect: 'follow',
-          headers: {
-            'User-Agent': 'newsera-rss-engine/1.0',
-            Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
-          },
-        });
-
-        const redirectedValidation = validateSourceUrl(response.url || source.rss_url);
-        if (!redirectedValidation.valid) {
-          throw new Error(`Blocked redirected feed URL (${redirectedValidation.reason})`);
-        }
-
-        if (!response.ok) {
-          const error = new Error(
-            `HTTP ${response.status} ${response.statusText} for ${sanitizeUrlForLog(source.rss_url)}`,
-          );
-          error.statusCode = response.status;
-          throw error;
-        }
-
-        const xml = await response.text();
-        feed = await parser.parseString(xml);
-      } else {
-        let legacyTimeoutId;
-        const timeoutPromise = new Promise((_, reject) => {
-          legacyTimeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
-        });
-        feed = await Promise.race([
-          parser.parseURL(source.rss_url),
-          timeoutPromise,
-        ]).finally(() => clearTimeout(legacyTimeoutId));
-      }
+      feed = await fetchFeedDocument(source);
       break;
-    } catch (err) {
-      const transient = isTransientError(err);
-      const canRetry = transient && attempt < maxAttempts;
+    } catch (error) {
+      const transient = isTransientError(error);
+      if (isTimeoutError(error)) {
+        console.warn(`[RSS] Timeout: ${source.name}`);
+      }
 
-      if (canRetry) {
-        const maxDelayMs = Number.isNaN(RETRY_MAX_DELAY_MS) ? 8000 : Math.max(baseDelayMs, RETRY_MAX_DELAY_MS);
-        const exponent = Math.min(attempt - 1, 10);
-        const delayMs = Math.min(baseDelayMs * (2 ** exponent), maxDelayMs);
-        console.warn(`  [WARN] Failed to fetch "${source.name}" (attempt ${attempt}/${maxAttempts}): ${err.message}. Retrying in ${delayMs}ms.`);
+      if (transient && attempt < MAX_RETRIES) {
+        const retryNumber = attempt + 1;
+        const delayMs = Math.min(RETRY_BASE_DELAY_MS * (2 ** attempt), RETRY_MAX_DELAY_MS);
+        console.warn(`[RSS] Retry ${retryNumber}/${MAX_RETRIES}: ${source.name}`);
         await sleep(delayMs);
         continue;
       }
 
-      if (isTimeoutError(err)) {
-        console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
-      } else {
-        console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
+      if (transient) {
+        console.warn(`[RSS] Feed skipped after retries: ${source.name}`);
       }
-      return [];
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
+
+      throw error;
     }
   }
 
-  return (feed.items || []).map((item) => {
-    const rawContent = item['content:encoded'] || item.content || item.summary || '';
+  const limit = pLimit(ARTICLE_IMAGE_LOOKUP_CONCURRENCY);
+  const normalized = await Promise.all(
+    (feed?.items || []).map((item) => limit(() => normalizeArticle(item, source))),
+  );
 
-    // Task 9: fall back to the ingestion timestamp when pubDate is absent or
-    // unparseable so that articles without a date never float to the top of
-    // feeds ordered by published_at DESC.
-    let publishedAt = ingestionTime;
-    if (item.pubDate) {
-      const parsed = new Date(item.pubDate);
-      if (!Number.isNaN(parsed.getTime())) {
-        publishedAt = parsed.toISOString();
-      }
-    }
-
-    const imageUrl = extractImage(item);
-    if (DEBUG) {
-      console.log(`  [DEBUG] ${source.name} image extracted: ${imageUrl || 'none'} (${(item.title || '').trim() || 'untitled'})`);
-    }
-
-    return {
-      source_id: source.id,
-      category_id: source.category_id,
-      title: (item.title || '').trim(),
-      url: (item.link || item.guid || '').trim(),
-      snippet: extractSnippet(rawContent),
-      content: extractContent(rawContent),
-      image_url: imageUrl,
-      published_at: publishedAt,
-    };
-  }).filter((a) => a.url && a.title);
+  return normalized.filter((article) => !!article);
 }
 
 module.exports = { fetchRSS };

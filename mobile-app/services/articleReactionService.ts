@@ -50,8 +50,16 @@ export async function getArticleReactionSummary(articleId: string): Promise<Arti
   }
 
   const rows = (data ?? []) as ReactionCountRpcRow[];
-  const likeCount = Number(rows.find((row) => row.reaction_type === 'like')?.reaction_count ?? 0);
-  const dislikeCount = Number(rows.find((row) => row.reaction_type === 'dislike')?.reaction_count ?? 0);
+  const counts = rows.reduce(
+    (acc, row) => {
+      const countValue = Number(row.reaction_count ?? 0);
+      if (row.reaction_type === 'like') acc.likeCount += countValue;
+      if (row.reaction_type === 'dislike') acc.dislikeCount += countValue;
+      return acc;
+    },
+    { likeCount: 0, dislikeCount: 0 }
+  );
+  const { likeCount, dislikeCount } = counts;
   if (userReactionResult.error && !isMissingReactionsTableError(userReactionResult.error)) {
     throw userReactionResult.error;
   }

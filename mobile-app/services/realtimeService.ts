@@ -41,7 +41,7 @@ type SubscriberEntry<TPayload> = {
 };
 
 type TrendingEventPayload = {
-  articleId: string | null;
+  articleId?: string;
 };
 
 const articleLikeEntries = new Map<string, SubscriberEntry<LikeEventPayload>>();
@@ -67,14 +67,14 @@ const isReactionEventPayload = (payload: unknown): payload is ReactionEventPaylo
   return isRealtimeEventPayload(payload);
 };
 
-const extractTrendingArticleId = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== 'object') return null;
+const extractTrendingArticleId = (payload: unknown): string | undefined => {
+  if (!payload || typeof payload !== 'object') return undefined;
   const value = payload as {
     new?: { article_id?: string | null } | null;
     old?: { article_id?: string | null } | null;
   };
   // Prefer the "new" row on INSERT/UPDATE; fallback to "old" for DELETE.
-  return value.new?.article_id ?? value.old?.article_id ?? null;
+  return value.new?.article_id ?? value.old?.article_id ?? undefined;
 };
 
 const removeLikeChannel = async (key: string): Promise<void> => {

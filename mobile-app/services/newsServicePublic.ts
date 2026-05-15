@@ -427,7 +427,7 @@ export async function fetchSimilarArticlesPublic(
       logPublicErrorOnce('fetchSimilarArticlesPublic:trendingPool', trendingPoolResult.error);
     }
 
-    const trendingPoolRows: TrendingClickRow[] = (trendingPoolResult.data ?? []);
+    const trendingPoolRows = trendingPoolResult.data ?? [];
     const trendingIds = trendingPoolRows
       .map((row: TrendingClickRow) => row.article_id)
       .filter((id): id is string => !!id && !seenIds.has(id))

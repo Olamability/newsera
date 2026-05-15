@@ -74,7 +74,7 @@ const TrendingScreen: React.FC = () => {
   }, [loadArticles]);
 
   useEffect(() => {
-    const scheduleRealtimeRefresh = (articleId?: string | null) => {
+    const scheduleRealtimeRefresh = (articleId?: string) => {
       if (articleId) {
         pendingRealtimeArticleIdsRef.current.add(articleId);
       } else {

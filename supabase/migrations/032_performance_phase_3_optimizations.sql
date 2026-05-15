@@ -77,6 +77,19 @@ CREATE INDEX IF NOT EXISTS idx_articles_fts_title_snippet
   ON articles USING GIN (fts_title_snippet);
 
 -- 3) Reactions: SQL aggregation helper to avoid client-side full-row counting.
+
+-- Ensure article_reactions table exists (created in 028; guard here for
+-- environments where migrations are applied out of order).
+CREATE TABLE IF NOT EXISTS article_reactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  article_id uuid NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  reaction_type text NOT NULL CHECK (reaction_type IN ('like', 'dislike')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (article_id, user_id)
+);
+
 CREATE OR REPLACE FUNCTION get_article_reaction_counts(p_article_id uuid)
 RETURNS TABLE (
   reaction_type text,

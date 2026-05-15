@@ -41,6 +41,7 @@ BEGIN
   ) THEN
     ALTER TABLE article_comments ADD COLUMN IF NOT EXISTS user_id_uuid uuid;
 
+    -- UUID-shaped user IDs are preserved; legacy guest/device IDs are cleaned up below.
     UPDATE article_comments
     SET user_id_uuid = CASE
       WHEN user_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'

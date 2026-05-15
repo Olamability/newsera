@@ -66,6 +66,7 @@ const COMMENTS_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0
 const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
+const OPTIMISTIC_COMMENT_PREFIX = 'optimistic-';
 let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
@@ -173,10 +174,10 @@ const sortCommentsAscending = (items: ArticleComment[]): ArticleComment[] => (
 
 const generateOptimisticCommentId = (): string => {
   optimisticCommentSequence += 1;
-  return `optimistic-${Date.now()}-${optimisticCommentSequence}`;
+  return `${OPTIMISTIC_COMMENT_PREFIX}${Date.now()}-${optimisticCommentSequence}`;
 };
 
-const isOptimisticComment = (commentId: string): boolean => commentId.startsWith('optimistic-');
+const isOptimisticComment = (commentId: string): boolean => commentId.startsWith(OPTIMISTIC_COMMENT_PREFIX);
 
 const matchesOptimisticComment = (existing: ArticleComment, incoming: ArticleComment): boolean => (
   isOptimisticComment(existing.id)
@@ -263,6 +264,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const handleKeyboardShow = (event: KeyboardEvent) => {
       const keyboardHeight = Math.max(0, event.endCoordinates.height);
+      // iOS keyboard frames include the safe-area inset; Android already reports usable overlap.
       const keyboardOffset = keyboardHeight - (Platform.OS === 'ios' ? insets.bottom : 0);
       setCommentsKeyboardInset(Math.max(0, keyboardOffset));
     };

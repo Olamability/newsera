@@ -18,6 +18,16 @@ export type CommentPageResult = {
   hasMore: boolean;
 };
 
+export async function fetchCommentCount(articleId: string): Promise<number> {
+  const { count, error } = await supabaseAuth
+    .from('article_comments')
+    .select('id', { count: 'exact', head: true })
+    .eq('article_id', articleId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /**
  * Fetch a paginated set of comments for an article, ordered oldest-first.
  */
@@ -46,7 +56,6 @@ export async function fetchCommentsPage(
  */
 export async function addComment(
   articleId: string,
-  userId: string,
   content: string,
   parentId: string | null = null,
   createdAt: string = new Date().toISOString(),
@@ -57,29 +66,33 @@ export async function addComment(
 
   const trimmedContent = content.trim();
 
-  if (!articleId || !userId) {
+  if (!articleId) {
     console.log('[Comments] Invalid insert payload input:', {
       article_id: articleId,
-      user_id: userId,
       content: trimmedContent,
       parent_id: parentId,
       created_at: createdAt,
     });
-    throw new Error('Comment requires valid article ID, user ID, and content.');
+    throw new Error('Comment requires valid article ID and content.');
   }
 
   const {
     data: { session },
     error: sessionError,
   } = await supabaseAuth.auth.getSession();
-  if (sessionError || !session) {
-    console.log('[Comments] Missing auth session before insert:', { sessionError, hasSession: !!session });
+  const sessionUser = session?.user;
+  if (sessionError || !sessionUser) {
+    console.log('[Comments] Missing auth session before insert:', {
+      sessionError,
+      hasSession: !!session,
+      hasUser: !!sessionUser,
+    });
     throw new InteractionAuthRequiredError();
   }
 
   const payload = {
     article_id: articleId,
-    user_id: userId,
+    user_id: sessionUser.id,
     content: trimmedContent,
     parent_id: parentId,
     created_at: createdAt,

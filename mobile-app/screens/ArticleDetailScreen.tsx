@@ -1007,7 +1007,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           removeClippedSubviews
           ListHeaderComponent={
             <>
-              <View style={styles.body}>
+              <View style={styles.headerBody}>
                 {/* 1. Headline */}
                 <Text style={styles.title}>{article.title}</Text>
 
@@ -1054,7 +1054,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
               ) : null}
 
-              <View style={styles.body}>
+              <View style={styles.contentBody}>
                 <View style={styles.contentDivider} />
 
                 {/* 4. Article Snippet / Content */}
@@ -1362,7 +1362,12 @@ const styles = StyleSheet.create({
   listContent: {
     backgroundColor: '#fff',
   },
-  body: {
+  headerBody: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+  contentBody: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 4,

@@ -73,6 +73,7 @@ const extractTrendingArticleId = (payload: unknown): string | null => {
     new?: { article_id?: string | null } | null;
     old?: { article_id?: string | null } | null;
   };
+  // Prefer the "new" row on INSERT/UPDATE; fallback to "old" for DELETE.
   return value.new?.article_id ?? value.old?.article_id ?? null;
 };
 

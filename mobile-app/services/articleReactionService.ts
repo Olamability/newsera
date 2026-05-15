@@ -51,7 +51,7 @@ export async function getArticleReactionSummary(articleId: string): Promise<Arti
   if (userReactionResult.error && !isMissingReactionsTableError(userReactionResult.error)) {
     throw userReactionResult.error;
   }
-  const userReaction = (userReactionResult.data?.reaction_type as ArticleReactionType | null | undefined) ?? null;
+  const userReaction = (userReactionResult.data?.reaction_type as ArticleReactionType | undefined) ?? null;
 
   return { likeCount, dislikeCount, userReaction };
 }

@@ -37,7 +37,7 @@ type EngagementFeedRow = {
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 const loggedErrors = new Set<string>();
 const MAX_LOGGED_ERRORS = 200;
-const FEED_CACHE_TTL_MS = 90_000;
+const FEED_CACHE_TTL_MS = 90000;
 
 type FeedCacheEntry<T> = {
   value: T;

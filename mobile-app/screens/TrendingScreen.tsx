@@ -110,7 +110,7 @@ const TrendingScreen: React.FC = () => {
         }
 
         try {
-          const updatedRows = await Promise.all(
+          const updatedRows = await Promise.allSettled(
             pendingIds.map((id) => fetchTrendingArticleById(id))
           );
           if (fetchGenerationRef.current !== generation) return;
@@ -120,7 +120,9 @@ const TrendingScreen: React.FC = () => {
             pendingIds.forEach((id, index) => {
               const targetIndex = next.findIndex((article) => article.id === id);
               if (targetIndex === -1) return;
-              const updated = updatedRows[index];
+              const settled = updatedRows[index];
+              if (!settled || settled.status === 'rejected') return;
+              const updated = settled.value;
               if (!updated) {
                 next.splice(targetIndex, 1);
               } else {

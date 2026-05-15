@@ -40,12 +40,23 @@ const SearchScreen: React.FC = () => {
     setLoading(true);
     setSearched(true);
     try {
-      const { data, error } = await supabasePublic
+      let searchQuery = supabasePublic
         .from('articles')
         .select(ARTICLE_SELECT)
-        .textSearch('fts_content', q.trim(), { type: 'websearch', config: 'english' })
+        .textSearch('fts_title_snippet', q.trim(), { type: 'websearch', config: 'english' })
         .order('published_at', { ascending: false })
         .limit(30);
+
+      let { data, error } = await searchQuery;
+      if (error?.code === '42703') {
+        searchQuery = supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .textSearch('fts_content', q.trim(), { type: 'websearch', config: 'english' })
+          .order('published_at', { ascending: false })
+          .limit(30);
+        ({ data, error } = await searchQuery);
+      }
 
       if (error) throw error;
       setResults(((data as ArticleRow[]) ?? []).map(mapArticle));

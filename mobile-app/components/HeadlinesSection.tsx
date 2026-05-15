@@ -20,29 +20,47 @@ type Props = {
   refreshSignal?: number;
 };
 const REFRESH_COOLDOWN_MS = 1200;
+const HEADLINES_STALE_MS = 60000;
 
 const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
   const navigation = useNavigation<Nav>();
   const [headlines, setHeadlines] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const lastUpdatedAtRef = useRef<number | null>(null);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefreshRequestRef = useRef(0);
+  const isRefreshingRef = useRef(false);
 
   const loadHeadlines = useCallback(async (forceRefresh: boolean = false) => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     if (forceRefresh) invalidateHeadlinesPublicCache();
     try {
       const data = await fetchHeadlinesPublic();
       setHeadlines(data);
-      setLastUpdatedAt(Date.now());
+      const now = Date.now();
+      setLastUpdatedAt(now);
+      lastUpdatedAtRef.current = now;
     } catch (err) {
       console.warn('[HeadlinesSection] Failed to load headlines:', err);
     } finally {
+      isRefreshingRef.current = false;
       setLoading(false);
     }
   }, []);
 
-  const requestRefresh = useCallback((forceRefresh: boolean = false) => {
+  const requestRefresh = useCallback((
+    forceRefresh: boolean = false,
+    onlyWhenStale: boolean = false,
+  ) => {
+    if (
+      onlyWhenStale &&
+      lastUpdatedAtRef.current &&
+      Date.now() - lastUpdatedAtRef.current < HEADLINES_STALE_MS
+    ) {
+      return;
+    }
     const now = Date.now();
     if (now - lastRefreshRequestRef.current < REFRESH_COOLDOWN_MS) return;
     lastRefreshRequestRef.current = now;
@@ -55,19 +73,19 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
 
   useEffect(() => {
     if (refreshSignal <= 0) return;
-    requestRefresh(true);
+    requestRefresh(true, false);
   }, [refreshSignal, requestRefresh]);
 
   useFocusEffect(
     useCallback(() => {
-      requestRefresh(true);
+      requestRefresh(true, true);
     }, [requestRefresh]),
   );
 
   useEffect(() => {
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        requestRefresh(true);
+        requestRefresh(true, true);
       }
     };
     const subscription = AppState.addEventListener('change', onAppStateChange);
@@ -83,15 +101,11 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
         () => {
           if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
           refreshTimeoutRef.current = setTimeout(() => {
-            requestRefresh(true);
+            requestRefresh(true, false);
           }, 400);
         },
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          requestRefresh(true);
-        }
-      });
+      .subscribe();
 
     return () => {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);

@@ -40,10 +40,14 @@ type SubscriberEntry<TPayload> = {
   callbacks: Set<(payload: TPayload) => void>;
 };
 
+type TrendingEventPayload = {
+  articleId?: string;
+};
+
 const articleLikeEntries = new Map<string, SubscriberEntry<LikeEventPayload>>();
 const articleCommentEntries = new Map<string, SubscriberEntry<CommentEventPayload>>();
 const articleReactionEntries = new Map<string, SubscriberEntry<ReactionEventPayload>>();
-let trendingEntry: { channel: RealtimeChannel; callbacks: Set<() => void> } | null = null;
+let trendingEntry: { channel: RealtimeChannel; callbacks: Set<(payload: TrendingEventPayload) => void> } | null = null;
 
 const isRealtimeEventPayload = (payload: unknown): payload is { eventType: unknown } => {
   if (!payload || typeof payload !== 'object') return false;
@@ -61,6 +65,16 @@ const isCommentEventPayload = (payload: unknown): payload is CommentEventPayload
 
 const isReactionEventPayload = (payload: unknown): payload is ReactionEventPayload => {
   return isRealtimeEventPayload(payload);
+};
+
+const extractTrendingArticleId = (payload: unknown): string | undefined => {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const value = payload as {
+    new?: { article_id?: string | null } | null;
+    old?: { article_id?: string | null } | null;
+  };
+  // Prefer the "new" row on INSERT/UPDATE; fallback to "old" for DELETE.
+  return value.new?.article_id ?? value.old?.article_id ?? undefined;
 };
 
 const removeLikeChannel = async (key: string): Promise<void> => {
@@ -211,19 +225,24 @@ export const subscribeToArticleReactionEvents = (
   };
 };
 
-export const subscribeToTrendingEngagementEvents = (onEvent: () => void): (() => void) => {
+export const subscribeToTrendingEngagementEvents = (
+  onEvent: (payload: TrendingEventPayload) => void,
+): (() => void) => {
   if (!trendingEntry) {
-    const callbacks = new Set<() => void>();
+    const callbacks = new Set<(payload: TrendingEventPayload) => void>();
     const channel = supabasePublic
       .channel('trending_engagement_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_likes' }, () => {
-        callbacks.forEach((callback) => callback());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_likes' }, (payload) => {
+        const articleId = extractTrendingArticleId(payload);
+        callbacks.forEach((callback) => callback({ articleId }));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_comments' }, () => {
-        callbacks.forEach((callback) => callback());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_comments' }, (payload) => {
+        const articleId = extractTrendingArticleId(payload);
+        callbacks.forEach((callback) => callback({ articleId }));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_clicks' }, () => {
-        callbacks.forEach((callback) => callback());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_clicks' }, (payload) => {
+        const articleId = extractTrendingArticleId(payload);
+        callbacks.forEach((callback) => callback({ articleId }));
       })
       .subscribe();
 

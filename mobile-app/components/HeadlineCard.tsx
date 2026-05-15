@@ -2,11 +2,11 @@ import React from 'react';
 import {
   View,
   Text,
-  ImageBackground,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { NewsArticle } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -15,6 +15,7 @@ export const CARD_WIDTH = SCREEN_WIDTH - 48;
 export const CARD_HEIGHT = 210;
 export const CARD_SPACING = 12;
 export const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
+const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
 
 interface Props {
   article: NewsArticle;
@@ -71,14 +72,17 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
         onPress={() => onPress(article)}
         style={styles.touchable}
       >
-        <ImageBackground
-          source={{ uri: article.image_url }}
-          style={styles.imageBackground}
-          imageStyle={styles.imageBorderRadius}
-          resizeMode="cover"
-        >
+        <View style={styles.imageBackground}>
+          <Image
+            source={{ uri: article.image_url }}
+            style={styles.backgroundImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
+            transition={220}
+          />
           {cardContent}
-        </ImageBackground>
+        </View>
       </TouchableOpacity>
     );
   }
@@ -116,9 +120,10 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     borderRadius: 16,
     justifyContent: 'flex-end',
+    overflow: 'hidden',
   },
-  imageBorderRadius: {
-    borderRadius: 16,
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
   },
   noImageBackground: {
     backgroundColor: '#2c2c2e',

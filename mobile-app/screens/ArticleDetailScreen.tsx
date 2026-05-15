@@ -67,6 +67,7 @@ const REPLY_INDENT_PER_LEVEL = 16;
 const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
 const OPTIMISTIC_COMMENT_PREFIX = 'optimistic-';
+const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
 let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
@@ -394,11 +395,15 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     commentsOffsetRef.current = 0;
 
     try {
-      const { comments: loaded, hasMore } = await fetchCommentsPage(article.id, 0, COMMENT_PAGINATION_SIZE);
+      const [{ comments: loaded, hasMore }, count] = await Promise.all([
+        fetchCommentsPage(article.id, 0, COMMENT_PAGINATION_SIZE),
+        fetchCommentCount(article.id),
+      ]);
       if (commentsRequestIdRef.current !== requestId) return;
       setComments(loaded);
       setExpandedReplies(buildExpandedRepliesMap(loaded));
       setCommentsHasMore(hasMore);
+      setCommentCount(count);
       commentsOffsetRef.current = loaded.length;
       setCommentsInitialized(true);
     } catch (err) {
@@ -881,6 +886,43 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
+  const renderSimilarItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <TouchableOpacity
+        style={styles.similarCard}
+        onPress={() => navigation.replace('ArticleDetail', { article: item })}
+        activeOpacity={0.85}
+      >
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={styles.similarImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
+            transition={200}
+          />
+        ) : (
+          <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
+        )}
+        <View style={styles.similarCardContent}>
+          <Text style={styles.similarCardTitle} numberOfLines={3}>
+            {item.title}
+          </Text>
+          <Text style={styles.similarCardSource} numberOfLines={1}>
+            {item.source_name ?? item.sources?.name ?? ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    ),
+    [navigation]
+  );
+
+  const renderThreadedCommentItem = useCallback(
+    ({ item }: { item: ThreadedComment }) => <>{renderCommentNode(item)}</>,
+    [renderCommentNode]
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar style="dark" />
@@ -938,6 +980,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
           removeClippedSubviews
           ListHeaderComponent={
             <>
@@ -947,6 +993,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   source={{ uri: article.image_url }}
                   style={styles.featuredImage}
                   contentFit="cover"
+                  cachePolicy="memory-disk"
+                  placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
                   transition={300}
                 />
               ) : null}
@@ -963,6 +1011,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                         source={{ uri: sourceLogo }}
                         style={styles.sourceLogo}
                         contentFit="contain"
+                        cachePolicy="memory-disk"
                         transition={200}
                       />
                     ) : (
@@ -1061,32 +1110,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             </>
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.similarCard}
-              onPress={() => navigation.replace('ArticleDetail', { article: item })}
-              activeOpacity={0.85}
-            >
-              {item.image_url ? (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.similarImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              ) : (
-                <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
-              )}
-              <View style={styles.similarCardContent}>
-                <Text style={styles.similarCardTitle} numberOfLines={3}>
-                  {item.title}
-                </Text>
-                <Text style={styles.similarCardSource} numberOfLines={1}>
-                  {item.source_name ?? item.sources?.name ?? ''}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          renderItem={renderSimilarItem}
           ListFooterComponent={
             <>
               {/* Skeleton while loading next page */}
@@ -1199,12 +1223,17 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <FlatList
                   data={threadedComments}
                   keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => <>{renderCommentNode(item)}</>}
+                  renderItem={renderThreadedCommentItem}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.commentsSheetListContent}
                   onEndReached={() => void loadMoreComments()}
                   onEndReachedThreshold={0.4}
                   keyboardShouldPersistTaps="handled"
+                  initialNumToRender={10}
+                  maxToRenderPerBatch={10}
+                  windowSize={7}
+                  updateCellsBatchingPeriod={50}
+                  removeClippedSubviews
                   ListFooterComponent={commentsLoadingMore ? (
                     <Text style={styles.commentsLoadingMore}>Loading more comments…</Text>
                   ) : null}

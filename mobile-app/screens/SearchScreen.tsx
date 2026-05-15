@@ -22,6 +22,7 @@ type Nav = CompositeNavigationProp<
 >;
 
 const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
+const POSTGRES_UNDEFINED_COLUMN_ERROR = '42703';
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -40,12 +41,23 @@ const SearchScreen: React.FC = () => {
     setLoading(true);
     setSearched(true);
     try {
-      const { data, error } = await supabasePublic
+      let searchQuery = supabasePublic
         .from('articles')
         .select(ARTICLE_SELECT)
-        .ilike('title', `%${q.trim()}%`)
+        .textSearch('fts_title_snippet', q.trim(), { type: 'websearch', config: 'english' })
         .order('published_at', { ascending: false })
         .limit(30);
+
+      let { data, error } = await searchQuery;
+      if (error?.code === POSTGRES_UNDEFINED_COLUMN_ERROR) {
+        searchQuery = supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .textSearch('fts_content', q.trim(), { type: 'websearch', config: 'english' })
+          .order('published_at', { ascending: false })
+          .limit(30);
+        ({ data, error } = await searchQuery);
+      }
 
       if (error) throw error;
       setResults(((data as ArticleRow[]) ?? []).map(mapArticle));
@@ -72,6 +84,13 @@ const SearchScreen: React.FC = () => {
       navigation.navigate('ArticleDetail', { article });
     },
     [navigation]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <ArticleCard article={item} onPress={openArticle} />
+    ),
+    [openArticle]
   );
 
   const renderEmpty = () => {
@@ -107,12 +126,15 @@ const SearchScreen: React.FC = () => {
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ArticleCard article={item} onPress={openArticle} />
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews
         />
       )}
     </View>

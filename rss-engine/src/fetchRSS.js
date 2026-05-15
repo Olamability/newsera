@@ -2,9 +2,9 @@ const RSSParser = require('rss-parser');
 
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
-const MIN_TIMEOUT_MS = 10000;
-const DEFAULT_TIMEOUT_MS = 12000;
-const MAX_TIMEOUT_MS = 15000;
+const MIN_TIMEOUT_MS = 8000;
+const DEFAULT_TIMEOUT_MS = 10000;
+const MAX_TIMEOUT_MS = 12000;
 // Maximum time (ms) to wait for a single RSS feed before giving up.
 const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
 const FETCH_TIMEOUT_MS = Math.max(

@@ -4,11 +4,11 @@ import {
   PanResponder,
   View,
   Text,
-  Image,
   StyleSheet,
   Pressable,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { NewsArticle } from '../types';
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
 
 const PLACEHOLDER_COLOR = '#e8e8e8';
 const SWIPE_THRESHOLD = 60;
+const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
 
 function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
@@ -100,7 +101,10 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
         <Image
           source={{ uri: article.image_url }}
           style={styles.image}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
+          transition={180}
         />
       ) : (
         <View style={[styles.image, styles.placeholder]} />

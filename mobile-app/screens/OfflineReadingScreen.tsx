@@ -161,6 +161,11 @@ const OfflineReadingScreen: React.FC = () => {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews
         />
       )}
     </SafeAreaView>

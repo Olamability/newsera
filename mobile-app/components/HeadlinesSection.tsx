@@ -19,6 +19,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Props = {
   refreshSignal?: number;
 };
+const REFRESH_COOLDOWN_MS = 1200;
 
 const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
   const navigation = useNavigation<Nav>();
@@ -26,6 +27,7 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
   const [loading, setLoading] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRefreshRequestRef = useRef(0);
 
   const loadHeadlines = useCallback(async (forceRefresh: boolean = false) => {
     if (forceRefresh) invalidateHeadlinesPublicCache();
@@ -40,47 +42,54 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
     }
   }, []);
 
-  useEffect(() => {
-    loadHeadlines();
+  const requestRefresh = useCallback((forceRefresh: boolean = false) => {
+    const now = Date.now();
+    if (now - lastRefreshRequestRef.current < REFRESH_COOLDOWN_MS) return;
+    lastRefreshRequestRef.current = now;
+    void loadHeadlines(forceRefresh);
   }, [loadHeadlines]);
 
   useEffect(() => {
+    requestRefresh();
+  }, [requestRefresh]);
+
+  useEffect(() => {
     if (refreshSignal <= 0) return;
-    void loadHeadlines(true);
-  }, [loadHeadlines, refreshSignal]);
+    requestRefresh(true);
+  }, [refreshSignal, requestRefresh]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadHeadlines(true);
-    }, [loadHeadlines]),
+      requestRefresh(true);
+    }, [requestRefresh]),
   );
 
   useEffect(() => {
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        void loadHeadlines(true);
+        requestRefresh(true);
       }
     };
     const subscription = AppState.addEventListener('change', onAppStateChange);
     return () => subscription.remove();
-  }, [loadHeadlines]);
+  }, [requestRefresh]);
 
   useEffect(() => {
     const channel = supabasePublic
       .channel('headlines-article-updates')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'articles' },
+        { event: 'INSERT', schema: 'public', table: 'articles' },
         () => {
           if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
           refreshTimeoutRef.current = setTimeout(() => {
-            void loadHeadlines(true);
+            requestRefresh(true);
           }, 400);
         },
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          void loadHeadlines(true);
+          requestRefresh(true);
         }
       });
 
@@ -88,7 +97,7 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
       void supabasePublic.removeChannel(channel);
     };
-  }, [loadHeadlines]);
+  }, [requestRefresh]);
 
   return (
     <View style={styles.section}>

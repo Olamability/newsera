@@ -23,6 +23,7 @@ sudo npm install -g pm2
 git clone https://github.com/Olamability/newsera.git
 cd newsera
 cp .env.example .env
+# Edit .env with real SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY values.
 pnpm install
 ```
 

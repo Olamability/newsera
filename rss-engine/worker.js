@@ -25,9 +25,9 @@ async function runCycle() {
   }
 }
 
-function startWorker() {
+async function startWorker() {
   console.log(`[WORKER] RSS worker started. Interval: ${INGESTION_INTERVAL_MS}ms`);
-  void runCycle();
+  await runCycle();
   timer = setInterval(() => {
     void runCycle();
   }, INGESTION_INTERVAL_MS);
@@ -52,4 +52,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-startWorker();
+startWorker().catch((error) => {
+  console.error(`[WORKER] Failed to start: ${error?.message ?? String(error)}`);
+  process.exit(1);
+});

@@ -8,6 +8,7 @@ const DEFAULT_TIMEOUT_MS = 10000;
 const MAX_TIMEOUT_MS = 12000;
 const RETRY_ATTEMPTS = parseInt(process.env.RSS_FETCH_RETRY_ATTEMPTS || '3', 10);
 const RETRY_BASE_DELAY_MS = parseInt(process.env.RSS_FETCH_RETRY_BASE_DELAY_MS || '500', 10);
+const RETRY_MAX_DELAY_MS = parseInt(process.env.RSS_FETCH_RETRY_MAX_DELAY_MS || '8000', 10);
 // Maximum time (ms) to wait for a single RSS feed before giving up.
 const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
 const FETCH_TIMEOUT_MS = Math.max(
@@ -140,7 +141,11 @@ function isPrivateIPv4(ip) {
 
 function isPrivateIPv6(ip) {
   const normalized = ip.toLowerCase();
-  return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80');
+  if (normalized === '::1') return true;
+  if (normalized.startsWith('fe80:')) return true;
+  const firstHextet = normalized.split(':').find((segment) => segment.length > 0) || '';
+  if (firstHextet.startsWith('fc') || firstHextet.startsWith('fd')) return true;
+  return false;
 }
 
 function isBlockedHost(hostname) {
@@ -149,8 +154,9 @@ function isBlockedHost(hostname) {
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
   if (normalized.endsWith('.local') || normalized.endsWith('.internal')) return true;
 
-  if (!net.isIP(normalized)) return false;
-  if (net.isIPv4(normalized)) return isPrivateIPv4(normalized);
+  const ipVersion = net.isIP(normalized);
+  if (ipVersion === 0) return false;
+  if (ipVersion === 4) return isPrivateIPv4(normalized);
   return isPrivateIPv6(normalized);
 }
 
@@ -171,6 +177,19 @@ function validateSourceUrl(url) {
   }
 
   return { valid: true };
+}
+
+function sanitizeUrlForLog(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.username = '';
+    parsed.password = '';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return '[invalid-url]';
+  }
 }
 
 function isTransientError(err) {
@@ -293,8 +312,15 @@ async function fetchRSS(source) {
           },
         });
 
+        const redirectedValidation = validateSourceUrl(response.url || source.rss_url);
+        if (!redirectedValidation.valid) {
+          throw new Error(`Blocked redirected feed URL (${redirectedValidation.reason})`);
+        }
+
         if (!response.ok) {
-          const error = new Error(`HTTP ${response.status}`);
+          const error = new Error(
+            `HTTP ${response.status} ${response.statusText} for ${sanitizeUrlForLog(source.rss_url)}`,
+          );
           error.statusCode = response.status;
           throw error;
         }
@@ -317,7 +343,9 @@ async function fetchRSS(source) {
       const canRetry = transient && attempt < maxAttempts;
 
       if (canRetry) {
-        const delayMs = baseDelayMs * (2 ** (attempt - 1));
+        const maxDelayMs = Number.isNaN(RETRY_MAX_DELAY_MS) ? 8000 : Math.max(baseDelayMs, RETRY_MAX_DELAY_MS);
+        const exponent = Math.min(attempt - 1, 10);
+        const delayMs = Math.min(baseDelayMs * (2 ** exponent), maxDelayMs);
         console.warn(`  [WARN] Failed to fetch "${source.name}" (attempt ${attempt}/${maxAttempts}): ${err.message}. Retrying in ${delayMs}ms.`);
         await sleep(delayMs);
         continue;

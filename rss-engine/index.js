@@ -178,10 +178,9 @@ async function runIngestion() {
       totalInserted += result.value.inserted;
       totalDuplicates += result.value.duplicates;
       totalFailed += result.value.failedCount;
-      continue;
+    } else {
+      totalFailed += 1;
     }
-
-    totalFailed += 1;
   }
 
   if (totalInserted > 0) {

@@ -86,8 +86,8 @@ function decodeHtmlEntities(value) {
 
 function stripHtml(value) {
   return value
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style\s*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ');
 }
 
@@ -113,7 +113,7 @@ function parseDimension(value) {
 function isLowQualityImage(url, dimensions = {}) {
   const candidate = sanitizeMaybeUrl(url);
   if (!candidate) return true;
-  if (candidate.startsWith('data:') || candidate.startsWith('javascript:')) return true;
+  if (candidate.startsWith('data:') || candidate.startsWith('javascript:') || candidate.startsWith('vbscript:')) return true;
 
   try {
     const parsed = new URL(candidate);
@@ -346,32 +346,38 @@ async function fetchOpenGraphImage(articleUrl) {
   const sanitizedArticleUrl = sanitizeMaybeUrl(articleUrl);
   if (!sanitizedArticleUrl) return null;
 
-  if (articleImageCache.has(sanitizedArticleUrl)) {
-    return articleImageCache.get(sanitizedArticleUrl);
+  const cached = articleImageCache.get(sanitizedArticleUrl);
+  if (cached) {
+    return cached;
   }
 
   const validation = validateSourceUrl(sanitizedArticleUrl);
   if (!validation.valid || typeof fetch !== 'function') {
-    articleImageCache.set(sanitizedArticleUrl, null);
-    return null;
-  }
-
-  try {
-    const html = await fetchTextWithTimeout(
-      sanitizedArticleUrl,
-      ARTICLE_PAGE_TIMEOUT_MS,
-      'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    );
-    const decodedHtml = decodeHtmlEntities(html);
-    const match = decodedHtml.match(OG_IMAGE_META_REGEX);
-    const candidate = sanitizeMaybeUrl(match?.[1] || match?.[2]);
-    const resolved = candidate && !isLowQualityImage(candidate) ? candidate : null;
+    const resolved = Promise.resolve(null);
     articleImageCache.set(sanitizedArticleUrl, resolved);
     return resolved;
-  } catch {
-    articleImageCache.set(sanitizedArticleUrl, null);
-    return null;
   }
+
+  const pending = (async () => {
+    try {
+      const html = await fetchTextWithTimeout(
+        sanitizedArticleUrl,
+        ARTICLE_PAGE_TIMEOUT_MS,
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      );
+      const decodedHtml = decodeHtmlEntities(html);
+      const match = decodedHtml.match(OG_IMAGE_META_REGEX);
+      const candidate = sanitizeMaybeUrl(match?.[1] || match?.[2]);
+      return candidate && !isLowQualityImage(candidate) ? candidate : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  articleImageCache.set(sanitizedArticleUrl, pending);
+  const resolved = await pending;
+  articleImageCache.set(sanitizedArticleUrl, Promise.resolve(resolved));
+  return resolved;
 }
 
 async function extractImage(item, articleUrl) {

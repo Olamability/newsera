@@ -73,18 +73,54 @@ ALTER TABLE article_comments
   ALTER COLUMN user_id SET NOT NULL;
 
 DO $$
+DECLARE
+  dep record;
+  has_dependency boolean := false;
 BEGIN
   -- STEP 1: Identify dependent objects before parent_id type change.
-  -- (Views/materialized views/rules/indexes/triggers can depend on this column.)
-  PERFORM 1
-  FROM pg_depend d
-  JOIN pg_rewrite rw ON rw.oid = d.objid
-  JOIN pg_class c ON c.oid = rw.ev_class
-  JOIN pg_class t ON t.oid = d.refobjid
-  JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
-  WHERE t.relname = 'article_comments'
-    AND a.attname = 'parent_id'
-    AND c.relname = 'articles_engagement_feed';
+  FOR dep IN
+    SELECT
+      CASE c.relkind
+        WHEN 'm' THEN 'materialized_view'
+        WHEN 'v' THEN 'view'
+        ELSE c.relkind::text
+      END AS dependency_type,
+      c.relname AS dependency_name
+    FROM pg_depend d
+    JOIN pg_rewrite rw ON rw.oid = d.objid
+    JOIN pg_class c ON c.oid = rw.ev_class
+    JOIN pg_class t ON t.oid = d.refobjid
+    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+    WHERE t.relname = 'article_comments'
+      AND a.attname = 'parent_id'
+      AND c.relname = 'articles_engagement_feed'
+    UNION ALL
+    SELECT
+      'index' AS dependency_type,
+      i.relname AS dependency_name
+    FROM pg_index ix
+    JOIN pg_class i ON i.oid = ix.indexrelid
+    JOIN pg_class t ON t.oid = ix.indrelid
+    JOIN pg_attribute a ON a.attrelid = t.oid
+    WHERE t.relname = 'article_comments'
+      AND a.attname = 'parent_id'
+      AND a.attnum = ANY(ix.indkey)
+    UNION ALL
+    SELECT
+      'trigger' AS dependency_type,
+      tg.tgname AS dependency_name
+    FROM pg_trigger tg
+    JOIN pg_class t ON t.oid = tg.tgrelid
+    WHERE t.relname = 'article_comments'
+      AND NOT tg.tgisinternal
+  LOOP
+    has_dependency := true;
+    RAISE NOTICE 'Dependency on article_comments.parent_id: % => %', dep.dependency_type, dep.dependency_name;
+  END LOOP;
+
+  IF NOT has_dependency THEN
+    RAISE NOTICE 'No dependency metadata found for article_comments.parent_id';
+  END IF;
 END $$;
 
 -- STEP 2: Drop dependent materialized view before type alteration.
@@ -104,7 +140,7 @@ BEGIN
       ALTER COLUMN parent_id TYPE uuid
       USING CASE
         WHEN parent_id IS NULL THEN NULL
-        WHEN parent_id::text ~ '^[0-9a-fA-F-]{36}$'
+        WHEN parent_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
           THEN parent_id::text::uuid
         ELSE NULL
       END;

@@ -263,7 +263,8 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const handleKeyboardShow = (event: KeyboardEvent) => {
       const keyboardHeight = Math.max(0, event.endCoordinates.height);
-      setCommentsKeyboardInset(Math.max(0, keyboardHeight - (Platform.OS === 'ios' ? insets.bottom : 0)));
+      const keyboardOffset = keyboardHeight - (Platform.OS === 'ios' ? insets.bottom : 0);
+      setCommentsKeyboardInset(Math.max(0, keyboardOffset));
     };
 
     const handleKeyboardHide = () => {

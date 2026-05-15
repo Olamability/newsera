@@ -94,7 +94,7 @@ export async function addComment(
     article_id: articleId,
     user_id: sessionUser.id,
     content: trimmedContent,
-    parent_id: parentId ?? null,
+    parent_id: parentId,
     created_at: createdAt,
   };
 

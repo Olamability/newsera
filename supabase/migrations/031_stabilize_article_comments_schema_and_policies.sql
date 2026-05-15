@@ -43,11 +43,12 @@ BEGIN
 
     UPDATE article_comments
     SET user_id_uuid = CASE
-      WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      WHEN user_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
         THEN user_id::text::uuid
       ELSE NULL
     END;
 
+    -- Legacy guest/device comment rows cannot satisfy the authenticated UUID FK.
     DELETE FROM article_comments WHERE user_id_uuid IS NULL;
 
     ALTER TABLE article_comments DROP COLUMN user_id;

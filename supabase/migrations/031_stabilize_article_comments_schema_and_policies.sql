@@ -43,6 +43,24 @@ DROP POLICY IF EXISTS "Allow users delete own comments" ON article_comments;
 
 DO $$
 BEGIN
+  -- STEP 1: Identify dependent objects before parent_id type change.
+  -- (Views/materialized views/rules/indexes/triggers can depend on this column.)
+  PERFORM 1
+  FROM pg_depend d
+  JOIN pg_rewrite rw ON rw.oid = d.objid
+  JOIN pg_class c ON c.oid = rw.ev_class
+  JOIN pg_class t ON t.oid = d.refobjid
+  JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+  WHERE t.relname = 'article_comments'
+    AND a.attname = 'parent_id'
+    AND c.relname = 'articles_engagement_feed';
+END $$;
+
+-- STEP 2: Drop dependent materialized view before type alteration.
+DROP MATERIALIZED VIEW IF EXISTS articles_engagement_feed;
+
+DO $$
+BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
@@ -86,12 +104,88 @@ BEGIN
       ALTER COLUMN parent_id TYPE uuid
       USING CASE
         WHEN parent_id IS NULL THEN NULL
-        WHEN parent_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        WHEN parent_id::text ~ '^[0-9a-fA-F-]{36}$'
           THEN parent_id::text::uuid
         ELSE NULL
       END;
   END IF;
 END $$;
+
+-- STEP 4: Recreate materialized engagement feed exactly as before.
+CREATE MATERIALIZED VIEW articles_engagement_feed AS
+SELECT
+  a.id,
+  a.title,
+  a.content,
+  a.snippet,
+  a.source_id,
+  a.image_url,
+  a.published_at,
+  a.url,
+  a.category_id,
+  s.name AS source_name,
+  s.website_url AS source_website_url,
+  s.logo_url AS source_logo_url,
+  c.name AS category_name,
+  c.slug AS category_slug,
+  COALESCE(l.likes_count, 0)::int AS likes_count,
+  COALESCE(cm.comments_count, 0)::int AS comments_count,
+  COALESCE(cm.replies_count, 0)::int AS replies_count,
+  0::int AS shares_count,
+  COALESCE(v.views_count, 0)::int AS views_count,
+  (
+    (COALESCE(l.likes_count, 0) * 1.0)
+    + (COALESCE(cm.comments_count, 0) * 2.0)
+    + (COALESCE(cm.replies_count, 0) * 1.5)
+    + (COALESCE(v.views_count, 0) * 0.2)
+    - (
+      GREATEST(
+        EXTRACT(EPOCH FROM (now() - COALESCE(a.published_at, now()))) / 3600,
+        0
+      ) * 0.05
+    )
+  )::numeric(14,4) AS engagement_score
+FROM articles a
+LEFT JOIN sources s ON s.id = a.source_id
+LEFT JOIN categories c ON c.id = a.category_id
+LEFT JOIN (
+  SELECT article_id, COUNT(*)::int AS likes_count
+  FROM article_likes
+  GROUP BY article_id
+) l ON l.article_id = a.id
+LEFT JOIN (
+  SELECT
+    article_id,
+    COUNT(*) FILTER (WHERE parent_id IS NULL)::int AS comments_count,
+    COUNT(*) FILTER (WHERE parent_id IS NOT NULL)::int AS replies_count
+  FROM article_comments
+  GROUP BY article_id
+) cm ON cm.article_id = a.id
+LEFT JOIN (
+  SELECT article_id, COUNT(*)::int AS views_count
+  FROM article_clicks
+  GROUP BY article_id
+) v ON v.article_id = a.id
+WHERE (
+  a.published_at >= now() - INTERVAL '7 days'
+  OR a.published_at IS NULL
+)
+WITH DATA;
+
+-- STEP 5: Recreate materialized view indexes.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_aef_id
+  ON articles_engagement_feed (id);
+CREATE INDEX IF NOT EXISTS idx_aef_engagement_score
+  ON articles_engagement_feed (engagement_score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_aef_published_at
+  ON articles_engagement_feed (published_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_aef_category_id
+  ON articles_engagement_feed (category_id);
+
+GRANT SELECT ON articles_engagement_feed TO anon, authenticated;
+
+-- STEP 6: Refresh materialized view after rebuild.
+REFRESH MATERIALIZED VIEW articles_engagement_feed;
 
 DO $$
 BEGIN

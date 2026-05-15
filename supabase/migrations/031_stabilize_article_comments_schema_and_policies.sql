@@ -43,24 +43,6 @@ DROP POLICY IF EXISTS "Allow users delete own comments" ON article_comments;
 
 DO $$
 BEGIN
-  -- STEP 1: Identify dependent objects before parent_id type change.
-  -- (Views/materialized views/rules/indexes/triggers can depend on this column.)
-  PERFORM 1
-  FROM pg_depend d
-  JOIN pg_rewrite rw ON rw.oid = d.objid
-  JOIN pg_class c ON c.oid = rw.ev_class
-  JOIN pg_class t ON t.oid = d.refobjid
-  JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
-  WHERE t.relname = 'article_comments'
-    AND a.attname = 'parent_id'
-    AND c.relname = 'articles_engagement_feed';
-END $$;
-
--- STEP 2: Drop dependent materialized view before type alteration.
-DROP MATERIALIZED VIEW IF EXISTS articles_engagement_feed;
-
-DO $$
-BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
@@ -89,6 +71,24 @@ END $$;
 
 ALTER TABLE article_comments
   ALTER COLUMN user_id SET NOT NULL;
+
+DO $$
+BEGIN
+  -- STEP 1: Identify dependent objects before parent_id type change.
+  -- (Views/materialized views/rules/indexes/triggers can depend on this column.)
+  PERFORM 1
+  FROM pg_depend d
+  JOIN pg_rewrite rw ON rw.oid = d.objid
+  JOIN pg_class c ON c.oid = rw.ev_class
+  JOIN pg_class t ON t.oid = d.refobjid
+  JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+  WHERE t.relname = 'article_comments'
+    AND a.attname = 'parent_id'
+    AND c.relname = 'articles_engagement_feed';
+END $$;
+
+-- STEP 2: Drop dependent materialized view before type alteration.
+DROP MATERIALIZED VIEW IF EXISTS articles_engagement_feed;
 
 DO $$
 BEGIN

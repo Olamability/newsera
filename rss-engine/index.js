@@ -146,7 +146,22 @@ async function processSource(source) {
   }
 }
 
-async function run() {
+async function refreshTrendingFeed() {
+  try {
+    const { error } = await supabase.rpc('refresh_trending_feed');
+    if (error) {
+      console.error(`  [ERROR] Failed to refresh trending feed: ${error.message}`);
+      return false;
+    }
+    console.log('Trending feed materialized view refreshed.');
+    return true;
+  } catch (error) {
+    console.error(`  [ERROR] Failed to refresh trending feed: ${error?.message ?? String(error)}`);
+    return false;
+  }
+}
+
+async function runIngestion() {
   console.log('=== Newsera RSS Ingestion Engine ===');
   console.log(`Started at: ${new Date().toISOString()}\n`);
 
@@ -194,10 +209,15 @@ async function run() {
   console.log(`Sources failed    : ${totalFailed}`);
   console.log(`Articles inserted : ${totalInserted}`);
   console.log(`Duplicates skipped: ${totalDuplicates}`);
+  await refreshTrendingFeed();
   console.log(`Finished at       : ${new Date().toISOString()}`);
 }
 
-run().catch((err) => {
-  console.error(`[FATAL] ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  runIngestion().catch((err) => {
+    console.error(`[FATAL] ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { runIngestion };

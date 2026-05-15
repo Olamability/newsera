@@ -1,10 +1,13 @@
 const RSSParser = require('rss-parser');
+const net = require('node:net');
 
 const SNIPPET_MAX_LENGTH = 500;
 const CONTENT_MAX_LENGTH = 1500;
 const MIN_TIMEOUT_MS = 8000;
 const DEFAULT_TIMEOUT_MS = 10000;
 const MAX_TIMEOUT_MS = 12000;
+const RETRY_ATTEMPTS = parseInt(process.env.RSS_FETCH_RETRY_ATTEMPTS || '3', 10);
+const RETRY_BASE_DELAY_MS = parseInt(process.env.RSS_FETCH_RETRY_BASE_DELAY_MS || '500', 10);
 // Maximum time (ms) to wait for a single RSS feed before giving up.
 const RAW_TIMEOUT_MS = parseInt(process.env.RSS_FETCH_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
 const FETCH_TIMEOUT_MS = Math.max(
@@ -121,6 +124,71 @@ function isTimeoutError(err) {
   return err?.name === 'AbortError' || String(err?.message || '').startsWith('Timed out after');
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPrivateIPv4(ip) {
+  const [a, b] = ip.split('.').map((segment) => parseInt(segment, 10));
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const normalized = ip.toLowerCase();
+  return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80');
+}
+
+function isBlockedHost(hostname) {
+  if (!hostname) return true;
+  const normalized = hostname.toLowerCase();
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
+  if (normalized.endsWith('.local') || normalized.endsWith('.internal')) return true;
+
+  if (!net.isIP(normalized)) return false;
+  if (net.isIPv4(normalized)) return isPrivateIPv4(normalized);
+  return isPrivateIPv6(normalized);
+}
+
+function validateSourceUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { valid: false, reason: 'invalid URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, reason: 'unsupported protocol' };
+  }
+
+  if (isBlockedHost(parsed.hostname)) {
+    return { valid: false, reason: 'blocked host' };
+  }
+
+  return { valid: true };
+}
+
+function isTransientError(err) {
+  const status = err?.statusCode;
+  if (typeof status === 'number' && (status === 429 || status >= 500)) {
+    return true;
+  }
+  if (isTimeoutError(err)) return true;
+  const message = String(err?.message || '').toLowerCase();
+  return (
+    message.includes('network')
+    || message.includes('timed out')
+    || message.includes('econnreset')
+    || message.includes('etimedout')
+    || message.includes('eai_again')
+  );
+}
+
 /**
  * Tries to find an image URL from an RSS feed item.
  * Priority order:
@@ -184,13 +252,6 @@ function extractImage(item) {
     }
   }
 
-  // Fallback: bare image URL in content (WordPress / CDN style)
-  const bareRe = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)(?:[?#][^\s"'<>]*)?/gi;
-  while ((match = bareRe.exec(contentRaw)) !== null) {
-    const url = match[0];
-    if (!isLowQualityImage(url)) return url;
-  }
-
   return null;
 }
 
@@ -206,49 +267,71 @@ async function fetchRSS(source) {
     return [];
   }
 
+  const urlValidation = validateSourceUrl(source.rss_url);
+  if (!urlValidation.valid) {
+    console.warn(`  [WARN] Source "${source.name}" has unsafe rss_url (${urlValidation.reason}) — skipping.`);
+    return [];
+  }
+
   let feed;
   const ingestionTime = new Date().toISOString();
+  const maxAttempts = Number.isNaN(RETRY_ATTEMPTS) ? 3 : Math.max(1, RETRY_ATTEMPTS);
+  const baseDelayMs = Number.isNaN(RETRY_BASE_DELAY_MS) ? 500 : Math.max(100, RETRY_BASE_DELAY_MS);
 
-  const canAbort = typeof fetch === 'function' && typeof AbortController === 'function';
-  const controller = canAbort ? new AbortController() : null;
-  const timeoutId = canAbort ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
-  try {
-    if (typeof fetch === 'function') {
-      const response = await fetch(source.rss_url, {
-        signal: controller?.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'newsera-rss-engine/1.0',
-          Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
-        },
-      });
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const canAbort = typeof fetch === 'function' && typeof AbortController === 'function';
+    const controller = canAbort ? new AbortController() : null;
+    const timeoutId = canAbort ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
+    try {
+      if (typeof fetch === 'function') {
+        const response = await fetch(source.rss_url, {
+          signal: controller?.signal,
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'newsera-rss-engine/1.0',
+            Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const error = new Error(`HTTP ${response.status}`);
+          error.statusCode = response.status;
+          throw error;
+        }
+
+        const xml = await response.text();
+        feed = await parser.parseString(xml);
+      } else {
+        let legacyTimeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+          legacyTimeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
+        });
+        feed = await Promise.race([
+          parser.parseURL(source.rss_url),
+          timeoutPromise,
+        ]).finally(() => clearTimeout(legacyTimeoutId));
+      }
+      break;
+    } catch (err) {
+      const transient = isTransientError(err);
+      const canRetry = transient && attempt < maxAttempts;
+
+      if (canRetry) {
+        const delayMs = baseDelayMs * (2 ** (attempt - 1));
+        console.warn(`  [WARN] Failed to fetch "${source.name}" (attempt ${attempt}/${maxAttempts}): ${err.message}. Retrying in ${delayMs}ms.`);
+        await sleep(delayMs);
+        continue;
       }
 
-      const xml = await response.text();
-      feed = await parser.parseString(xml);
-    } else {
-      let legacyTimeoutId;
-      const timeoutPromise = new Promise((_, reject) => {
-        legacyTimeoutId = setTimeout(() => reject(new Error(`Timed out after ${FETCH_TIMEOUT_MS}ms`)), FETCH_TIMEOUT_MS);
-      });
-      feed = await Promise.race([
-        parser.parseURL(source.rss_url),
-        timeoutPromise,
-      ]).finally(() => clearTimeout(legacyTimeoutId));
+      if (isTimeoutError(err)) {
+        console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
+      } else {
+        console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
+      }
+      return [];
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-  } catch (err) {
-    const isTimeout = isTimeoutError(err);
-    if (isTimeout) {
-      console.warn(`  [TIMEOUT] "${source.name}" did not respond within ${FETCH_TIMEOUT_MS}ms — skipping.`);
-    } else {
-      console.error(`  [ERROR] Failed to fetch RSS for "${source.name}": ${err.message}`);
-    }
-    return [];
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
   }
 
   return (feed.items || []).map((item) => {

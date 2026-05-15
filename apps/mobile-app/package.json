@@ -1,0 +1,11 @@
+{
+  "name": "@newsera/mobile-app",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npm --prefix ../../mobile-app run start",
+    "android": "npm --prefix ../../mobile-app run android",
+    "ios": "npm --prefix ../../mobile-app run ios",
+    "web": "npm --prefix ../../mobile-app run web"
+  }
+}

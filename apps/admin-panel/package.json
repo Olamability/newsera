@@ -1,0 +1,9 @@
+{
+  "name": "@newsera/admin-panel",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix ../../admin-panel run dev",
+    "build": "npm --prefix ../../admin-panel run build"
+  }
+}

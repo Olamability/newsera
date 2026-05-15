@@ -1,0 +1,14 @@
+{
+  "name": "newsera-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm --filter @newsera/admin-panel dev",
+    "build": "pnpm --filter @newsera/admin-panel build",
+    "rss:start": "pnpm --filter @newsera/rss-engine start",
+    "rss:worker": "pnpm --filter @newsera/rss-engine worker",
+    "lint": "pnpm -r run lint --if-present",
+    "typecheck": "pnpm -r run typecheck --if-present"
+  }
+}

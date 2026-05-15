@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
@@ -18,10 +19,16 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'CategoryDetail'>;
 
 const SKELETON_COUNT = 4;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
+const FEED_BOTTOM_SPACING = 16;
+const INITIAL_ITEMS_TO_RENDER = 8;
+const MAX_ITEMS_PER_BATCH = 8;
+const FEED_WINDOW_SIZE = 9;
+const BATCHING_PERIOD_MS = 60;
 
 const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
   const { categoryId } = route.params;
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,23 +94,27 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
     [openArticle]
   );
 
-  const renderFooter = () => {
+  const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
     return (
       <View style={styles.footer}>
         <ActivityIndicator size="small" color="#888" />
       </View>
     );
-  };
+  }, [loadingMore]);
+  const keyExtractor = useCallback((item: NewsArticle) => item.id, []);
+  const skeletonKeyExtractor = useCallback((item: number) => `sk-${item}`, []);
+  const renderSkeletonItem = useCallback(() => <View style={styles.skeletonCard} />, []);
+  const listPaddingBottom = FEED_BOTTOM_SPACING + insets.bottom;
 
   if (loading) {
     return (
       <View style={styles.container}>
         <FlatList
           data={SKELETON_DATA}
-          keyExtractor={(item) => `sk-${item}`}
-          renderItem={() => <View style={styles.skeletonCard} />}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+          keyExtractor={skeletonKeyExtractor}
+          renderItem={renderSkeletonItem}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: listPaddingBottom }}
           scrollEnabled={false}
         />
       </View>
@@ -124,17 +135,17 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
     <View style={styles.container}>
       <FlatList
         data={articles}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: listPaddingBottom }}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={7}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={INITIAL_ITEMS_TO_RENDER}
+        maxToRenderPerBatch={MAX_ITEMS_PER_BATCH}
+        windowSize={FEED_WINDOW_SIZE}
+        updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
         removeClippedSubviews
       />
     </View>

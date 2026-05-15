@@ -32,9 +32,13 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefreshRequestRef = useRef(0);
   const isRefreshingRef = useRef(false);
+  const pendingForceRefreshRef = useRef(false);
 
   const loadHeadlines = useCallback(async (forceRefresh: boolean = false) => {
-    if (isRefreshingRef.current) return;
+    if (isRefreshingRef.current) {
+      if (forceRefresh) pendingForceRefreshRef.current = true;
+      return;
+    }
     isRefreshingRef.current = true;
     if (forceRefresh) invalidateHeadlinesPublicCache();
     try {
@@ -48,6 +52,10 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
     } finally {
       isRefreshingRef.current = false;
       setLoading(false);
+      if (pendingForceRefreshRef.current) {
+        pendingForceRefreshRef.current = false;
+        void loadHeadlines(true);
+      }
     }
   }, []);
 
@@ -91,26 +99,32 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
     return () => subscription.remove();
   }, [requestRefresh]);
 
-  useEffect(() => {
-    const channel = supabasePublic
-      .channel('headlines-article-updates')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'articles' },
-        () => {
-          if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-          refreshTimeoutRef.current = setTimeout(() => {
-            requestRefresh('force');
-          }, 400);
-        },
-      )
-      .subscribe();
+  useFocusEffect(
+    useCallback(() => {
+      const channel = supabasePublic
+        .channel('headlines-article-updates')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'articles' },
+          () => {
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(() => {
+              requestRefresh('force');
+            }, 400);
+          },
+        )
+        .subscribe();
 
-    return () => {
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-      void supabasePublic.removeChannel(channel);
-    };
-  }, [requestRefresh]);
+      return () => {
+        if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+        void supabasePublic.removeChannel(channel);
+      };
+    }, [requestRefresh]),
+  );
+
+  const handleSeeMorePress = useCallback(() => {
+    navigation.navigate('Trending');
+  }, [navigation]);
 
   return (
     <View style={styles.section}>
@@ -119,7 +133,7 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
         <Text style={styles.sectionTitle}>Headlines</Text>
         <TouchableOpacity
           style={styles.seeMoreButton}
-          onPress={() => navigation.navigate('Trending')}
+          onPress={handleSeeMorePress}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >

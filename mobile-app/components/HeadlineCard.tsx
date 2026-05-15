@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,9 @@ const SMALL_SCREEN_THRESHOLD = 360;
 const MIN_CARD_HEIGHT = 196;
 const MAX_CARD_HEIGHT = 232;
 const CARD_HEIGHT_RATIO = 0.56;
-const PREMIUM_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)'] as const;
+const PREMIUM_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.45)'] as const;
 const PREMIUM_GRADIENT_LOCATIONS = [0.1, 0.58, 1] as const;
-const TEXT_REGION_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)'] as const;
+const TEXT_REGION_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.32)'] as const;
 const TEXT_REGION_GRADIENT_LOCATIONS = [0.35, 1] as const;
 
 export const CARD_WIDTH = SCREEN_WIDTH - 48;
@@ -52,9 +52,25 @@ function formatTimestamp(dateStr: string | null): string {
 }
 
 const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
+  const [imageFailed, setImageFailed] = useState(false);
   const sourceName =
     article.source_name ?? article.sources?.name ?? 'Unknown Source';
   const timestamp = formatTimestamp(article.published_at);
+  const imageSource = useMemo(() => (
+    article.image_url ? { uri: article.image_url } : null
+  ), [article.image_url]);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [article.image_url]);
+
+  const handlePress = useCallback(() => {
+    onPress(article);
+  }, [onPress, article]);
+
+  const handleImageError = useCallback(() => {
+    setImageFailed(true);
+  }, []);
 
   const cardContent = (
     <View style={styles.card}>
@@ -87,21 +103,22 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
     </View>
   );
 
-  if (article.image_url) {
+  if (imageSource && !imageFailed) {
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => onPress(article)}
+        onPress={handlePress}
         style={styles.touchable}
       >
         <View style={styles.imageBackground}>
           <Image
-            source={{ uri: article.image_url }}
+            source={imageSource}
             style={styles.backgroundImage}
             contentFit="cover"
             cachePolicy="memory-disk"
             placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
             transition={260}
+            onError={handleImageError}
           />
           {cardContent}
         </View>
@@ -113,7 +130,7 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => onPress(article)}
+      onPress={handlePress}
       style={styles.touchable}
     >
       <View style={[styles.imageBackground, styles.noImageBackground]}>

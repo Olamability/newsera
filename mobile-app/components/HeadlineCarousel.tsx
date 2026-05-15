@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -66,9 +66,9 @@ const HeadlineCarousel: React.FC<Props> = ({ articles, loading }) => {
     };
   }, [articles, startTimer, stopTimer]);
 
-  const handlePress = (article: NewsArticle) => {
+  const handlePress = useCallback((article: NewsArticle) => {
     navigation.navigate('ArticleDetail', { article });
-  };
+  }, [navigation]);
 
   const handleMomentumScrollEnd = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
     if (carouselItems.length === 0) return;
@@ -77,6 +77,18 @@ const HeadlineCarousel: React.FC<Props> = ({ articles, loading }) => {
     indexRef.current = normalizedIndex;
     setDotIndex(normalizedIndex);
   }, [carouselItems.length]);
+
+  const renderCarouselItem = useCallback((article: NewsArticle) => (
+    <HeadlineCard
+      key={article.id}
+      article={article}
+      onPress={handlePress}
+    />
+  ), [handlePress]);
+
+  const renderedCarouselItems = useMemo(() => (
+    carouselItems.map(renderCarouselItem)
+  ), [carouselItems, renderCarouselItem]);
 
   if (loading) {
     return (
@@ -110,13 +122,7 @@ const HeadlineCarousel: React.FC<Props> = ({ articles, loading }) => {
         onMomentumScrollEnd={handleMomentumScrollEnd}
         scrollEventThrottle={16}
       >
-        {carouselItems.map((article) => (
-          <HeadlineCard
-            key={article.id}
-            article={article}
-            onPress={handlePress}
-          />
-        ))}
+        {renderedCarouselItems}
         <View style={styles.trailingSpace} />
       </ScrollView>
 
@@ -135,7 +141,7 @@ const HeadlineCarousel: React.FC<Props> = ({ articles, loading }) => {
   );
 };
 
-export default HeadlineCarousel;
+export default React.memo(HeadlineCarousel);
 
 const styles = StyleSheet.create({
   scrollContent: {

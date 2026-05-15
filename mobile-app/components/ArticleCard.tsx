@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   PanResponder,
@@ -23,13 +23,40 @@ interface Props {
 const PLACEHOLDER_COLOR = '#e8e8e8';
 const SWIPE_THRESHOLD = 60;
 const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
+const CARD_RIPPLE = { color: 'rgba(0,0,0,0.06)', borderless: false } as const;
 
 function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
   const likeCount = article.like_count ?? 0;
   const commentCount = article.comment_count ?? 0;
+  const [imageFailed, setImageFailed] = useState(false);
 
   const translateX = useRef(new Animated.Value(0)).current;
+  const latestArticleRef = useRef(article);
+  const latestSwipeLeftRef = useRef(onSwipeLeft);
+  const latestSwipeRightRef = useRef(onSwipeRight);
+
+  useEffect(() => {
+    latestArticleRef.current = article;
+    latestSwipeLeftRef.current = onSwipeLeft;
+    latestSwipeRightRef.current = onSwipeRight;
+  }, [article, onSwipeLeft, onSwipeRight]);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [article.image_url]);
+
+  const imageSource = useMemo(() => (
+    article.image_url ? { uri: article.image_url } : null
+  ), [article.image_url]);
+
+  const handleCardPress = useCallback(() => {
+    onPress(article);
+  }, [onPress, article]);
+
+  const handleImageError = useCallback(() => {
+    setImageFailed(true);
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -42,22 +69,26 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
         translateX.setValue(clamped);
       },
       onPanResponderRelease: (_, { dx }) => {
-        if (dx < -SWIPE_THRESHOLD && onSwipeLeft) {
+        const activeArticle = latestArticleRef.current;
+        const swipeLeft = latestSwipeLeftRef.current;
+        const swipeRight = latestSwipeRightRef.current;
+
+        if (dx < -SWIPE_THRESHOLD && swipeLeft) {
           Animated.timing(translateX, {
             toValue: -300,
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            onSwipeLeft(article);
+            swipeLeft(activeArticle);
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
           });
-        } else if (dx > SWIPE_THRESHOLD && onSwipeRight) {
+        } else if (dx > SWIPE_THRESHOLD && swipeRight) {
           Animated.timing(translateX, {
             toValue: 300,
             duration: 180,
             useNativeDriver: true,
           }).start(() => {
-            onSwipeRight(article);
+            swipeRight(activeArticle);
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
           });
         } else {
@@ -93,18 +124,19 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
       >
         <Pressable
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={() => onPress(article)}
-          android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}
+          onPress={handleCardPress}
+          android_ripple={CARD_RIPPLE}
         >
       {/* Left: Image */}
-      {article.image_url ? (
+      {imageSource && !imageFailed ? (
         <Image
-          source={{ uri: article.image_url }}
+          source={imageSource}
           style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
           placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
           transition={180}
+          onError={handleImageError}
         />
       ) : (
         <View style={[styles.image, styles.placeholder]} />
@@ -141,7 +173,23 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   );
 }
 
-export default React.memo(ArticleCard);
+const areArticleCardPropsEqual = (prev: Props, next: Props): boolean => {
+  if (prev.onPress !== next.onPress) return false;
+  if (prev.onSwipeLeft !== next.onSwipeLeft) return false;
+  if (prev.onSwipeRight !== next.onSwipeRight) return false;
+
+  const previous = prev.article;
+  const current = next.article;
+  return previous.id === current.id
+    && previous.title === current.title
+    && previous.image_url === current.image_url
+    && previous.source_name === current.source_name
+    && previous.sources?.name === current.sources?.name
+    && previous.like_count === current.like_count
+    && previous.comment_count === current.comment_count;
+};
+
+export default React.memo(ArticleCard, areArticleCardPropsEqual);
 
 const styles = StyleSheet.create({
   card: {

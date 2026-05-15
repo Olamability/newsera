@@ -67,6 +67,10 @@ const MAX_REPLY_INDENT = 48;
 const COMMENT_PAGINATION_SIZE = COMMENTS_PAGE_SIZE;
 const OPTIMISTIC_COMMENT_PREFIX = 'optimistic-';
 const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
+const INITIAL_ITEMS_TO_RENDER = 8;
+const MAX_ITEMS_PER_BATCH = 8;
+const FEED_WINDOW_SIZE = 9;
+const BATCHING_PERIOD_MS = 60;
 let optimisticCommentSequence = 0;
 
 const buildArticlePreview = (snippet: string | null, content: string | null): string | null => {
@@ -250,6 +254,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [similarArticles, setSimilarArticles] = useState<NewsArticle[]>([]);
   const [similarHasMore, setSimilarHasMore] = useState(true);
   const [similarLoadingMore, setSimilarLoadingMore] = useState(false);
+  const [similarImageFailures, setSimilarImageFailures] = useState<Record<string, boolean>>({});
   const similarPageRef = useRef(1);
   const loadingMoreRef = useRef(false);
   const seenIdsRef = useRef<string[]>([]);
@@ -293,6 +298,12 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [article]);
 
   useEffect(() => {
+    if (!commentsLoading) {
+      shimmerOpacity.stopAnimation();
+      shimmerOpacity.setValue(0.35);
+      return;
+    }
+
     const shimmerLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmerOpacity, {
@@ -312,8 +323,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     shimmerLoop.start();
     return () => {
       shimmerLoop.stop();
+      shimmerOpacity.stopAnimation();
+      shimmerOpacity.setValue(0.35);
     };
-  }, [shimmerOpacity]);
+  }, [commentsLoading, shimmerOpacity]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('blur', () => {
@@ -502,6 +515,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setSimilarHasMore(true);
     similarPageRef.current = 1;
     seenIdsRef.current = [];
+    setSimilarImageFailures({});
 
     (async () => {
       setSimilarLoadingMore(true);
@@ -821,10 +835,22 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleEndReached = useCallback(() => {
     void loadMoreSimilar();
   }, [loadMoreSimilar]);
+  const handleCommentsEndReached = useCallback(() => {
+    void loadMoreComments();
+  }, [loadMoreComments]);
+  const similarKeyExtractor = useCallback((item: NewsArticle) => item.id, []);
+  const commentKeyExtractor = useCallback((item: ThreadedComment) => item.id, []);
+
+  const handleSimilarImageError = useCallback((articleId: string) => {
+    setSimilarImageFailures((prev) => {
+      if (prev[articleId]) return prev;
+      return { ...prev, [articleId]: true };
+    });
+  }, []);
 
   const threadedComments = useMemo(() => buildThreadedComments(comments), [comments]);
 
-  const renderCommentNode = (comment: ThreadedComment, depth: number = 0): React.ReactNode => {
+  const renderCommentNode = useCallback((comment: ThreadedComment, depth: number = 0): React.ReactNode => {
     const hasReplies = comment.replies.length > 0;
     const repliesExpanded = expandedReplies[comment.id] ?? true;
     const indent = Math.min(depth * REPLY_INDENT_PER_LEVEL, MAX_REPLY_INDENT);
@@ -877,7 +903,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         {hasReplies && repliesExpanded ? comment.replies.map((reply) => renderCommentNode(reply, depth + 1)) : null}
       </View>
     );
-  };
+  }, [expandedReplies, promptSignInForInteraction, toggleReplies, user?.email, user?.id]);
 
   const renderSimilarItem = useCallback(
     ({ item }: { item: NewsArticle }) => (
@@ -886,7 +912,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         onPress={() => navigation.replace('ArticleDetail', { article: item })}
         activeOpacity={0.85}
       >
-        {item.image_url ? (
+        {item.image_url && !similarImageFailures[item.id] ? (
           <Image
             source={{ uri: item.image_url }}
             style={styles.similarImage}
@@ -894,6 +920,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             cachePolicy="memory-disk"
             placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
             transition={200}
+            onError={() => handleSimilarImageError(item.id)}
           />
         ) : (
           <View style={[styles.similarImage, styles.similarImagePlaceholder]} />
@@ -908,7 +935,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </TouchableOpacity>
     ),
-    [navigation]
+    [navigation, similarImageFailures, handleSimilarImageError]
   );
 
   const renderThreadedCommentItem = useCallback(
@@ -964,7 +991,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.flex}>
         <FlatList
           data={similarArticles}
-          keyExtractor={(item) => item.id}
+          keyExtractor={similarKeyExtractor}
           style={styles.flex}
           contentContainerStyle={[
             styles.listContent,
@@ -973,10 +1000,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={7}
-          updateCellsBatchingPeriod={50}
+          initialNumToRender={INITIAL_ITEMS_TO_RENDER}
+          maxToRenderPerBatch={MAX_ITEMS_PER_BATCH}
+          windowSize={FEED_WINDOW_SIZE}
+          updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
           removeClippedSubviews
           ListHeaderComponent={
             <>
@@ -1215,17 +1242,17 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               ) : (
                 <FlatList
                   data={threadedComments}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={commentKeyExtractor}
                   renderItem={renderThreadedCommentItem}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.commentsSheetListContent}
-                  onEndReached={() => void loadMoreComments()}
+                  onEndReached={handleCommentsEndReached}
                   onEndReachedThreshold={0.4}
                   keyboardShouldPersistTaps="handled"
-                  initialNumToRender={10}
-                  maxToRenderPerBatch={10}
-                  windowSize={7}
-                  updateCellsBatchingPeriod={50}
+                  initialNumToRender={INITIAL_ITEMS_TO_RENDER}
+                  maxToRenderPerBatch={MAX_ITEMS_PER_BATCH}
+                  windowSize={FEED_WINDOW_SIZE}
+                  updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
                   removeClippedSubviews
                   ListFooterComponent={commentsLoadingMore ? (
                     <Text style={styles.commentsLoadingMore}>Loading more comments…</Text>

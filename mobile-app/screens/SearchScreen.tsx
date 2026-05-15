@@ -22,6 +22,7 @@ type Nav = CompositeNavigationProp<
 >;
 
 const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
+const POSTGRES_UNDEFINED_COLUMN_ERROR = '42703';
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -48,7 +49,7 @@ const SearchScreen: React.FC = () => {
         .limit(30);
 
       let { data, error } = await searchQuery;
-      if (error?.code === '42703') {
+      if (error?.code === POSTGRES_UNDEFINED_COLUMN_ERROR) {
         searchQuery = supabasePublic
           .from('articles')
           .select(ARTICLE_SELECT)

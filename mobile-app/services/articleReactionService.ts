@@ -16,6 +16,10 @@ const isMissingReactionsTableError = (error: { code?: string } | null | undefine
 const isMissingRpcFunctionError = (error: { code?: string } | null | undefined): boolean => (
   error?.code === '42883'
 );
+type ReactionCountRpcRow = {
+  reaction_type: ArticleReactionType;
+  reaction_count: number | string;
+};
 
 export async function getArticleReactionSummary(articleId: string): Promise<ArticleReactionSummary> {
   const {
@@ -45,9 +49,9 @@ export async function getArticleReactionSummary(articleId: string): Promise<Arti
     throw error;
   }
 
-  const rows = (data ?? []) as Array<{ reaction_type: ArticleReactionType; reaction_count: number }>;
-  const likeCount = rows.find((row) => row.reaction_type === 'like')?.reaction_count ?? 0;
-  const dislikeCount = rows.find((row) => row.reaction_type === 'dislike')?.reaction_count ?? 0;
+  const rows = (data ?? []) as ReactionCountRpcRow[];
+  const likeCount = Number(rows.find((row) => row.reaction_type === 'like')?.reaction_count ?? 0);
+  const dislikeCount = Number(rows.find((row) => row.reaction_type === 'dislike')?.reaction_count ?? 0);
   if (userReactionResult.error && !isMissingReactionsTableError(userReactionResult.error)) {
     throw userReactionResult.error;
   }

@@ -21,6 +21,7 @@ const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 const MIN_REALTIME_REFRESH_LIMIT = 20;
 const REALTIME_REFRESH_DEBOUNCE_MS = 350;
+const REALTIME_PATCH_BATCH_SIZE = 5;
 
 const TrendingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -110,9 +111,14 @@ const TrendingScreen: React.FC = () => {
         }
 
         try {
-          const updatedRows = await Promise.allSettled(
-            pendingIds.map((id) => fetchTrendingArticleById(id))
-          );
+          const updatedRows: Array<PromiseSettledResult<NewsArticle | null>> = [];
+          for (let index = 0; index < pendingIds.length; index += REALTIME_PATCH_BATCH_SIZE) {
+            const batchIds = pendingIds.slice(index, index + REALTIME_PATCH_BATCH_SIZE);
+            const batchRows = await Promise.allSettled(
+              batchIds.map((id) => fetchTrendingArticleById(id))
+            );
+            updatedRows.push(...batchRows);
+          }
           if (fetchGenerationRef.current !== generation) return;
           setArticles((prev) => {
             if (prev.length === 0) return prev;

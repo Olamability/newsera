@@ -1,0 +1,9 @@
+{
+  "name": "@newsera/admin-panel",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "corepack pnpm --dir ../../admin-panel run dev",
+    "build": "corepack pnpm --dir ../../admin-panel run build"
+  }
+}

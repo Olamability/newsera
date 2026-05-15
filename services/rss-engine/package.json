@@ -1,0 +1,11 @@
+{
+  "name": "@newsera/rss-engine",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "corepack pnpm --dir ../../rss-engine run start",
+    "worker": "corepack pnpm --dir ../../rss-engine run worker",
+    "lint": "corepack pnpm --dir ../../rss-engine run lint",
+    "typecheck": "corepack pnpm --dir ../../rss-engine run typecheck"
+  }
+}

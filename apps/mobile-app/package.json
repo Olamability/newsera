@@ -1,0 +1,11 @@
+{
+  "name": "@newsera/mobile-app",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "corepack pnpm --dir ../../mobile-app run start",
+    "android": "corepack pnpm --dir ../../mobile-app run android",
+    "ios": "corepack pnpm --dir ../../mobile-app run ios",
+    "web": "corepack pnpm --dir ../../mobile-app run web"
+  }
+}

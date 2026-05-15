@@ -37,6 +37,39 @@ type EngagementFeedRow = {
 const ARTICLE_SELECT = '*, sources(id, name, website_url, logo_url), categories(id, name, slug)';
 const loggedErrors = new Set<string>();
 const MAX_LOGGED_ERRORS = 200;
+const FEED_CACHE_TTL_MS = 90_000;
+
+type FeedCacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const feedCache = new Map<string, FeedCacheEntry<unknown>>();
+
+const buildCacheKey = (name: string, parts: Record<string, string | number | null | undefined>): string => {
+  const encoded = Object.entries(parts)
+    .map(([key, value]) => `${key}=${value ?? 'null'}`)
+    .join('|');
+  return `${name}|${encoded}`;
+};
+
+const readFeedCache = <T>(key: string): T | null => {
+  const hit = feedCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expiresAt) {
+    feedCache.delete(key);
+    return null;
+  }
+  return hit.value as T;
+};
+
+const writeFeedCache = <T>(key: string, value: T): T => {
+  feedCache.set(key, {
+    value,
+    expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+  });
+  return value;
+};
 
 function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
   return {
@@ -91,6 +124,14 @@ export async function fetchArticlesPublic(
   page: number,
   categoryId?: string | null
 ): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
+  const cacheKey = buildCacheKey('articles', {
+    category: categoryId ?? 'all',
+    page,
+    user: 'public',
+  });
+  const cached = readFeedCache<{ articles: NewsArticle[]; hasMore: boolean }>(cacheKey);
+  if (cached) return cached;
+
   const from = (page - 1) * PAGE_SIZE;
   const to = page * PAGE_SIZE - 1;
 
@@ -112,7 +153,7 @@ export async function fetchArticlesPublic(
 
   const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
   const hasMore = articles.length >= PAGE_SIZE;
-  return { articles, hasMore };
+  return writeFeedCache(cacheKey, { articles, hasMore });
 }
 
 const VIRTUAL_CATEGORIES: Category[] = [
@@ -140,16 +181,59 @@ export async function fetchCategoriesPublic(): Promise<Category[]> {
 }
 
 export async function fetchHeadlinesPublic(): Promise<NewsArticle[]> {
-  const { articles } = await fetchArticlesPublic(1, null);
-  const withImages = articles.filter((a) => a.image_url);
-  const withoutImages = articles.filter((a) => !a.image_url);
-  return [...withImages, ...withoutImages].slice(0, HEADLINES_LIMIT);
+  const cacheKey = buildCacheKey('headlines', {
+    limit: HEADLINES_LIMIT,
+    user: 'public',
+  });
+  const cached = readFeedCache<NewsArticle[]>(cacheKey);
+  if (cached) return cached;
+
+  const { data: imageRows, error: imageError } = await supabasePublic
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .not('image_url', 'is', null)
+    .order('published_at', { ascending: false })
+    .limit(HEADLINES_LIMIT);
+
+  if (imageError) {
+    logPublicErrorOnce('fetchHeadlinesPublic:withImages', imageError);
+    throw imageError;
+  }
+
+  const withImages = ((imageRows as ArticleRow[]) ?? []).map(mapArticle);
+  if (withImages.length >= HEADLINES_LIMIT) {
+    return writeFeedCache(cacheKey, withImages.slice(0, HEADLINES_LIMIT));
+  }
+
+  const remainder = HEADLINES_LIMIT - withImages.length;
+  const { data: fallbackRows, error: fallbackError } = await supabasePublic
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .is('image_url', null)
+    .order('published_at', { ascending: false })
+    .limit(remainder);
+
+  if (fallbackError) {
+    logPublicErrorOnce('fetchHeadlinesPublic:withoutImages', fallbackError);
+    return writeFeedCache(cacheKey, withImages);
+  }
+
+  const withoutImages = ((fallbackRows as ArticleRow[]) ?? []).map(mapArticle);
+  return writeFeedCache(cacheKey, [...withImages, ...withoutImages].slice(0, HEADLINES_LIMIT));
 }
 
 export async function fetchTrendingArticlesPublic(
   page: number = 1,
   limit: number = TRENDING_LIMIT
 ): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
+  const cacheKey = buildCacheKey('trending', {
+    page,
+    limit,
+    user: 'public',
+  });
+  const cached = readFeedCache<{ articles: NewsArticle[]; hasMore: boolean }>(cacheKey);
+  if (cached) return cached;
+
   const from = (page - 1) * limit;
   const to = page * limit - 1;
 
@@ -168,7 +252,23 @@ export async function fetchTrendingArticlesPublic(
   const rawCount = (data ?? []).length;
   const articles = ((data as EngagementFeedRow[]) ?? []).map(mapEngagementFeedRow);
   const hasMore = rawCount >= limit;
-  return { articles, hasMore };
+  return writeFeedCache(cacheKey, { articles, hasMore });
+}
+
+export async function fetchTrendingArticleByIdPublic(articleId: string): Promise<NewsArticle | null> {
+  const { data, error } = await supabasePublic
+    .from('articles_engagement_feed')
+    .select('*')
+    .eq('id', articleId)
+    .maybeSingle();
+
+  if (error) {
+    logPublicErrorOnce('fetchTrendingArticleByIdPublic', error);
+    return null;
+  }
+
+  if (!data) return null;
+  return mapEngagementFeedRow(data as EngagementFeedRow);
 }
 
 const SIMILAR_PAGE_SIZE = 10;
@@ -185,49 +285,45 @@ export async function fetchSimilarArticlesPagePublic(
   const seenIds = new Set<string>(allExcluded);
   const collected: NewsArticle[] = [];
 
-  if (categoryId && collected.length < pageSize) {
-    const needed = pageSize - collected.length;
-    const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
-    const stageOffset = Math.max(0, page - 1) * needed;
-    let query = supabasePublic
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .eq('category_id', categoryId)
-      .order('published_at', { ascending: false })
-      .range(stageOffset, stageOffset + fetchLimit - 1);
-    const { data, error } = await query;
+  const stageOffset = Math.max(0, page - 1) * pageSize;
+  const fetchLimit = pageSize * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
+  const [categoryResult, sourceResult] = await Promise.all([
+    categoryId
+      ? supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .eq('category_id', categoryId)
+          .order('published_at', { ascending: false })
+          .range(stageOffset, stageOffset + fetchLimit - 1)
+      : Promise.resolve({ data: [], error: null } as const),
+    sourceId
+      ? supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .eq('source_id', sourceId)
+          .order('published_at', { ascending: false })
+          .range(stageOffset, stageOffset + fetchLimit - 1)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
 
-    if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', error);
-    for (const row of (data ?? []) as ArticleRow[]) {
-      if (collected.length >= pageSize) break;
-      const mapped = mapArticle(row);
-      if (!seenIds.has(mapped.id)) {
-        seenIds.add(mapped.id);
-        collected.push(mapped);
-      }
+  if (categoryResult.error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:category', categoryResult.error);
+  if (sourceResult.error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', sourceResult.error);
+
+  for (const row of (categoryResult.data ?? []) as ArticleRow[]) {
+    if (collected.length >= pageSize) break;
+    const mapped = mapArticle(row);
+    if (!seenIds.has(mapped.id)) {
+      seenIds.add(mapped.id);
+      collected.push(mapped);
     }
   }
 
-  if (sourceId && collected.length < pageSize) {
-    const needed = pageSize - collected.length;
-    const fetchLimit = needed * SIMILAR_PRIMARY_FETCH_MULTIPLIER;
-    const stageOffset = Math.max(0, page - 1) * needed;
-    let query = supabasePublic
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .eq('source_id', sourceId)
-      .order('published_at', { ascending: false })
-      .range(stageOffset, stageOffset + fetchLimit - 1);
-    const { data, error } = await query;
-
-    if (error) logPublicErrorOnce('fetchSimilarArticlesPagePublic:source', error);
-    for (const row of (data ?? []) as ArticleRow[]) {
-      if (collected.length >= pageSize) break;
-      const mapped = mapArticle(row);
-      if (!seenIds.has(mapped.id)) {
-        seenIds.add(mapped.id);
-        collected.push(mapped);
-      }
+  for (const row of (sourceResult.data ?? []) as ArticleRow[]) {
+    if (collected.length >= pageSize) break;
+    const mapped = mapArticle(row);
+    if (!seenIds.has(mapped.id)) {
+      seenIds.add(mapped.id);
+      collected.push(mapped);
     }
   }
 
@@ -265,66 +361,73 @@ export async function fetchSimilarArticlesPublic(
   const collected: NewsArticle[] = [];
   const seenIds = new Set<string>([articleId]);
 
-  if (categoryId && collected.length < limit) {
-    const { data, error } = await supabasePublic
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .eq('category_id', categoryId)
-      .neq('id', articleId)
-      .order('published_at', { ascending: false })
-      .limit(limit);
+  const [categoryResult, sourceResult] = await Promise.all([
+    categoryId
+      ? supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .eq('category_id', categoryId)
+          .neq('id', articleId)
+          .order('published_at', { ascending: false })
+          .limit(limit)
+      : Promise.resolve({ data: [], error: null } as const),
+    sourceId
+      ? supabasePublic
+          .from('articles')
+          .select(ARTICLE_SELECT)
+          .eq('source_id', sourceId)
+          .neq('id', articleId)
+          .order('published_at', { ascending: false })
+          .limit(limit * 2)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
 
-    if (error) {
-      logPublicErrorOnce('fetchSimilarArticlesPublic:category', error);
-    } else {
-      for (const row of (data ?? []) as ArticleRow[]) {
-        if (collected.length >= limit) break;
-        const mapped = mapArticle(row);
-        if (!seenIds.has(mapped.id)) {
-          seenIds.add(mapped.id);
-          collected.push(mapped);
-        }
-      }
+  if (categoryResult.error) {
+    logPublicErrorOnce('fetchSimilarArticlesPublic:category', categoryResult.error);
+  }
+  if (sourceResult.error) {
+    logPublicErrorOnce('fetchSimilarArticlesPublic:source', sourceResult.error);
+  }
+
+  for (const row of (categoryResult.data ?? []) as ArticleRow[]) {
+    if (collected.length >= limit) break;
+    const mapped = mapArticle(row);
+    if (!seenIds.has(mapped.id)) {
+      seenIds.add(mapped.id);
+      collected.push(mapped);
     }
   }
 
-  if (sourceId && collected.length < limit) {
-    const needed = limit - collected.length;
-    const { data, error } = await supabasePublic
-      .from('articles')
-      .select(ARTICLE_SELECT)
-      .eq('source_id', sourceId)
-      .neq('id', articleId)
-      .order('published_at', { ascending: false })
-      .limit(needed * 2);
-
-    if (error) {
-      logPublicErrorOnce('fetchSimilarArticlesPublic:source', error);
-    } else {
-      for (const row of (data ?? []) as ArticleRow[]) {
-        if (collected.length >= limit) break;
-        const mapped = mapArticle(row);
-        if (!seenIds.has(mapped.id)) {
-          seenIds.add(mapped.id);
-          collected.push(mapped);
-        }
-      }
+  for (const row of (sourceResult.data ?? []) as ArticleRow[]) {
+    if (collected.length >= limit) break;
+    const mapped = mapArticle(row);
+    if (!seenIds.has(mapped.id)) {
+      seenIds.add(mapped.id);
+      collected.push(mapped);
     }
   }
 
   if (collected.length < limit) {
     const needed = limit - collected.length;
-    const { data: trendingRows, error: trendingError } = await supabasePublic
-      .from('article_click_counts')
-      .select('article_id')
-      .order('click_count', { ascending: false })
-      .limit(needed * RECOMMENDATION_TRENDING_FETCH_MULTIPLIER);
+    const [trendingPoolResult, latestFallbackResult] = await Promise.all([
+      supabasePublic
+        .from('article_click_counts')
+        .select('article_id')
+        .order('click_count', { ascending: false })
+        .limit(needed * RECOMMENDATION_TRENDING_FETCH_MULTIPLIER),
+      supabasePublic
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .neq('id', articleId)
+        .order('published_at', { ascending: false })
+        .limit(needed * RECOMMENDATION_CANDIDATE_MULTIPLIER),
+    ]);
 
-    if (trendingError) {
-      logPublicErrorOnce('fetchSimilarArticlesPublic:trendingPool', trendingError);
+    if (trendingPoolResult.error) {
+      logPublicErrorOnce('fetchSimilarArticlesPublic:trendingPool', trendingPoolResult.error);
     }
 
-    const trendingIds = (trendingRows ?? [])
+    const trendingIds = ((trendingPoolResult.data as TrendingClickRow[] | null) ?? [])
       .map((row: TrendingClickRow) => row.article_id)
       .filter((id): id is string => !!id && !seenIds.has(id))
       .slice(0, needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
@@ -351,17 +454,10 @@ export async function fetchSimilarArticlesPublic(
     }
 
     if (collected.length < limit) {
-      const { data, error } = await supabasePublic
-        .from('articles')
-        .select(ARTICLE_SELECT)
-        .neq('id', articleId)
-        .order('published_at', { ascending: false })
-        .limit(needed * RECOMMENDATION_CANDIDATE_MULTIPLIER);
-
-      if (error) {
-        logPublicErrorOnce('fetchSimilarArticlesPublic:latestFallback', error);
+      if (latestFallbackResult.error) {
+        logPublicErrorOnce('fetchSimilarArticlesPublic:latestFallback', latestFallbackResult.error);
       } else {
-        for (const row of (data ?? []) as ArticleRow[]) {
+        for (const row of (latestFallbackResult.data ?? []) as ArticleRow[]) {
           if (collected.length >= limit) break;
           const mapped = mapArticle(row);
           if (!seenIds.has(mapped.id)) {
@@ -380,6 +476,14 @@ export async function fetchPersonalizedArticlesPublic(
   page: number = 1,
   limit: number = PERSONALIZED_DISPLAY_COUNT
 ): Promise<{ articles: NewsArticle[]; hasMore: boolean }> {
+  const cacheKey = buildCacheKey('personalized', {
+    page,
+    limit,
+    user: 'public',
+  });
+  const cached = readFeedCache<{ articles: NewsArticle[]; hasMore: boolean }>(cacheKey);
+  if (cached) return cached;
+
   try {
     const from = (page - 1) * limit;
     const to = page * limit - 1;
@@ -395,7 +499,7 @@ export async function fetchPersonalizedArticlesPublic(
     const rawCount = (data ?? []).length;
     const articles = ((data as ArticleRow[]) ?? []).map(mapArticle);
     const hasMore = rawCount >= limit;
-    return { articles, hasMore };
+    return writeFeedCache(cacheKey, { articles, hasMore });
   } catch (error) {
     logPublicErrorOnce('fetchPersonalizedArticlesPublic', error);
     return { articles: [], hasMore: false };
@@ -409,4 +513,5 @@ export {
   fetchPersonalizedArticlesPublic as fetchPersonalizedArticles,
   fetchSimilarArticlesPagePublic as fetchSimilarArticlesPage,
   fetchSimilarArticlesPublic as fetchSimilarArticles,
+  fetchTrendingArticleByIdPublic as fetchTrendingArticleById,
 };

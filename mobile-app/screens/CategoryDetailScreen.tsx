@@ -80,6 +80,13 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
     [navigation]
   );
 
+  const renderItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <ArticleCard article={item} onPress={openArticle} />
+    ),
+    [openArticle]
+  );
+
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -118,9 +125,7 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
       <FlatList
         data={articles}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ArticleCard article={item} onPress={openArticle} />
-        )}
+        renderItem={renderItem}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
@@ -128,7 +133,8 @@ const CategoryDetailScreen: React.FC<Props> = ({ route }) => {
         keyboardShouldPersistTaps="handled"
         initialNumToRender={10}
         maxToRenderPerBatch={10}
-        windowSize={5}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
         removeClippedSubviews
       />
     </View>

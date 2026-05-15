@@ -13,19 +13,31 @@ export type ArticleReactionSummary = {
 const isMissingReactionsTableError = (error: { code?: string } | null | undefined): boolean => (
   error?.code === '42P01'
 );
+const isMissingRpcFunctionError = (error: { code?: string } | null | undefined): boolean => (
+  error?.code === '42883'
+);
 
 export async function getArticleReactionSummary(articleId: string): Promise<ArticleReactionSummary> {
   const {
     data: { user },
   } = await supabaseAuth.auth.getUser();
 
-  const { data, error } = await supabaseAuth
-    .from('article_reactions')
-    .select('reaction_type, user_id')
-    .eq('article_id', articleId);
+  const [countsResult, userReactionResult] = await Promise.all([
+    supabaseAuth.rpc('get_article_reaction_counts', { p_article_id: articleId }),
+    user
+      ? supabaseAuth
+          .from('article_reactions')
+          .select('reaction_type')
+          .eq('article_id', articleId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null } as const),
+  ]);
+
+  const { data, error } = countsResult;
 
   if (error) {
-    if (isMissingReactionsTableError(error)) {
+    if (isMissingReactionsTableError(error) || isMissingRpcFunctionError(error)) {
       const likeCount = await getLikeCount(articleId);
       const userReaction = user ? ((await isLiked(articleId)) ? 'like' : null) : null;
       return { likeCount, dislikeCount: 0, userReaction };
@@ -33,22 +45,13 @@ export async function getArticleReactionSummary(articleId: string): Promise<Arti
     throw error;
   }
 
-  const rows = data ?? [];
-  let likeCount = 0;
-  let dislikeCount = 0;
-  let userReaction: ArticleReactionType | null = null;
-
-  for (const row of rows) {
-    if (row.reaction_type === 'like') {
-      likeCount += 1;
-    } else if (row.reaction_type === 'dislike') {
-      dislikeCount += 1;
-    }
-
-    if (user?.id && row.user_id === user.id) {
-      userReaction = row.reaction_type;
-    }
+  const rows = (data ?? []) as Array<{ reaction_type: ArticleReactionType; reaction_count: number }>;
+  const likeCount = rows.find((row) => row.reaction_type === 'like')?.reaction_count ?? 0;
+  const dislikeCount = rows.find((row) => row.reaction_type === 'dislike')?.reaction_count ?? 0;
+  if (userReactionResult.error && !isMissingReactionsTableError(userReactionResult.error)) {
+    throw userReactionResult.error;
   }
+  const userReaction = (userReactionResult.data?.reaction_type as ArticleReactionType | null | undefined) ?? null;
 
   return { likeCount, dislikeCount, userReaction };
 }

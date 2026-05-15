@@ -32,6 +32,13 @@ const RecentlyViewedScreen: React.FC = () => {
     [navigation]
   );
 
+  const renderItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <ArticleCard article={item} onPress={openArticle} />
+    ),
+    [openArticle]
+  );
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -56,11 +63,14 @@ const RecentlyViewedScreen: React.FC = () => {
     <FlatList
       data={articles}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <ArticleCard article={item} onPress={openArticle} />
-      )}
+      renderItem={renderItem}
       contentContainerStyle={styles.list}
       keyboardShouldPersistTaps="handled"
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      windowSize={7}
+      updateCellsBatchingPeriod={50}
+      removeClippedSubviews
     />
   );
 };

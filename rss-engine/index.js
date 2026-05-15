@@ -6,11 +6,11 @@ const { fetchRSS } = require('./src/fetchRSS');
 const { deduplicateArticles } = require('./src/deduplicateArticles');
 const { saveArticles } = require('./src/saveArticles');
 
-const MIN_CONCURRENCY = 3;
-const DEFAULT_CONCURRENCY = 3;
-const MAX_CONCURRENCY = 5;
+const MIN_CONCURRENCY = 5;
+const DEFAULT_CONCURRENCY = 5;
+const MAX_CONCURRENCY = 10;
 const RAW_CONCURRENCY = parseInt(process.env.RSS_CONCURRENCY || String(DEFAULT_CONCURRENCY), 10);
-// Process at least 3 and at most 5 feeds at once (safe bounded concurrency).
+// Process at least 5 and at most 10 feeds at once (safe bounded concurrency).
 const CONCURRENCY = Math.max(
   MIN_CONCURRENCY,
   Math.min(Number.isNaN(RAW_CONCURRENCY) ? DEFAULT_CONCURRENCY : RAW_CONCURRENCY, MAX_CONCURRENCY),

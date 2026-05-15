@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
-import { fetchTrendingArticles } from '../services/newsServicePublic';
+import { fetchTrendingArticleById, fetchTrendingArticles } from '../services/newsServicePublic';
 import { NewsArticle, RootStackParamList } from '../types';
 import { isAuthError } from '../services/publicDataErrors';
 import { subscribeToTrendingEngagementEvents } from '../services/realtimeService';
@@ -34,6 +34,8 @@ const TrendingScreen: React.FC = () => {
   const isFetchingRef = useRef(false);
   const fetchGenerationRef = useRef(0);
   const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRealtimeArticleIdsRef = useRef<Set<string>>(new Set());
+  const requiresFallbackRefreshRef = useRef(false);
 
   const loadArticles = useCallback(async (pageNum: number, append: boolean): Promise<boolean> => {
     if (isFetchingRef.current) return false;
@@ -71,7 +73,13 @@ const TrendingScreen: React.FC = () => {
   }, [loadArticles]);
 
   useEffect(() => {
-    const scheduleRealtimeRefresh = () => {
+    const scheduleRealtimeRefresh = (articleId?: string | null) => {
+      if (articleId) {
+        pendingRealtimeArticleIdsRef.current.add(articleId);
+      } else {
+        requiresFallbackRefreshRef.current = true;
+      }
+
       if (realtimeRefreshTimerRef.current) {
         clearTimeout(realtimeRefreshTimerRef.current);
       }
@@ -79,13 +87,48 @@ const TrendingScreen: React.FC = () => {
       realtimeRefreshTimerRef.current = setTimeout(async () => {
         if (isFetchingRef.current) return;
         const generation = fetchGenerationRef.current;
-        const limit = MIN_REALTIME_REFRESH_LIMIT;
+        const pendingIds = Array.from(pendingRealtimeArticleIdsRef.current);
+        const useFallbackRefresh = requiresFallbackRefreshRef.current || pendingIds.length === 0;
+        pendingRealtimeArticleIdsRef.current.clear();
+        requiresFallbackRefreshRef.current = false;
+
+        if (useFallbackRefresh) {
+          const limit = MIN_REALTIME_REFRESH_LIMIT;
+          try {
+            const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(1, limit);
+            if (fetchGenerationRef.current !== generation) return;
+            setArticles(data);
+            setHasMore(moreAvailable);
+            setPage(1);
+          } catch (err) {
+            if (fetchGenerationRef.current !== generation) return;
+            if (isAuthError(err)) {
+              setHasMore(false);
+            }
+          }
+          return;
+        }
+
         try {
-          const { articles: data, hasMore: moreAvailable } = await fetchTrendingArticles(1, limit);
+          const updatedRows = await Promise.all(
+            pendingIds.map((id) => fetchTrendingArticleById(id))
+          );
           if (fetchGenerationRef.current !== generation) return;
-          setArticles(data);
-          setHasMore(moreAvailable);
-          setPage(1);
+          setArticles((prev) => {
+            if (prev.length === 0) return prev;
+            const next = [...prev];
+            pendingIds.forEach((id, index) => {
+              const targetIndex = next.findIndex((article) => article.id === id);
+              if (targetIndex === -1) return;
+              const updated = updatedRows[index];
+              if (!updated) {
+                next.splice(targetIndex, 1);
+              } else {
+                next[targetIndex] = updated;
+              }
+            });
+            return next;
+          });
         } catch (err) {
           if (fetchGenerationRef.current !== generation) return;
           if (isAuthError(err)) {
@@ -95,7 +138,9 @@ const TrendingScreen: React.FC = () => {
       }, REALTIME_REFRESH_DEBOUNCE_MS);
     };
 
-    const unsubscribe = subscribeToTrendingEngagementEvents(scheduleRealtimeRefresh);
+    const unsubscribe = subscribeToTrendingEngagementEvents(({ articleId }) => {
+      scheduleRealtimeRefresh(articleId);
+    });
 
     return () => {
       if (realtimeRefreshTimerRef.current) {
@@ -134,6 +179,13 @@ const TrendingScreen: React.FC = () => {
     [navigation]
   );
 
+  const renderItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <ArticleCard article={item} onPress={openArticle} />
+    ),
+    [openArticle]
+  );
+
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -162,9 +214,7 @@ const TrendingScreen: React.FC = () => {
       <FlatList
         data={articles}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ArticleCard article={item} onPress={openArticle} />
-        )}
+        renderItem={renderItem}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -175,7 +225,8 @@ const TrendingScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         initialNumToRender={10}
         maxToRenderPerBatch={10}
-        windowSize={5}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
         removeClippedSubviews
       />
     </View>

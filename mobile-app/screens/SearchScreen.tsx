@@ -43,7 +43,7 @@ const SearchScreen: React.FC = () => {
       const { data, error } = await supabasePublic
         .from('articles')
         .select(ARTICLE_SELECT)
-        .ilike('title', `%${q.trim()}%`)
+        .textSearch('fts_content', q.trim(), { type: 'websearch', config: 'english' })
         .order('published_at', { ascending: false })
         .limit(30);
 
@@ -72,6 +72,13 @@ const SearchScreen: React.FC = () => {
       navigation.navigate('ArticleDetail', { article });
     },
     [navigation]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: NewsArticle }) => (
+      <ArticleCard article={item} onPress={openArticle} />
+    ),
+    [openArticle]
   );
 
   const renderEmpty = () => {
@@ -107,12 +114,15 @@ const SearchScreen: React.FC = () => {
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ArticleCard article={item} onPress={openArticle} />
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews
         />
       )}
     </View>

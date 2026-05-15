@@ -1007,23 +1007,11 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           removeClippedSubviews
           ListHeaderComponent={
             <>
-              {/* 1. Featured Image — full-bleed at top */}
-              {article.image_url ? (
-                <Image
-                  source={{ uri: article.image_url }}
-                  style={styles.featuredImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
-                  transition={300}
-                />
-              ) : null}
-
-              <View style={styles.body}>
-                {/* 2. Headline */}
+              <View style={styles.headerBody}>
+                {/* 1. Headline */}
                 <Text style={styles.title}>{article.title}</Text>
 
-                {/* 3. Metadata Row: source+logo left · timestamp+reading-time right */}
+                {/* 2. Metadata Row: source+logo left · timestamp+reading-time right */}
                 <View style={styles.metaRow}>
                   <View style={styles.metaLeft}>
                     {sourceLogo ? (
@@ -1052,7 +1040,21 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                     ) : null}
                   </View>
                 </View>
+              </View>
 
+              {/* 3. Featured Image */}
+              {article.image_url ? (
+                <Image
+                  source={{ uri: article.image_url }}
+                  style={styles.featuredImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
+                  transition={300}
+                />
+              ) : null}
+
+              <View style={styles.contentBody}>
                 <View style={styles.contentDivider} />
 
                 {/* 4. Article Snippet / Content */}
@@ -1360,7 +1362,12 @@ const styles = StyleSheet.create({
   listContent: {
     backgroundColor: '#fff',
   },
-  body: {
+  headerBody: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+  contentBody: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 4,

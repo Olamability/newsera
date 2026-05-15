@@ -11,6 +11,7 @@ const RETRY_MAX_DELAY_MS = 4_000;
 const MIN_IMAGE_DIMENSION = 100;
 const ARTICLE_IMAGE_LOOKUP_CONCURRENCY = 3;
 const ARTICLE_PAGE_TIMEOUT_MS = 8_000;
+const ARTICLE_IMAGE_CACHE_MAX_SIZE = 500;
 const OG_IMAGE_META_REGEX = /<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i;
 const IMG_TAG_REGEX = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
 const NAMED_HTML_ENTITIES = {
@@ -43,6 +44,22 @@ const SKIP_IMAGE_PATTERNS = [
   /\/ads\//i,
 ];
 const articleImageCache = new Map();
+
+function setArticleImageCache(url, value) {
+  if (articleImageCache.has(url)) {
+    articleImageCache.delete(url);
+  }
+
+  articleImageCache.set(url, value);
+  if (articleImageCache.size <= ARTICLE_IMAGE_CACHE_MAX_SIZE) {
+    return;
+  }
+
+  const oldestKey = articleImageCache.keys().next().value;
+  if (oldestKey) {
+    articleImageCache.delete(oldestKey);
+  }
+}
 
 const parser = new RSSParser({
   customFields: {
@@ -86,8 +103,8 @@ function decodeHtmlEntities(value) {
 
 function stripHtml(value) {
   return value
-    .replace(/<script[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
-    .replace(/<style[^>]*>[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\b[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ');
 }
 
@@ -181,6 +198,14 @@ function pickEnclosureImage(value) {
   return null;
 }
 
+function readImageDimensions(imageTag) {
+  const dimensions = { width: null, height: null };
+  for (const [, name, value] of imageTag.matchAll(/(width|height)=["']?(\d+)/gi)) {
+    dimensions[name.toLowerCase()] = parseDimension(value);
+  }
+  return dimensions;
+}
+
 function pickImageFromHtml(contentRaw) {
   IMG_TAG_REGEX.lastIndex = 0;
   let match;
@@ -188,9 +213,8 @@ function pickImageFromHtml(contentRaw) {
   while ((match = IMG_TAG_REGEX.exec(contentRaw)) !== null) {
     const imageTag = match[0];
     const imageUrl = sanitizeMaybeUrl(match[1]);
-    const width = parseDimension(/width=["']?(\d+)/i.exec(imageTag)?.[1]);
-    const height = parseDimension(/height=["']?(\d+)/i.exec(imageTag)?.[1]);
-    if (imageUrl && !isLowQualityImage(imageUrl, { width, height })) {
+    const dimensions = readImageDimensions(imageTag);
+    if (imageUrl && !isLowQualityImage(imageUrl, dimensions)) {
       return imageUrl;
     }
   }
@@ -354,7 +378,7 @@ async function fetchOpenGraphImage(articleUrl) {
   const validation = validateSourceUrl(sanitizedArticleUrl);
   if (!validation.valid || typeof fetch !== 'function') {
     const resolved = Promise.resolve(null);
-    articleImageCache.set(sanitizedArticleUrl, resolved);
+    setArticleImageCache(sanitizedArticleUrl, resolved);
     return resolved;
   }
 
@@ -374,9 +398,9 @@ async function fetchOpenGraphImage(articleUrl) {
     }
   })();
 
-  articleImageCache.set(sanitizedArticleUrl, pending);
+  setArticleImageCache(sanitizedArticleUrl, pending);
   const resolved = await pending;
-  articleImageCache.set(sanitizedArticleUrl, Promise.resolve(resolved));
+  setArticleImageCache(sanitizedArticleUrl, Promise.resolve(resolved));
   return resolved;
 }
 

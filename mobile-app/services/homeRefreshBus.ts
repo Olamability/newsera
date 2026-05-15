@@ -19,12 +19,12 @@ export function subscribeToHomeRefresh(listener: HomeRefreshListener): () => voi
 }
 
 export function emitHomeRefresh(origin: HomeRefreshOrigin): HomeRefreshEvent {
+  requestId += 1;
   const event: HomeRefreshEvent = {
-    requestId: requestId + 1,
+    requestId,
     origin,
     triggeredAt: Date.now(),
   };
-  requestId = event.requestId;
   listeners.forEach((listener) => listener(event));
   return event;
 }

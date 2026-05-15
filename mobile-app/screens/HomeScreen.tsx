@@ -170,8 +170,9 @@ export default function HomeScreen() {
       if (isTabPress) {
         try {
           await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch {
+        } catch (error) {
           // Haptics can fail silently on unsupported devices.
+          if (__DEV__) console.debug('[HomeScreen] Haptics unavailable:', error);
         }
       }
 
@@ -192,20 +193,20 @@ export default function HomeScreen() {
       ];
 
       if (selectedCategory !== CATEGORY_ALL) {
-        prefetchTasks.push(fetchArticles(1, null).catch((err) => {
-          console.warn('[HomeScreen] Latest feed prefetch failed:', err);
+        prefetchTasks.push(fetchArticles(1, null).catch((error) => {
+          console.warn('[HomeScreen] Latest feed prefetch failed:', error);
           return null;
         }));
       }
       if (selectedCategory !== CATEGORY_TRENDING) {
-        prefetchTasks.push(fetchTrendingArticles(1).catch((err) => {
-          console.warn('[HomeScreen] Trending prefetch failed:', err);
+        prefetchTasks.push(fetchTrendingArticles(1).catch((error) => {
+          console.warn('[HomeScreen] Trending prefetch failed:', error);
           return null;
         }));
       }
       if (selectedCategory !== CATEGORY_FOR_YOU) {
-        prefetchTasks.push(fetchPersonalizedArticles(1).catch((err) => {
-          console.warn('[HomeScreen] Personalized prefetch failed:', err);
+        prefetchTasks.push(fetchPersonalizedArticles(1).catch((error) => {
+          console.warn('[HomeScreen] Personalized prefetch failed:', error);
           return null;
         }));
       }

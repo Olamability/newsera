@@ -11,14 +11,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NewsArticle } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SMALL_SCREEN_THRESHOLD = 360;
+const MIN_CARD_HEIGHT = 196;
+const MAX_CARD_HEIGHT = 232;
+const CARD_HEIGHT_RATIO = 0.56;
 
 export const CARD_WIDTH = SCREEN_WIDTH - 48;
-export const CARD_HEIGHT = Math.max(196, Math.min(232, Math.round(SCREEN_WIDTH * 0.56)));
+export const CARD_HEIGHT = Math.max(MIN_CARD_HEIGHT, Math.min(MAX_CARD_HEIGHT, Math.round(SCREEN_WIDTH * CARD_HEIGHT_RATIO)));
 export const CARD_SPACING = 12;
 export const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
-const TITLE_LINES = SCREEN_WIDTH < 360 ? 2 : 3;
-const TITLE_FONT_SIZE = SCREEN_WIDTH < 360 ? 14 : 16;
+const TITLE_LINES = SCREEN_WIDTH < SMALL_SCREEN_THRESHOLD ? 2 : 3;
+const TITLE_FONT_SIZE = SCREEN_WIDTH < SMALL_SCREEN_THRESHOLD ? 14 : 16;
 
 interface Props {
   article: NewsArticle;

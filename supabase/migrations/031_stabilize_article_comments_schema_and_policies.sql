@@ -93,7 +93,6 @@ BEGIN
     JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
     WHERE t.relname = 'article_comments'
       AND a.attname = 'parent_id'
-      AND c.relname = 'articles_engagement_feed'
     UNION ALL
     SELECT
       'index' AS dependency_type,

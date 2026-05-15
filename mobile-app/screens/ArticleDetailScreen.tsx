@@ -17,7 +17,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  UIManager,
   View,
   type KeyboardEvent,
 } from 'react-native';
@@ -286,12 +285,6 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       hideSubscription.remove();
     };
   }, [commentsSheetVisible, insets.bottom]);
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-  }, []);
 
   // Save to recently viewed and check for breaking news on screen mount
   useEffect(() => {

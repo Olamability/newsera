@@ -57,7 +57,7 @@ module.exports = {
       infoPlist: {
         // Push notifications usage description (required for App Store)
         NSUserNotificationsUsageDescription:
-          'NewsEra sends breaking news alerts and personalised notifications.',
+          'NewsEra sends breaking news alerts and personalized notifications.',
         // Background fetch so push delivery works when the app is backgrounded
         UIBackgroundModes: ['fetch', 'remote-notification'],
       },

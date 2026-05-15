@@ -49,11 +49,11 @@ Version is defined in two places:
 | `version` (semver) | `mobile-app/app.config.js` | User-facing string, e.g. `"1.2.0"` |
 | `versionCode` | `mobile-app/app.config.js` | Android integer, must increase every upload |
 
-**For a patch release (bug fix):** bump `version` minor segment and increment `versionCode` by 1.
+**For a patch release (bug fix):** bump `version` patch segment (e.g. `1.0.0` → `1.0.1`) and increment `versionCode` by 1 for local/manual builds.
 
-**For a minor release (new feature):** bump `version` minor segment, reset patch to `0`, increment `versionCode`.
+**For a minor release (new feature):** bump `version` minor segment (e.g. `1.0.0` → `1.1.0`), reset patch to `0`, and increment `versionCode` for local/manual builds.
 
-**For EAS production builds**, enable `"autoIncrement": true` in `eas.json` (already set) — EAS will automatically increment `versionCode` so manual tracking is only needed for local/manual builds.
+**For EAS production builds**, enable `"autoIncrement": true` in `eas.json` (already set) — EAS will automatically increment `versionCode` so you only need to manage it manually for local builds not going through EAS.
 
 ### Admin Panel & RSS Engine
 
@@ -139,9 +139,11 @@ Fix any type errors before building.
 Edit `mobile-app/app.config.js`:
 
 ```js
-version: '1.x.y',            // bump as needed
-versionCode: ANDROID_VERSION_CODE + 1,   // always increase
+version: '1.x.y',            // bump as needed (semver string)
+versionCode: 2,               // increment by 1 for local/manual builds only
 ```
+
+> **EAS builds:** When submitting via `eas build --profile production`, the `autoIncrement: true` setting in `eas.json` handles `versionCode` automatically. You do not need to edit this value for EAS builds.
 
 Commit the change: `git commit -am "chore: bump mobile version to 1.x.y"`
 

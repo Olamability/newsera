@@ -3,9 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "start": "npm --prefix ../../rss-engine run start",
-    "worker": "npm --prefix ../../rss-engine run worker",
-    "lint": "npm --prefix ../../rss-engine run lint",
-    "typecheck": "npm --prefix ../../rss-engine run typecheck"
+    "start": "corepack pnpm --dir ../../rss-engine run start",
+    "worker": "corepack pnpm --dir ../../rss-engine run worker",
+    "lint": "corepack pnpm --dir ../../rss-engine run lint",
+    "typecheck": "corepack pnpm --dir ../../rss-engine run typecheck"
   }
 }

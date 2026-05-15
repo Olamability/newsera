@@ -79,6 +79,31 @@ BEGIN
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'article_comments'
+      AND column_name = 'parent_id'
+      AND data_type <> 'uuid'
+  ) THEN
+    ALTER TABLE article_comments ADD COLUMN IF NOT EXISTS parent_id_uuid uuid;
+
+    UPDATE article_comments
+    SET parent_id_uuid = CASE
+      WHEN parent_id IS NULL THEN NULL
+      WHEN parent_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        THEN parent_id::text::uuid
+      ELSE NULL
+    END;
+
+    ALTER TABLE article_comments DROP COLUMN parent_id;
+    ALTER TABLE article_comments RENAME COLUMN parent_id_uuid TO parent_id;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'article_comments'
       AND column_name = 'created_at'
       AND data_type <> 'timestamp with time zone'
   ) THEN

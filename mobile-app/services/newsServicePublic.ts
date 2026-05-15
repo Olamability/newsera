@@ -214,6 +214,19 @@ export function invalidateHeadlinesPublicCache(): void {
   }
 }
 
+export function invalidatePublicFeedCaches(prefixes: string[] = ['articles', 'headlines', 'trending', 'personalized']): void {
+  if (prefixes.length === 0) return;
+  const targets = new Set(prefixes.map((prefix) => `${prefix}|`));
+  for (const key of feedCache.keys()) {
+    for (const target of targets) {
+      if (key.startsWith(target)) {
+        feedCache.delete(key);
+        break;
+      }
+    }
+  }
+}
+
 export async function fetchTrendingArticlesPublic(
   page: number = 1,
   limit: number = TRENDING_LIMIT

@@ -7,15 +7,29 @@ import {
   Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NewsArticle } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SMALL_SCREEN_THRESHOLD = 360;
+const MIN_CARD_HEIGHT = 196;
+const MAX_CARD_HEIGHT = 232;
+const CARD_HEIGHT_RATIO = 0.56;
+const PREMIUM_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)'] as const;
+const PREMIUM_GRADIENT_LOCATIONS = [0.1, 0.58, 1] as const;
+const TEXT_REGION_GRADIENT_COLORS = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.42)'] as const;
+const TEXT_REGION_GRADIENT_LOCATIONS = [0.35, 1] as const;
 
 export const CARD_WIDTH = SCREEN_WIDTH - 48;
-export const CARD_HEIGHT = 210;
+const calculateCardHeight = (screenWidth: number): number =>
+  Math.max(MIN_CARD_HEIGHT, Math.min(MAX_CARD_HEIGHT, Math.round(screenWidth * CARD_HEIGHT_RATIO)));
+
+export const CARD_HEIGHT = calculateCardHeight(SCREEN_WIDTH);
 export const CARD_SPACING = 12;
 export const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
+const TITLE_LINES = SCREEN_WIDTH < SMALL_SCREEN_THRESHOLD ? 2 : 3;
+const TITLE_FONT_SIZE = SCREEN_WIDTH < SMALL_SCREEN_THRESHOLD ? 14 : 16;
 
 interface Props {
   article: NewsArticle;
@@ -44,11 +58,19 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
 
   const cardContent = (
     <View style={styles.card}>
-      {/* Bottom gradient overlay */}
-      <View style={styles.gradientOverlayTop} />
-      <View style={styles.gradientOverlayBottom} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={PREMIUM_GRADIENT_COLORS}
+        locations={PREMIUM_GRADIENT_LOCATIONS}
+        style={styles.gradientOverlay}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={TEXT_REGION_GRADIENT_COLORS}
+        locations={TEXT_REGION_GRADIENT_LOCATIONS}
+        style={styles.textRegionBlend}
+      />
 
-      {/* Content at the bottom */}
       <View style={styles.content}>
         <View style={styles.metaRow}>
           <Text style={styles.sourceName} numberOfLines={1}>
@@ -58,7 +80,7 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
             <Text style={styles.timestamp}>{timestamp}</Text>
           ) : null}
         </View>
-        <Text style={styles.title} numberOfLines={3} ellipsizeMode="tail">
+        <Text style={styles.title} numberOfLines={TITLE_LINES} ellipsizeMode="tail">
           {article.title}
         </Text>
       </View>
@@ -79,7 +101,7 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
             contentFit="cover"
             cachePolicy="memory-disk"
             placeholder={{ blurhash: FEED_IMAGE_BLURHASH }}
-            transition={220}
+            transition={260}
           />
           {cardContent}
         </View>
@@ -134,54 +156,59 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },
-  gradientOverlayTop: {
+  gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.03)',
   },
-  gradientOverlayBottom: {
+  textRegionBlend: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: CARD_HEIGHT * 0.45,
+    height: CARD_HEIGHT * 0.52,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   content: {
-    padding: 14,
+    paddingHorizontal: 15,
+    paddingTop: 12,
     paddingBottom: 16,
+    minHeight: Math.max(86, Math.round(CARD_HEIGHT * 0.42)),
+    justifyContent: 'flex-end',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   sourceName: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: '#e63946',
+    color: '#ffd7db',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     flex: 1,
     marginRight: 8,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   timestamp: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
-    fontWeight: '400',
-    textShadowColor: 'rgba(0,0,0,0.22)',
+    color: 'rgba(255,255,255,0.82)',
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: TITLE_FONT_SIZE,
+    fontWeight: '800',
     color: '#ffffff',
-    lineHeight: 21,
-    textShadowColor: 'rgba(0,0,0,0.32)',
+    lineHeight: TITLE_FONT_SIZE * 1.35,
+    letterSpacing: -0.2,
+    textShadowColor: 'rgba(0,0,0,0.38)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },

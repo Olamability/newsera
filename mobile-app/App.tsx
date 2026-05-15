@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
+import { Animated, Easing } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
@@ -32,33 +33,67 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { registerForPushNotificationsAsync } from './services/notificationService';
+import { emitHomeRefresh } from './services/homeRefreshBus';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ACTIVE_COLOR = '#e63946';
 const INACTIVE_COLOR = '#9e9e9e';
+const HOME_REFRESH_ROTATION_ANGLE = '180deg';
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const c = theme.colors;
   const tabBarPaddingBottom = Math.max(insets.bottom, 10);
   const tabBarHeight = 56 + tabBarPaddingBottom;
+  const homeRefreshSpin = useRef(new Animated.Value(0)).current;
+
+  const spinStyle = useMemo(() => ({
+    transform: [
+      {
+        rotate: homeRefreshSpin.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', HOME_REFRESH_ROTATION_ANGLE],
+        }),
+      },
+    ],
+  }), [homeRefreshSpin]);
+
+  const animateHomeRefreshIcon = useCallback(() => {
+    homeRefreshSpin.stopAnimation();
+    homeRefreshSpin.setValue(0);
+    Animated.timing(homeRefreshSpin, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      homeRefreshSpin.setValue(0);
+    });
+  }, [homeRefreshSpin]);
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, size, focused }) => {
           let iconName: React.ComponentProps<typeof Ionicons>['name'];
           if (route.name === 'Home') {
-            iconName = 'home';
+            iconName = focused ? 'refresh' : 'home';
           } else if (route.name === 'Search') {
             iconName = 'search';
           } else if (route.name === 'Notifications') {
             iconName = 'notifications';
           } else {
             iconName = 'person';
+          }
+          if (route.name === 'Home') {
+            return (
+              <Animated.View style={focused ? spinStyle : undefined}>
+                <Ionicons name={iconName} size={size} color={color} />
+              </Animated.View>
+            );
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -85,6 +120,14 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            if (!navigation.isFocused()) return;
+            event.preventDefault();
+            animateHomeRefreshIcon();
+            emitHomeRefresh('active-tab-press');
+          },
+        })}
         options={{ headerShown: false, tabBarLabel: 'Home' }}
       />
       <Tab.Screen
@@ -251,4 +294,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-

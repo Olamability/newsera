@@ -188,10 +188,14 @@ const matchesOptimisticComment = (existing: ArticleComment, incoming: ArticleCom
   && existing.created_at === incoming.created_at
 );
 
+const removeMatchingOptimisticComment = (item: ArticleComment, incoming: ArticleComment): boolean => (
+  item.id === incoming.id || !matchesOptimisticComment(item, incoming)
+);
+
 const upsertComment = (items: ArticleComment[], incoming: ArticleComment): ArticleComment[] => {
   const deduped = isOptimisticComment(incoming.id)
     ? items
-    : items.filter((item) => item.id === incoming.id || !matchesOptimisticComment(item, incoming));
+    : items.filter((item) => removeMatchingOptimisticComment(item, incoming));
   const index = deduped.findIndex((item) => item.id === incoming.id);
   if (index === -1) return sortCommentsAscending([...deduped, incoming]);
   const next = [...deduped];
@@ -265,7 +269,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
       const keyboardHeight = Math.max(0, event.endCoordinates.height);
       // iOS keyboard frames include the safe-area inset; Android already reports usable overlap.
-      const keyboardOffset = keyboardHeight - (Platform.OS === 'ios' ? insets.bottom : 0);
+      const keyboardOffset = keyboardHeight - (Platform.OS === 'ios' ? (insets.bottom ?? 0) : 0);
       setCommentsKeyboardInset(Math.max(0, keyboardOffset));
     };
 

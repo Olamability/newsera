@@ -6,6 +6,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ArticleCard from '../components/ArticleCard';
@@ -22,9 +23,15 @@ const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 const MIN_REALTIME_REFRESH_LIMIT = 20;
 const REALTIME_REFRESH_DEBOUNCE_MS = 350;
 const REALTIME_PATCH_BATCH_SIZE = 5;
+const FEED_BOTTOM_SPACING = 16;
+const INITIAL_ITEMS_TO_RENDER = 8;
+const MAX_ITEMS_PER_BATCH = 8;
+const FEED_WINDOW_SIZE = 9;
+const BATCHING_PERIOD_MS = 60;
 
 const TrendingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -156,7 +163,7 @@ const TrendingScreen: React.FC = () => {
     };
   }, []);
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     fetchGenerationRef.current += 1;
     isFetchingRef.current = false;
     setRefreshing(true);
@@ -164,7 +171,7 @@ const TrendingScreen: React.FC = () => {
     setHasMore(true);
     await loadArticles(1, false);
     setRefreshing(false);
-  };
+  }, [loadArticles]);
 
   const onEndReached = useCallback(async () => {
     if (loading || loadingMore || !hasMore || isFetchingRef.current) return;
@@ -192,23 +199,27 @@ const TrendingScreen: React.FC = () => {
     [openArticle]
   );
 
-  const renderFooter = () => {
+  const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
     return (
       <View style={styles.footer}>
         <ActivityIndicator size="small" color="#888" />
       </View>
     );
-  };
+  }, [loadingMore]);
+  const keyExtractor = useCallback((item: NewsArticle) => item.id, []);
+  const skeletonKeyExtractor = useCallback((item: number) => `skeleton-${item}`, []);
+  const renderSkeletonItem = useCallback(() => <SkeletonCard />, []);
+  const listPaddingBottom = FEED_BOTTOM_SPACING + insets.bottom;
 
   if (loading) {
     return (
       <View style={styles.container}>
         <FlatList
           data={SKELETON_DATA}
-          keyExtractor={(item) => `skeleton-${item}`}
-          renderItem={() => <SkeletonCard />}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          keyExtractor={skeletonKeyExtractor}
+          renderItem={renderSkeletonItem}
+          contentContainerStyle={{ paddingBottom: listPaddingBottom }}
           scrollEnabled={false}
         />
       </View>
@@ -219,7 +230,7 @@ const TrendingScreen: React.FC = () => {
     <View style={styles.container}>
       <FlatList
         data={articles}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -227,12 +238,12 @@ const TrendingScreen: React.FC = () => {
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: listPaddingBottom }}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={7}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={INITIAL_ITEMS_TO_RENDER}
+        maxToRenderPerBatch={MAX_ITEMS_PER_BATCH}
+        windowSize={FEED_WINDOW_SIZE}
+        updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
         removeClippedSubviews
       />
     </View>

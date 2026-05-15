@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ArticleCard from '../components/ArticleCard';
 import SkeletonCard from '../components/SkeletonCard';
 import CategoryFilter from '../components/CategoryFilter';
@@ -38,10 +38,16 @@ import { subscribeToHomeRefresh } from '../services/homeRefreshBus';
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
 const TAB_REFRESH_DEBOUNCE_MS = 1000;
+const FEED_BOTTOM_SPACING = 16;
+const INITIAL_ITEMS_TO_RENDER = 8;
+const MAX_ITEMS_PER_BATCH = 8;
+const FEED_WINDOW_SIZE = 9;
+const BATCHING_PERIOD_MS = 60;
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -300,14 +306,25 @@ export default function HomeScreen() {
     />
   ), [openArticle, handleSwipeLeft, handleSwipeRight]);
 
-  const renderFooter = () => {
+  const keyExtractor = useCallback((item: NewsArticle) => item.id, []);
+  const skeletonKeyExtractor = useCallback((item: number) => `skeleton-${item}`, []);
+  const renderSkeletonItem = useCallback(() => <SkeletonCard />, []);
+  const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
     return (
       <View style={styles.footer}>
         <ActivityIndicator size="small" color="#888" />
       </View>
     );
-  };
+  }, [loadingMore]);
+  const listPaddingBottom = useMemo(
+    () => FEED_BOTTOM_SPACING + insets.bottom,
+    [insets.bottom],
+  );
+  const listHeader = useMemo(
+    () => (searchQuery.trim() ? null : <HeadlinesSection refreshSignal={headlineRefreshSignal} />),
+    [searchQuery, headlineRefreshSignal],
+  );
 
   if (loading) {
     return (
@@ -320,9 +337,9 @@ export default function HomeScreen() {
         />
         <FlatList
           data={SKELETON_DATA}
-          keyExtractor={(item) => `skeleton-${item}`}
-          renderItem={() => <SkeletonCard />}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          keyExtractor={skeletonKeyExtractor}
+          renderItem={renderSkeletonItem}
+          contentContainerStyle={{ paddingBottom: listPaddingBottom }}
           keyboardShouldPersistTaps="handled"
           scrollEnabled={false}
         />
@@ -369,21 +386,21 @@ export default function HomeScreen() {
       <FlatList
         ref={flatListRef}
         data={displayedArticles}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListHeaderComponent={searchQuery.trim() ? null : <HeadlinesSection refreshSignal={headlineRefreshSignal} />}
+        ListHeaderComponent={listHeader}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: listPaddingBottom }}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={7}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={INITIAL_ITEMS_TO_RENDER}
+        maxToRenderPerBatch={MAX_ITEMS_PER_BATCH}
+        windowSize={FEED_WINDOW_SIZE}
+        updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
         removeClippedSubviews
       />
     </SafeAreaView>

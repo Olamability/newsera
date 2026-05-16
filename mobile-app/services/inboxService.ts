@@ -11,18 +11,19 @@ export async function fetchInboxMessages(
   const { data, error } = await supabaseAuth
     .from('inbox_messages')
     .select('*')
-    .eq('user_id', userId)
+    .or(`user_id.eq.${userId},user_id.is.null`)
     .order('created_at', { ascending: false })
     .range(from, to);
   if (error) throw error;
   return (data ?? []) as InboxMessage[];
 }
 
-export async function markMessageRead(messageId: string): Promise<void> {
+export async function markMessageRead(messageId: string, userId: string): Promise<void> {
   const { error } = await supabaseAuth
     .from('inbox_messages')
     .update({ read: true })
-    .eq('id', messageId);
+    .eq('id', messageId)
+    .eq('user_id', userId);
   if (error) throw error;
 }
 
@@ -39,7 +40,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
   const { count, error } = await supabaseAuth
     .from('inbox_messages')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .or(`user_id.eq.${userId},user_id.is.null`)
     .eq('read', false);
   if (error) return 0;
   return count ?? 0;

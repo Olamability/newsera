@@ -85,11 +85,12 @@ const InboxScreen: React.FC = () => {
 
   const handlePress = useCallback(
     async (msg: InboxMessage) => {
+      if (!user) return;
       if (!msg.read) {
         setMessages((prev) =>
           prev.map((m) => (m.id === msg.id ? { ...m, read: true } : m))
         );
-        await markMessageRead(msg.id).catch(() => {});
+        await markMessageRead(msg.id, user.id).catch(() => {});
       }
       if (msg.article_id && msg.article) {
         navigation.navigate('ArticleDetail', {
@@ -99,7 +100,7 @@ const InboxScreen: React.FC = () => {
         Alert.alert(msg.title, msg.body);
       }
     },
-    [navigation]
+    [navigation, user]
   );
 
   const handleDelete = useCallback(

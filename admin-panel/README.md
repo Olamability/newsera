@@ -74,20 +74,21 @@ npm run build
 
 ```
 admin-panel/
-├── components/
-│   ├── Layout.jsx          # Sidebar + main wrapper
-│   └── ProtectedRoute.jsx  # Redirects non-admin users
-├── pages/
-│   ├── Login.jsx
-│   ├── Dashboard.jsx
-│   ├── Sources.jsx
-│   ├── PublisherApplication.jsx
-│   └── Categories.jsx
-├── services/
-│   └── supabase.js         # Supabase client singleton
 └── src/
-    ├── context/
-    │   └── AuthContext.jsx  # Auth state + admin check
+    ├── auth/
+    │   └── AuthContext.jsx   # Auth state + admin check
+    ├── components/
+    │   ├── Layout.jsx        # Sidebar + main wrapper
+    │   └── ProtectedRoute.jsx # Redirects non-admin users
+    ├── lib/
+    │   └── supabaseClient.ts # Sole Supabase client singleton
+    ├── pages/
+    │   ├── Login.jsx
+    │   ├── Dashboard.jsx
+    │   ├── Sources.jsx
+    │   ├── PublisherApplication.jsx
+    │   ├── Categories.jsx
+    │   └── Analytics.jsx
     ├── App.jsx              # Route definitions
     ├── main.jsx             # React entry point
     └── index.css            # Tailwind directives

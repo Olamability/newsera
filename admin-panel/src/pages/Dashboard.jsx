@@ -16,27 +16,27 @@ function StatCard({ label, value, color }) {
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: null, pending: null, active: null })
+  const [stats, setStats] = useState({ articles: null, categories: null, feedbackOpen: null })
   const [error, setError] = useState('')
 
   useEffect(() => {
     async function fetchStats() {
-      const [totalRes, pendingRes, activeRes] = await Promise.all([
-        supabase.from('sources').select('id', { count: 'exact', head: true }),
-        supabase.from('sources').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('sources').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      const [articlesRes, categoriesRes, feedbackRes] = await Promise.all([
+        supabase.from('articles').select('id', { count: 'exact', head: true }),
+        supabase.from('categories').select('id', { count: 'exact', head: true }),
+        supabase.from('feedback').select('id', { count: 'exact', head: true }).eq('status', 'open'),
       ])
 
-      const err = totalRes.error || pendingRes.error || activeRes.error
+      const err = articlesRes.error || categoriesRes.error || feedbackRes.error
       if (err) {
         setError(err.message)
         return
       }
 
       setStats({
-        total: totalRes.count,
-        pending: pendingRes.count,
-        active: activeRes.count,
+        articles: articlesRes.count,
+        categories: categoriesRes.count,
+        feedbackOpen: feedbackRes.count,
       })
     }
     fetchStats()
@@ -53,9 +53,9 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <StatCard label="Total Sources" value={stats.total} color="blue" />
-        <StatCard label="Pending Sources" value={stats.pending} color="yellow" />
-        <StatCard label="Active Sources" value={stats.active} color="green" />
+        <StatCard label="Total Articles" value={stats.articles} color="blue" />
+        <StatCard label="Total Categories" value={stats.categories} color="yellow" />
+        <StatCard label="Open Feedback" value={stats.feedbackOpen} color="green" />
       </div>
     </div>
   )

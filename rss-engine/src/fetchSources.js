@@ -5,16 +5,8 @@ const supabase = require('../config/supabase');
  * @returns {Promise<Array>} Array of source objects.
  */
 async function fetchSources() {
-  const { data, error } = await supabase
-    .from('sources')
-    .select('id, name, rss_url, category_id')
-    .eq('status', 'active');
-
-  if (error) {
-    throw new Error(`Failed to fetch sources: ${error.message}`);
-  }
-
-  return data || [];
+  console.warn('[RSS] Source ingestion is deprecated: sources table not present in schema snapshot.');
+  return [];
 }
 
 module.exports = { fetchSources };

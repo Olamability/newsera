@@ -68,10 +68,9 @@ export async function fetchSupabaseReadLater(userId: string): Promise<NewsArticl
     .select(
       `article_id,
        articles (
-         id, title, snippet, image_url, published_at, url, source_id, category_id,
-         sources ( id, name, website_url, logo_url ),
-         categories ( id, name, slug )
-       )`
+          id, title, snippet, image_url, published_at, url, source_id, category_id,
+          categories ( id, name, slug )
+        )`
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });

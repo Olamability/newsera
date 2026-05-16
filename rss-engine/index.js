@@ -2,7 +2,6 @@ require('dotenv').config();
 
 const pLimit = require('p-limit');
 
-const supabase = require('./config/supabase');
 const { fetchSources } = require('./src/fetchSources');
 const { fetchRSS } = require('./src/fetchRSS');
 const { deduplicateArticles } = require('./src/deduplicateArticles');
@@ -19,26 +18,9 @@ function buildDurationMs(startedAt, finishedAt) {
 }
 
 async function writeIngestionLog(source, metrics) {
-  const payload = {
-    feed_url: source.rss_url || source.website_url || '',
-    started_at: metrics.startedAt,
-    finished_at: metrics.finishedAt,
-    articles_found: metrics.fetched,
-    articles_saved: metrics.inserted,
-    articles_skipped: metrics.duplicates,
-    error: metrics.error,
-    status: buildStatus(metrics.success),
-  };
-
-  try {
-    const { error } = await supabase.from('rss_ingestion_log').insert([payload]);
-    if (error) {
-      console.warn(`[RSS] Ingestion log write failed: ${source.name} (${error.message})`);
-    }
-  } catch {
-    // Logging must never stop ingestion.
-    console.warn(`[RSS] Ingestion log write failed: ${source.name}`);
-  }
+  console.log(
+    `[RSS] ${source.name}: status=${buildStatus(metrics.success)} fetched=${metrics.fetched} inserted=${metrics.inserted} duplicates=${metrics.duplicates}`,
+  );
 }
 
 async function processSource(source) {
@@ -102,20 +84,6 @@ async function processSource(source) {
   }
 }
 
-async function refreshTrendingFeed() {
-  try {
-    const { error } = await supabase.rpc('refresh_trending_feed');
-    if (error) {
-      console.error(`[RSS] Trending refresh failed: ${error.message}`);
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error(`[RSS] Trending refresh failed: ${error?.message ?? String(error)}`);
-    return false;
-  }
-}
-
 async function runIngestion() {
   const sources = await fetchSources();
   const limit = pLimit(SOURCE_CONCURRENCY);
@@ -134,10 +102,6 @@ async function runIngestion() {
     } else {
       totalFailed += 1;
     }
-  }
-
-  if (totalInserted > 0) {
-    await refreshTrendingFeed();
   }
 
   console.log(

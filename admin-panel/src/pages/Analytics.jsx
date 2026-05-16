@@ -27,7 +27,7 @@ function Td({ children }) {
 
 export default function Analytics() {
   const [todayClicks, setTodayClicks] = useState(null)
-  const [topSources, setTopSources] = useState([])
+  const [topCategories, setTopCategories] = useState([])
   const [topArticles, setTopArticles] = useState([])
   const [error, setError] = useState('')
 
@@ -44,31 +44,33 @@ export default function Analytics() {
         if (e1) throw e1
         setTodayClicks(count)
 
-        // B. Top Sources — use pre-aggregated view, then enrich with source names
-        const { data: sourceCounts, error: e2 } = await supabase
-          .from('source_click_counts')
-          .select('source_id, click_count')
-          .order('click_count', { ascending: false })
-          .limit(20)
+        // B. Top Categories by article volume
+        const { data: categoryRows, error: e2 } = await supabase
+          .from('articles')
+          .select('category_id')
         if (e2) throw e2
 
-        const sourceIds = (sourceCounts ?? []).map((r) => r.source_id)
-        if (sourceIds.length > 0) {
-          const { data: sourceRows, error: e3 } = await supabase
-            .from('sources')
-            .select('id, name')
-            .in('id', sourceIds)
-          if (e3) throw e3
-
-          const nameMap = Object.fromEntries((sourceRows ?? []).map((s) => [s.id, s.name]))
-          const enriched = (sourceCounts ?? []).map((r) => ({
-            name: nameMap[r.source_id] ?? 'Unknown',
-            clicks: r.click_count,
+        const grouped = (categoryRows ?? []).reduce((acc, row) => {
+          const key = row.category_id ?? 'uncategorized'
+          acc[key] = (acc[key] ?? 0) + 1
+          return acc
+        }, {})
+        const categoryIds = Object.keys(grouped).filter((id) => id !== 'uncategorized')
+        const { data: categories, error: e3 } = categoryIds.length > 0
+          ? await supabase.from('categories').select('id, name').in('id', categoryIds)
+          : { data: [], error: null }
+        if (e3) throw e3
+        const categoryNameById = Object.fromEntries((categories ?? []).map((c) => [c.id, c.name]))
+        const rankedCategories = Object.entries(grouped)
+          .map(([id, count]) => ({
+            name: id === 'uncategorized' ? 'Uncategorized' : (categoryNameById[id] ?? 'Unknown category'),
+            count,
           }))
-          setTopSources(enriched)
-        }
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20)
+        setTopCategories(rankedCategories)
 
-        // C. Top Articles — use pre-aggregated all-time view, then enrich with article + source data
+        // C. Top Articles — use pre-aggregated all-time click view then enrich with article titles
         const { data: articleCounts, error: e4 } = await supabase
           .from('article_click_counts_alltime')
           .select('article_id, click_count')
@@ -80,7 +82,7 @@ export default function Analytics() {
         if (articleIds.length > 0) {
           const { data: articleRows, error: e5 } = await supabase
             .from('articles')
-            .select('id, title, sources ( name )')
+            .select('id, title')
             .in('id', articleIds)
           if (e5) throw e5
 
@@ -90,7 +92,6 @@ export default function Analytics() {
           const enrichedArticles = (articleRows ?? [])
             .map((a) => ({
               title: a.title,
-              source: a.sources?.name ?? 'Unknown',
               clicks: countMap[a.id] ?? 0,
             }))
             .sort((a, b) => b.clicks - a.clicks)
@@ -122,25 +123,25 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Top Sources */}
-      <SectionTitle>Top Sources (by clicks)</SectionTitle>
-      {topSources.length === 0 ? (
-        <p className="text-sm text-gray-400 mb-8">No click data yet.</p>
+      {/* Top Categories */}
+      <SectionTitle>Top Categories (by article volume)</SectionTitle>
+      {topCategories.length === 0 ? (
+        <p className="text-sm text-gray-400 mb-8">No category data yet.</p>
       ) : (
         <TableWrapper>
           <thead>
             <tr>
               <Th>#</Th>
-              <Th>Source Name</Th>
-              <Th>Total Clicks</Th>
+              <Th>Category</Th>
+              <Th>Article Count</Th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {topSources.map((row, i) => (
+            {topCategories.map((row, i) => (
               <tr key={row.name} className="hover:bg-gray-50 transition-colors">
                 <Td>{i + 1}</Td>
                 <Td>{row.name}</Td>
-                <Td>{row.clicks.toLocaleString()}</Td>
+                <Td>{row.count.toLocaleString()}</Td>
               </tr>
             ))}
           </tbody>
@@ -157,7 +158,6 @@ export default function Analytics() {
             <tr>
               <Th>#</Th>
               <Th>Article Title</Th>
-              <Th>Source</Th>
               <Th>Clicks</Th>
             </tr>
           </thead>
@@ -170,7 +170,6 @@ export default function Analytics() {
                     {row.title}
                   </span>
                 </Td>
-                <Td>{row.source}</Td>
                 <Td>{row.clicks.toLocaleString()}</Td>
               </tr>
             ))}

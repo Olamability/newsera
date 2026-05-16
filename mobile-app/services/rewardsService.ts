@@ -22,20 +22,71 @@ function localDateString(d: Date): string {
 
 export async function getUserRewards(userId: string): Promise<UserRewards | null> {
   const { data, error } = await supabaseAuth
-    .from('user_rewards')
-    .select('*')
+    .from('reward_events')
+    .select('id, user_id, event_type, points, description')
     .eq('user_id', userId)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data as UserRewards | null;
+    .order('id', { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+
+  const events = (data ?? []) as RewardEvent[];
+  if (events.length === 0) return null;
+
+  const rewardDays = events
+    .filter((event) => event.description?.startsWith('reward-date:'))
+    .map((event) => event.description?.replace('reward-date:', '') ?? '')
+    .filter(Boolean)
+    .sort();
+  const uniqueRewardDays = Array.from(new Set(rewardDays));
+
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let running = 0;
+  let previousDay: string | null = null;
+  for (const day of uniqueRewardDays) {
+    if (!previousDay) {
+      running = 1;
+    } else {
+      const prev = new Date(previousDay);
+      const cur = new Date(day);
+      const diff = Math.round((cur.getTime() - prev.getTime()) / MS_PER_DAY);
+      running = diff === 1 ? running + 1 : 1;
+    }
+    previousDay = day;
+    longestStreak = Math.max(longestStreak, running);
+  }
+
+  const today = localDateString(new Date());
+  const latestDay = uniqueRewardDays[uniqueRewardDays.length - 1] ?? null;
+  if (latestDay === today) {
+    currentStreak = running;
+  } else if (latestDay) {
+    const latest = new Date(latestDay);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    currentStreak = latest.toDateString() === yesterday.toDateString() ? running : 0;
+  }
+
+  const totalPoints = events.reduce((sum, event) => sum + Number(event.points ?? 0), 0);
+  const articlesRead = events.filter((event) => event.event_type === 'read').length;
+
+  return {
+    id: `derived-${userId}`,
+    user_id: userId,
+    total_points: totalPoints,
+    current_streak: currentStreak,
+    longest_streak: longestStreak,
+    last_active_date: latestDay,
+    articles_read: articlesRead,
+  };
 }
 
 export async function getRewardEvents(userId: string, limit = 20): Promise<RewardEvent[]> {
   const { data, error } = await supabaseAuth
     .from('reward_events')
-    .select('*')
+    .select('id, event_type, points, description')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as RewardEvent[];
@@ -50,40 +101,10 @@ export async function recordRewardEvent(
 
   await supabaseAuth
     .from('reward_events')
-    .insert({ user_id: userId, event_type: eventType, points, description });
-
-  const now = new Date();
-  const today = localDateString(now);
-  const existing = await getUserRewards(userId);
-
-  if (!existing) {
-    await supabaseAuth.from('user_rewards').insert({
+    .insert({
       user_id: userId,
-      total_points: points,
-      articles_read: eventType === 'read' ? 1 : 0,
-      current_streak: 1,
-      longest_streak: 1,
-      last_active_date: today,
+      event_type: eventType,
+      points,
+      description: description ?? `reward-date:${localDateString(new Date())}`,
     });
-    return;
-  }
-
-  const lastDate = existing.last_active_date;
-  const yesterday = localDateString(new Date(now.getTime() - MS_PER_DAY));
-  let newStreak = existing.current_streak;
-  if (lastDate !== today) {
-    newStreak = lastDate === yesterday ? newStreak + 1 : 1;
-  }
-
-  await supabaseAuth
-    .from('user_rewards')
-    .update({
-      total_points: existing.total_points + points,
-      articles_read: existing.articles_read + (eventType === 'read' ? 1 : 0),
-      current_streak: newStreak,
-      longest_streak: Math.max(existing.longest_streak, newStreak),
-      last_active_date: today,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId);
 }

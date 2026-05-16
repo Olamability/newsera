@@ -185,10 +185,11 @@ export interface UserRewards {
 
 export interface RewardEvent {
   id: string;
+  user_id?: string;
   event_type: 'read' | 'share' | 'bookmark' | 'streak' | 'milestone';
   points: number;
   description?: string | null;
-  created_at: string;
+  created_at?: string;
 }
 
 // ─── Blocked Users ───────────────────────────────────────────────────────────

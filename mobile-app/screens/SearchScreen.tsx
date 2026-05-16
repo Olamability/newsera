@@ -21,7 +21,7 @@ type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-const ARTICLE_SELECT = '*, sources(name, website_url), categories(name)';
+const ARTICLE_SELECT = '*, categories(name)';
 const POSTGRES_UNDEFINED_COLUMN_ERROR = '42703';
 
 const SearchScreen: React.FC = () => {

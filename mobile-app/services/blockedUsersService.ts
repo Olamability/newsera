@@ -38,7 +38,7 @@ export async function unblockSourceLocally(sourceId: string): Promise<void> {
 export async function fetchBlockedEntries(userId: string): Promise<BlockedEntry[]> {
   const { data, error } = await supabaseAuth
     .from('blocked_users')
-    .select('*, blocked_source:sources(id, name, logo_url)')
+    .select('id, user_id, blocked_user_id, blocked_source_id, reason, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;

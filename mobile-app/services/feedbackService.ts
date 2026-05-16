@@ -15,6 +15,7 @@ export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
     message: payload.message.trim(),
     email: payload.email?.trim() || null,
     user_id: payload.userId ?? null,
+    status: 'open',
   });
   if (error) throw error;
 }

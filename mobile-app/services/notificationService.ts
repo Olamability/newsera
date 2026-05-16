@@ -133,15 +133,12 @@ export async function registerForPushNotificationsAsync(): Promise<void> {
     const pushToken = tokenData.data;
     const deviceId = await getDeviceId();
 
-    const { error: upsertError } = await supabaseAuth.from('user_devices').upsert(
-      { user_id: currentUser.id, device_id: deviceId, push_token: pushToken },
-      { onConflict: 'user_id,device_id' }
-    );
-
-    if (upsertError) {
-      console.warn('[Notifications] Failed to store push token:', upsertError.message);
-    } else if (__DEV__) {
-      console.log('[Notifications] Push token registered:', pushToken);
+    if (__DEV__) {
+      console.log('[Notifications] Push token generated (no user_devices table in schema):', {
+        userId: currentUser.id,
+        deviceId,
+        pushToken,
+      });
     }
   } catch (err) {
     // Non-fatal — notification registration must never crash the app

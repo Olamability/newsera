@@ -20,7 +20,7 @@ function buildDurationMs(startedAt, finishedAt) {
 
 async function writeIngestionLog(source, metrics) {
   const payload = {
-    feed_url: source.rss_url || source.website_url || source.name || 'unknown-source',
+    feed_url: source.rss_url || source.website_url || '',
     started_at: metrics.startedAt,
     finished_at: metrics.finishedAt,
     articles_found: metrics.fetched,

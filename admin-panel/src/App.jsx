@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
-import ProtectedRoute from '../components/ProtectedRoute'
-import Layout from '../components/Layout'
-import Login from '../pages/Login'
-import Dashboard from '../pages/Dashboard'
-import Sources from '../pages/Sources'
-import PublisherApplication from '../pages/PublisherApplication'
-import Categories from '../pages/Categories'
-import Analytics from '../pages/Analytics'
+import ProtectedRoute from './components/ProtectedRoute'
+import Layout from './components/Layout'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Sources from './pages/Sources'
+import PublisherApplication from './pages/PublisherApplication'
+import Categories from './pages/Categories'
+import Analytics from './pages/Analytics'
 
 function Unauthorized() {
   return (

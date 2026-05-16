@@ -10,7 +10,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "allowJs": false
+    "allowJs": false,
+    "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*", "pages/**/*", "components/**/*", "services/**/*"]
 }

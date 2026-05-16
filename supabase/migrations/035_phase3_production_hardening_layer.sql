@@ -33,8 +33,11 @@ CREATE TABLE IF NOT EXISTS article_clicks_partitioned_default
 
 DO $$
 DECLARE
-  start_month date := date_trunc('month', now())::date - interval '1 month';
-  end_month date := date_trunc('month', now())::date + interval '2 months';
+  -- Rolling partition window for active traffic:
+  -- previous month + current month + next two months.
+  -- Older historical rows are routed into the DEFAULT partition during backfill.
+  start_month date := (date_trunc('month', now()) - interval '1 month')::date;
+  end_month date := (date_trunc('month', now()) + interval '2 months')::date;
   cursor_month date;
   partition_name text;
 BEGIN
@@ -82,6 +85,8 @@ FOR EACH ROW
 EXECUTE FUNCTION mirror_article_clicks_to_partitioned();
 
 -- One-time backfill into partitioned store.
+-- user_id handling is defensive because historical environments may hold either
+-- uuid-typed user_id (newer schema) or text-typed UUID strings (legacy schema).
 INSERT INTO article_clicks_partitioned (id, article_id, source_id, clicked_at, user_id, device_id)
 SELECT
   c.id,
@@ -245,7 +250,8 @@ LEFT JOIN (
 ) v ON v.article_id = a.id
 WHERE (
   a.status = 'published'
-  AND (a.published_at >= now() - interval '7 days' OR a.published_at IS NULL)
+  AND a.published_at IS NOT NULL
+  AND a.published_at >= now() - interval '7 days'
 )
 WITH DATA;
 

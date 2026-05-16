@@ -15,12 +15,8 @@ import { useTheme } from '../context/ThemeContext';
 import {
   getOfflineArticles,
   removeOfflineArticle,
-  OfflineArticle as OfflineArticleData,
 } from '../services/offlineService';
-import { NewsArticle, RootStackParamList } from '../types';
-
-// Re-export for convenience
-export { OfflineArticleData };
+import { NewsArticle, OfflineArticle as OfflineArticleData, RootStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'OfflineReading'>;
 

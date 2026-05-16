@@ -9,7 +9,6 @@ const { deduplicateArticles } = require('./src/deduplicateArticles');
 const { saveArticles } = require('./src/saveArticles');
 
 const SOURCE_CONCURRENCY = 5;
-let preferredLogPayloadIndex = 0;
 
 function buildStatus(success) {
   return success ? 'success' : 'error';
@@ -20,72 +19,26 @@ function buildDurationMs(startedAt, finishedAt) {
 }
 
 async function writeIngestionLog(source, metrics) {
-  const payloads = [
-    {
-      source_id: source.id,
-      source_name: source.name,
-      articles_fetched: metrics.fetched,
-      articles_inserted: metrics.inserted,
-      duplicates_skipped: metrics.duplicates,
-      failed_count: metrics.failedCount,
-      duration_ms: metrics.durationMs,
-      status: buildStatus(metrics.success),
-      error_message: metrics.error,
-      started_at: metrics.startedAt,
-      finished_at: metrics.finishedAt,
-    },
-    {
-      source_id: source.id,
-      source_name: source.name,
-      status: buildStatus(metrics.success),
-      articles_fetched: metrics.fetched,
-      articles_inserted: metrics.inserted,
-      articles_skipped: metrics.duplicates,
-      error_message: metrics.error,
-      started_at: metrics.startedAt,
-      finished_at: metrics.finishedAt,
-    },
-    {
-      feed_id: source.id,
-      feed_url: source.rss_url || '',
-      started_at: metrics.startedAt,
-      finished_at: metrics.finishedAt,
-      articles_found: metrics.fetched,
-      articles_saved: metrics.inserted,
-      articles_skipped: metrics.duplicates,
-      error: metrics.error,
-      status: buildStatus(metrics.success),
-    },
-    {
-      feed_url: source.rss_url || '',
-      started_at: metrics.startedAt,
-      finished_at: metrics.finishedAt,
-      articles_found: metrics.fetched,
-      articles_saved: metrics.inserted,
-      articles_skipped: metrics.duplicates,
-      error: metrics.error,
-      status: buildStatus(metrics.success),
-    },
-  ];
+  const payload = {
+    feed_url: source.rss_url || source.website_url || source.name || 'unknown-source',
+    started_at: metrics.startedAt,
+    finished_at: metrics.finishedAt,
+    articles_found: metrics.fetched,
+    articles_saved: metrics.inserted,
+    articles_skipped: metrics.duplicates,
+    error: metrics.error,
+    status: buildStatus(metrics.success),
+  };
 
-  const orderedIndexes = [
-    preferredLogPayloadIndex,
-    ...payloads.map((_, index) => index).filter((index) => index !== preferredLogPayloadIndex),
-  ];
-
-  for (const payloadIndex of orderedIndexes) {
-    try {
-      const { error } = await supabase.from('rss_ingestion_log').insert([payloads[payloadIndex]]);
-      if (!error) {
-        preferredLogPayloadIndex = payloadIndex;
-        return;
-      }
-    } catch {
-      // Logging must never stop ingestion.
+  try {
+    const { error } = await supabase.from('rss_ingestion_log').insert([payload]);
+    if (error) {
+      console.warn(`[RSS] Ingestion log write failed: ${source.name} (${error.message})`);
     }
+  } catch {
+    // Logging must never stop ingestion.
+    console.warn(`[RSS] Ingestion log write failed: ${source.name}`);
   }
-
-  console.warn(`[RSS] Ingestion log write failed: ${source.name}`);
 }
 
 async function processSource(source) {

@@ -117,13 +117,25 @@ export async function registerForPushNotificationsAsync(): Promise<void> {
       return;
     }
 
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+    if (userError) {
+      console.warn('[Notifications] Failed to resolve current user:', userError.message);
+      return;
+    }
+
+    const currentUser = userData.user;
+    if (!currentUser) {
+      console.log('[Notifications] No authenticated user — skipping token registration.');
+      return;
+    }
+
     const tokenData = await Notifications.getExpoPushTokenAsync();
     const pushToken = tokenData.data;
     const deviceId = await getDeviceId();
 
     const { error: upsertError } = await supabaseAuth.from('user_devices').upsert(
-      { device_id: deviceId, push_token: pushToken },
-      { onConflict: 'device_id' }
+      { user_id: currentUser.id, device_id: deviceId, push_token: pushToken },
+      { onConflict: 'user_id,device_id' }
     );
 
     if (upsertError) {

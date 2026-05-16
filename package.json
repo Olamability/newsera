@@ -10,5 +10,9 @@
     "rss:worker": "corepack pnpm --filter @newsera/rss-engine worker",
     "lint": "corepack pnpm -r --if-present run lint",
     "typecheck": "corepack pnpm -r --if-present run typecheck"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^17.4.2"
   }
 }

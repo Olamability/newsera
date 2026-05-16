@@ -50,11 +50,12 @@ export default function Analytics() {
           .select('category_id')
         if (e2) throw e2
 
-        const grouped = (categoryRows ?? []).reduce((acc, row) => {
+        const groupedMap = (categoryRows ?? []).reduce((acc, row) => {
           const key = row.category_id ?? 'uncategorized'
-          acc[key] = (acc[key] ?? 0) + 1
+          acc.set(key, (acc.get(key) ?? 0) + 1)
           return acc
-        }, {})
+        }, new Map())
+        const grouped = Object.fromEntries(groupedMap.entries())
         const categoryIds = Object.keys(grouped).filter((id) => id !== 'uncategorized')
         const { data: categories, error: e3 } = categoryIds.length > 0
           ? await supabase.from('categories').select('id, name').in('id', categoryIds)

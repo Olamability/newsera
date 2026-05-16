@@ -7,6 +7,7 @@ const TRENDING_LIMIT = 20;
 const PERSONALIZED_DISPLAY_COUNT = 10;
 const RECOMMENDATION_CANDIDATE_MULTIPLIER = 3;
 const RECOMMENDATION_TRENDING_FETCH_MULTIPLIER = 6;
+const TRENDING_POOL_MULTIPLIER = 3;
 const HEADLINES_LIMIT = 8;
 const SIMILAR_PRIMARY_FETCH_MULTIPLIER = 2;
 const SIMILAR_FALLBACK_FETCH_MULTIPLIER = 3;
@@ -184,8 +185,9 @@ export async function fetchTrendingArticlesPublic(
   const cached = readFeedCache<{ articles: NewsArticle[]; hasMore: boolean }>(cacheKey);
   if (cached) return cached;
 
-  const from = (page - 1) * limit;
-  const to = page * limit - 1;
+  const poolLimit = limit * TRENDING_POOL_MULTIPLIER;
+  const from = (page - 1) * poolLimit;
+  const to = page * poolLimit - 1;
 
   const { data: trendingPool, error: trendingError } = await supabasePublic
     .from('article_click_counts')
@@ -216,10 +218,10 @@ export async function fetchTrendingArticlesPublic(
     throw error;
   }
 
-  const articleById = new Map(((data as ArticleRow[]) ?? []).map((row) => [String(row.id), mapArticle(row)]));
-  const articles = candidateIds.map((id) => articleById.get(id)).filter((value): value is NewsArticle => !!value);
-  const rawCount = candidateIds.length;
-  const hasMore = rawCount >= limit;
+  const articleById = new Map(((data as ArticleRow[]) ?? []).map((row) => [row.id as string, mapArticle(row)]));
+  const orderedArticles = candidateIds.map((id) => articleById.get(id)).filter((value): value is NewsArticle => !!value);
+  const articles = orderedArticles.slice(0, limit);
+  const hasMore = orderedArticles.length > limit || candidateIds.length >= poolLimit;
   return writeFeedCache(cacheKey, { articles, hasMore });
 }
 

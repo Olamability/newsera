@@ -10,6 +10,8 @@ const POINTS: Record<RewardEvent['event_type'], number> = {
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const REWARD_DATE_PREFIX = 'reward-date:';
+const REWARD_DATE_PATTERN = /reward-date:(\d{4}-\d{2}-\d{2})/;
 
 /** Returns local date string YYYY-MM-DD (timezone-aware, uses device local time). */
 function localDateString(d: Date): string {
@@ -32,11 +34,15 @@ export async function getUserRewards(userId: string): Promise<UserRewards | null
   const events = (data ?? []) as RewardEvent[];
   if (events.length === 0) return null;
 
-  const rewardDays = events
-    .filter((event) => event.description?.startsWith('reward-date:'))
-    .map((event) => event.description?.replace('reward-date:', '') ?? '')
-    .filter(Boolean)
-    .sort();
+  const rewardDays = events.reduce((days, event) => {
+    const match = event.description?.match(REWARD_DATE_PATTERN);
+    if (match?.[1]) {
+      days.push(match[1]);
+    } else if (__DEV__ && event.description) {
+      console.warn('[Rewards] Ignoring malformed reward event description:', event.description);
+    }
+    return days;
+  }, [] as string[]).sort();
   const uniqueRewardDays = Array.from(new Set(rewardDays));
 
   let currentStreak = 0;
@@ -62,16 +68,16 @@ export async function getUserRewards(userId: string): Promise<UserRewards | null
     currentStreak = running;
   } else if (latestDay) {
     const latest = new Date(latestDay);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    currentStreak = latest.toDateString() === yesterday.toDateString() ? running : 0;
+    const todayDate = new Date(today);
+    const dayDiff = Math.round((todayDate.getTime() - latest.getTime()) / MS_PER_DAY);
+    currentStreak = dayDiff === 1 ? running : 0;
   }
 
   const totalPoints = events.reduce((sum, event) => sum + Number(event.points ?? 0), 0);
   const articlesRead = events.filter((event) => event.event_type === 'read').length;
 
   return {
-    id: `derived-${userId}`,
+    id: userId,
     user_id: userId,
     total_points: totalPoints,
     current_streak: currentStreak,
@@ -99,12 +105,17 @@ export async function recordRewardEvent(
 ): Promise<void> {
   const points = POINTS[eventType] ?? 0;
 
+  const rewardDateDescription = `${REWARD_DATE_PREFIX}${localDateString(new Date())}`;
+  const normalizedDescription = description?.trim()
+    ? `${description.trim()} | ${rewardDateDescription}`
+    : rewardDateDescription;
+
   await supabaseAuth
     .from('reward_events')
     .insert({
       user_id: userId,
       event_type: eventType,
       points,
-      description: description ?? `reward-date:${localDateString(new Date())}`,
+      description: normalizedDescription,
     });
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../services/supabase'
+import { supabase } from '../lib/supabaseClient'
 import { validateRssUrl } from '../services/urlValidation'
 
 const STATUS_BADGE = {

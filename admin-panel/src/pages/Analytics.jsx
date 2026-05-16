@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../services/supabase'
+import { supabase } from '../lib/supabaseClient'
 
 function SectionTitle({ children }) {
   return <h2 className="text-lg font-semibold text-gray-700 mb-3">{children}</h2>

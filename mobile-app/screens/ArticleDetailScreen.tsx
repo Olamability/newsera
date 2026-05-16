@@ -344,7 +344,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!user) return;
     isBookmarked(article.id, user.id)
       .then(setBookmarked)
-      .catch(() => {});
+      .catch(() => { });
   }, [article.id, user]);
 
   const promptSignInForInteraction = useCallback((action: 'like' | 'comment' | 'reply') => {
@@ -1062,7 +1062,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={styles.articleContent}>{previewText}</Text>
                 ) : null}
 
-                {/* 5. Read on Source Website */}
+                {/* 5. Read Full Article */}
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={styles.button}
@@ -1071,7 +1071,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   >
                     <View style={styles.buttonInner}>
                       <Ionicons name="open-outline" size={17} color="#fff" />
-                      <Text style={styles.buttonText}>Read on Source Website</Text>
+                      <Text style={styles.buttonText}>Read Full Article</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -1118,7 +1118,7 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
                 {/* 6. "Read More Like This" section header */}
                 <View style={styles.similarSection}>
-                  <Text style={styles.similarTitle}>Read More Like This</Text>
+                  <Text style={styles.similarTitle}>Read More</Text>
                 </View>
 
                 {/* Skeleton placeholder while first page loads */}
@@ -1373,10 +1373,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   title: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '800',
     color: '#111',
-    lineHeight: 34,
+    lineHeight: 26,
     letterSpacing: -0.3,
     marginBottom: 14,
   },
@@ -1447,14 +1447,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f1f1',
   },
   articleContent: {
+    textAlign: 'justify',
     fontSize: 17,
     color: '#242424',
     lineHeight: 29,
     letterSpacing: 0.1,
-    marginBottom: 24,
+    marginBottom: 4,
   },
   actions: {
-    gap: 10,
+    gap: 15,
     marginBottom: 4,
   },
   button: {

@@ -1,602 +1,794 @@
 [
-    {
-        "table_name": "article_click_counts",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_click_counts",
-        "column_name": "click_count",
-        "data_type": "bigint",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_click_counts_alltime",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_click_counts_alltime",
-        "column_name": "click_count",
-        "data_type": "bigint",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "source_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "clicked_at",
-        "data_type": "timestamp without time zone",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_clicks",
-        "column_name": "device_id",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "content",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "parent_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "likes_count",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_comments",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_likes",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_likes",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_likes",
-        "column_name": "user_id",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_likes",
-        "column_name": "created_at",
-        "data_type": "timestamp without time zone",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_likes",
-        "column_name": "device_id",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "reaction_type",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "article_reactions",
-        "column_name": "updated_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "source_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "title",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "description",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "content",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "url",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "image_url",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "category_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "published_at",
-        "data_type": "timestamp without time zone",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "created_at",
-        "data_type": "timestamp without time zone",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "snippet",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "fts_title",
-        "data_type": "tsvector",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "fts_content",
-        "data_type": "tsvector",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "articles",
-        "column_name": "fts_title_snippet",
-        "data_type": "tsvector",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "blocked_user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "blocked_source_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "reason",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "blocked_users",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "bookmarks",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "bookmarks",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "bookmarks",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "bookmarks",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "categories",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "categories",
-        "column_name": "name",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "categories",
-        "column_name": "slug",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "comments",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "comments",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "comments",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "comments",
-        "column_name": "content",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "comments",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "category",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "message",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "email",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "status",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "feedback",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "title",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "body",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "type",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "read",
-        "data_type": "boolean",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "inbox_messages",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "news",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "news",
-        "column_name": "title",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "news",
-        "column_name": "content",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "news",
-        "column_name": "snippet",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "news",
-        "column_name": "source_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "news",
-        "column_name": "image_url",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "news",
-        "column_name": "published_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "news",
-        "column_name": "url",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "news",
-        "column_name": "category_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "title",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "body",
-        "data_type": "text",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "read",
-        "data_type": "boolean",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "notifications",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "read_later",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "read_later",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "YES"
-    },
-    {
-        "table_name": "read_later",
-        "column_name": "article_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "read_later",
-        "column_name": "created_at",
-        "data_type": "timestamp with time zone",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "reward_events",
-        "column_name": "id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "reward_events",
-        "column_name": "user_id",
-        "data_type": "uuid",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "reward_events",
-        "column_name": "event_type",
-        "data_type": "text",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "reward_events",
-        "column_name": "points",
-        "data_type": "integer",
-        "is_nullable": "NO"
-    },
-    {
-        "table_name": "reward_events",
-        "column_name": "description",
-        "data_type": "text",
-        "is_nullable": "YES"
-    }
+  {
+    "table_name": "article_click_counts",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_click_counts",
+    "column_name": "click_count",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_click_counts_alltime",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_click_counts_alltime",
+    "column_name": "click_count",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "clicked_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "device_id",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "clicked_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "device_id",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "clicked_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "device_id",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_clicks_partitioned_default",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "likes_count",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "parent_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_comments",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_likes",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_likes",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_likes",
+    "column_name": "device_id",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_likes",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_likes",
+    "column_name": "user_id",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "reaction_type",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "article_reactions",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "category_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "fts_content",
+    "data_type": "tsvector",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "fts_title",
+    "data_type": "tsvector",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "fts_title_snippet",
+    "data_type": "tsvector",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "image_url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "published_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "snippet",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "articles",
+    "column_name": "url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "category_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "category_name",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "category_slug",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "comments_count",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "engagement_score",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "image_url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "likes_count",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "published_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "replies_count",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "shares_count",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "snippet",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "source_logo_url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "source_name",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "source_website_url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "articles_engagement_feed",
+    "column_name": "views_count",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "blocked_source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "blocked_user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "reason",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "blocked_users",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bookmarks",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bookmarks",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bookmarks",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bookmarks",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "slug",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "comments",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "comments",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "comments",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "comments",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "comments",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "category",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "message",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "feedback",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "body",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "read",
+    "data_type": "boolean",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "type",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "inbox_messages",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "category_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "news",
+    "column_name": "image_url",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "published_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "snippet",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "source_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "news",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "news",
+    "column_name": "url",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "body",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "read",
+    "data_type": "boolean",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "notifications",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "read_later",
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "read_later",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "read_later",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "read_later",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reward_events",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reward_events",
+    "column_name": "event_type",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "reward_events",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "reward_events",
+    "column_name": "points",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "reward_events",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  }
 ]

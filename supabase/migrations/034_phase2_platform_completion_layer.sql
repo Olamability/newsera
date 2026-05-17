@@ -78,12 +78,26 @@ BEGIN
     UPDATE article_likes
     SET user_id_uuid = CASE
       WHEN user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        AND EXISTS (
+          SELECT 1
+          FROM auth.users au
+          WHERE au.id = user_id::uuid
+        )
         THEN user_id::uuid
       ELSE NULL
     END
     WHERE user_id_uuid IS NULL;
   END IF;
 END $$;
+
+UPDATE article_likes al
+SET user_id_uuid = NULL
+WHERE user_id_uuid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth.users au
+    WHERE au.id = al.user_id_uuid
+  );
 
 DO $$
 BEGIN
@@ -123,12 +137,26 @@ BEGIN
     UPDATE user_interests
     SET user_id_uuid = CASE
       WHEN user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        AND EXISTS (
+          SELECT 1
+          FROM auth.users au
+          WHERE au.id = user_id::uuid
+        )
         THEN user_id::uuid
       ELSE NULL
     END
     WHERE user_id_uuid IS NULL;
   END IF;
 END $$;
+
+UPDATE user_interests ui
+SET user_id_uuid = NULL
+WHERE user_id_uuid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth.users au
+    WHERE au.id = ui.user_id_uuid
+  );
 
 DO $$
 BEGIN

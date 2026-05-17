@@ -5,6 +5,8 @@
 -- - Security hardening for personalization and reactions
 -- ============================================================
 
+SET ROLE postgres;
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 

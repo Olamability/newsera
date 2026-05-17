@@ -6,6 +6,8 @@
 -- - Prepare deprecation of legacy duplicate tables safely
 -- ============================================================
 
+SET ROLE postgres;
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -684,3 +686,5 @@ CREATE POLICY rss_ingestion_log_write_service_role
   TO service_role
   USING (true)
   WITH CHECK (true);
+
+RESET ROLE;

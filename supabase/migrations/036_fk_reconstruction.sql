@@ -38,7 +38,6 @@ DECLARE
   v_target_schema text := split_part(p_target_table, '.', 1);
   v_target_rel text := split_part(p_target_table, '.', 2);
   v_nullable text;
-  v_index_name text;
   v_orphans bigint := 0;
 BEGIN
   IF v_source_rel = '' THEN
@@ -64,9 +63,6 @@ BEGIN
     VALUES (p_constraint_name, p_source_table, p_source_column, p_target_table, p_target_column, 0, 'skipped', 'source column not found');
     RETURN;
   END IF;
-
-  v_index_name := left(format('idx_%s_%s_fk', v_source_rel, p_source_column), 63);
-  EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I.%I (%I)', v_index_name, v_source_schema, v_source_rel, p_source_column);
 
   IF p_null_cleanup AND v_nullable = 'YES' THEN
     EXECUTE format(

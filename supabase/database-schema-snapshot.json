@@ -1665,7 +1665,563 @@
 
 [
     {
-        "relationship_map": null
+        "relationship_map": {
+            "version": "2026-05-17-fk-reconstruction",
+            "status": "reconstructed",
+            "strategy": "additive_not_valid_then_validate_when_clean",
+            "foreign_keys": [
+                {
+                    "source_table": "articles",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "articles_source_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "runtime_selects_and_rss_ingestion",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "articles",
+                    "source_column": "category_id",
+                    "target_table": "categories",
+                    "target_column": "id",
+                    "constraint_name": "articles_category_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "runtime_selects_and_category_filters",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "sources",
+                    "source_column": "category_id",
+                    "target_table": "categories",
+                    "target_column": "id",
+                    "constraint_name": "sources_category_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "admin_and_rss_category_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "bookmarks",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "bookmarks_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "bookmark_ownership",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "bookmarks",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "bookmarks_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "bookmark_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "read_later",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "read_later_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "read_later_ownership",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "read_later",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "read_later_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "read_later_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_comments",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_comments_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "comment_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_comments",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_comments_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "comment_author_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_comments",
+                    "source_column": "parent_id",
+                    "target_table": "article_comments",
+                    "target_column": "id",
+                    "constraint_name": "article_comments_parent_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "threaded_comment_parent",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_reactions",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_reactions_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "reaction_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_reactions",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_reactions_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "reaction_user_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_likes",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_likes_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "legacy_like_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_likes",
+                    "source_column": "user_id_uuid",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_likes_user_id_uuid_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "staged_legacy_like_user_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "click_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_source_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "click_source_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "click_user_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks_partitioned",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_partitioned_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "partitioned_click_article_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks_partitioned",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_partitioned_source_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "partitioned_click_source_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_clicks_partitioned",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_clicks_partitioned_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "partitioned_click_user_join",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "blocked_users",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "blocked_users_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "blocked_entries_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "blocked_users",
+                    "source_column": "blocked_user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "blocked_users_blocked_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "blocked_user_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "blocked_users",
+                    "source_column": "blocked_source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "blocked_users_blocked_source_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "blocked_source_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "feedback",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "feedback_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "optional_feedback_author",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "inbox_messages",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "inbox_messages_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "targeted_inbox_messages",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "inbox_messages",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "inbox_messages_article_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "message_article_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "notifications",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "notifications_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "notification_recipient",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "notifications",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "notifications_article_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "notification_article_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_devices",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "user_devices_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "device_registration_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_preferences",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "user_preferences_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "preferences_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_rewards",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "user_rewards_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "rewards_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "reward_events",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "reward_events_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "reward_event_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_read_history",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "user_read_history_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "read_history_owner",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_read_history",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "user_read_history_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "read_history_article",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_interests",
+                    "source_column": "category_id",
+                    "target_table": "categories",
+                    "target_column": "id",
+                    "constraint_name": "user_interests_category_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "interest_category_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "user_interests",
+                    "source_column": "user_id_uuid",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "user_interests_user_id_uuid_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "staged_interest_user_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "content_flags",
+                    "source_column": "reporter_user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "content_flags_reporter_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "flag_reporter_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "content_flags",
+                    "source_column": "reviewed_by",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "content_flags_reviewed_by_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "flag_reviewer_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "content_flags",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "content_flags_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "flagged_article_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "content_flags",
+                    "source_column": "comment_id",
+                    "target_table": "article_comments",
+                    "target_column": "id",
+                    "constraint_name": "content_flags_comment_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "flagged_comment_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "content_flags",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "content_flags_source_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": true,
+                    "evidence": "flagged_source_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_shares",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_shares_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "share_article_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_shares",
+                    "source_column": "user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "article_shares_user_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "share_user_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_tags",
+                    "source_column": "article_id",
+                    "target_table": "articles",
+                    "target_column": "id",
+                    "constraint_name": "article_tags_article_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "tagged_article_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "article_tags",
+                    "source_column": "tag_id",
+                    "target_table": "tags",
+                    "target_column": "id",
+                    "constraint_name": "article_tags_tag_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "tag_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "rss_feed_sources",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "rss_feed_sources_source_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "feed_source_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "rss_ingestion_log",
+                    "source_column": "feed_id",
+                    "target_table": "rss_feed_sources",
+                    "target_column": "id",
+                    "constraint_name": "rss_ingestion_log_feed_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "ingestion_feed_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "ingestion_jobs",
+                    "source_column": "feed_id",
+                    "target_table": "rss_feed_sources",
+                    "target_column": "id",
+                    "constraint_name": "ingestion_jobs_feed_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "ingestion_job_feed_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "ingestion_jobs",
+                    "source_column": "source_id",
+                    "target_table": "sources",
+                    "target_column": "id",
+                    "constraint_name": "ingestion_jobs_source_id_fkey",
+                    "on_delete": "SET NULL",
+                    "nullable": true,
+                    "evidence": "ingestion_job_source_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                },
+                {
+                    "source_table": "admin_audit_log",
+                    "source_column": "admin_user_id",
+                    "target_table": "auth.users",
+                    "target_column": "id",
+                    "constraint_name": "admin_audit_log_admin_user_id_fkey",
+                    "on_delete": "CASCADE",
+                    "nullable": false,
+                    "evidence": "admin_actor_reference",
+                    "migration": "036_fk_reconstruction.sql"
+                }
+            ]
+        }
     }
 ]
 
@@ -2422,7 +2978,6 @@
     }
 ]
 
-
 [
     {
         "tablename": "_deprecated_comments",
@@ -3098,9 +3653,68 @@
         "tablename": "user_rewards",
         "indexname": "user_rewards_pkey",
         "indexdef": "CREATE UNIQUE INDEX user_rewards_pkey ON public.user_rewards USING btree (id)"
+    },
+    {
+        "tablename": "article_comments",
+        "indexname": "idx_article_comments_user_id",
+        "indexdef": "CREATE INDEX idx_article_comments_user_id ON public.article_comments USING btree (user_id)"
+    },
+    {
+        "tablename": "article_likes",
+        "indexname": "idx_article_likes_article_id",
+        "indexdef": "CREATE INDEX idx_article_likes_article_id ON public.article_likes USING btree (article_id)"
+    },
+    {
+        "tablename": "article_likes",
+        "indexname": "idx_article_likes_user_id_uuid",
+        "indexdef": "CREATE INDEX idx_article_likes_user_id_uuid ON public.article_likes USING btree (user_id_uuid) WHERE (user_id_uuid IS NOT NULL)"
+    },
+    {
+        "tablename": "blocked_users",
+        "indexname": "idx_blocked_users_blocked_user_id",
+        "indexdef": "CREATE INDEX idx_blocked_users_blocked_user_id ON public.blocked_users USING btree (blocked_user_id)"
+    },
+    {
+        "tablename": "blocked_users",
+        "indexname": "idx_blocked_users_blocked_source_id",
+        "indexdef": "CREATE INDEX idx_blocked_users_blocked_source_id ON public.blocked_users USING btree (blocked_source_id)"
+    },
+    {
+        "tablename": "feedback",
+        "indexname": "idx_feedback_user_id",
+        "indexdef": "CREATE INDEX idx_feedback_user_id ON public.feedback USING btree (user_id)"
+    },
+    {
+        "tablename": "inbox_messages",
+        "indexname": "idx_inbox_messages_article_id",
+        "indexdef": "CREATE INDEX idx_inbox_messages_article_id ON public.inbox_messages USING btree (article_id)"
+    },
+    {
+        "tablename": "read_later",
+        "indexname": "idx_read_later_article_id",
+        "indexdef": "CREATE INDEX idx_read_later_article_id ON public.read_later USING btree (article_id)"
+    },
+    {
+        "tablename": "content_flags",
+        "indexname": "idx_content_flags_article_id",
+        "indexdef": "CREATE INDEX idx_content_flags_article_id ON public.content_flags USING btree (article_id)"
+    },
+    {
+        "tablename": "content_flags",
+        "indexname": "idx_content_flags_comment_id",
+        "indexdef": "CREATE INDEX idx_content_flags_comment_id ON public.content_flags USING btree (comment_id)"
+    },
+    {
+        "tablename": "content_flags",
+        "indexname": "idx_content_flags_source_id",
+        "indexdef": "CREATE INDEX idx_content_flags_source_id ON public.content_flags USING btree (source_id)"
+    },
+    {
+        "tablename": "ingestion_jobs",
+        "indexname": "idx_ingestion_jobs_source_id",
+        "indexdef": "CREATE INDEX idx_ingestion_jobs_source_id ON public.ingestion_jobs USING btree (source_id)"
     }
 ]
-
 
 [
     {

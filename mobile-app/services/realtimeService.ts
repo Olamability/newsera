@@ -67,6 +67,12 @@ const isReactionEventPayload = (payload: unknown): payload is ReactionEventPaylo
   return isRealtimeEventPayload(payload);
 };
 
+const extractReactionType = (row: unknown): 'like' | 'dislike' | null => {
+  if (!row || typeof row !== 'object') return null;
+  const reactionType = (row as { reaction_type?: unknown }).reaction_type;
+  return reactionType === 'like' || reactionType === 'dislike' ? reactionType : null;
+};
+
 const extractTrendingArticleId = (payload: unknown): string | undefined => {
   if (!payload || typeof payload !== 'object') return undefined;
   const value = payload as {
@@ -120,8 +126,8 @@ export const subscribeToArticleLikeEvents = (
         },
         (payload) => {
           if (!isLikeEventPayload(payload)) return;
-          const newType = payload.new?.reaction_type ?? null;
-          const oldType = payload.old?.reaction_type ?? null;
+          const newType = extractReactionType(payload.new);
+          const oldType = extractReactionType(payload.old);
           if (newType !== 'like' && oldType !== 'like') return;
           callbacks.forEach((callback) => callback(payload));
         },
@@ -237,8 +243,8 @@ export const subscribeToTrendingEngagementEvents = (
       .channel('trending_engagement_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'article_reactions' }, (payload) => {
         if (!isReactionEventPayload(payload)) return;
-        const newType = payload.new?.reaction_type ?? null;
-        const oldType = payload.old?.reaction_type ?? null;
+        const newType = extractReactionType(payload.new);
+        const oldType = extractReactionType(payload.old);
         if (newType !== 'like' && oldType !== 'like') return;
         const articleId = extractTrendingArticleId(payload);
         callbacks.forEach((callback) => callback({ articleId }));

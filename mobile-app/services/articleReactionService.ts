@@ -137,7 +137,7 @@ export async function toggleArticleReaction(
       .delete()
       .eq('id', existing.id);
     if (deleteError) throw deleteError;
-    if (reaction === 'like') {
+    if (existing.reaction_type === 'like') {
       await deleteLegacyLike(articleId, user.id);
     }
     return null;

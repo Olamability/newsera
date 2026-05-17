@@ -1,6 +1,25 @@
 import { supabaseAuth } from './supabase';
 import { InteractionAuthRequiredError } from './interactionErrors';
 
+async function upsertLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .upsert(
+      { article_id: articleId, user_id: userId, user_id_uuid: userId },
+      { onConflict: 'article_id,user_id' }
+    );
+  if (error) throw error;
+}
+
+async function deleteLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .delete()
+    .eq('article_id', articleId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 /**
  * Check whether a user (or device) has liked a given article.
  */
@@ -67,13 +86,7 @@ export async function toggleLike(articleId: string): Promise<boolean> {
       .insert({ article_id: articleId, user_id: user.id, reaction_type: 'like' });
     if (insertError) throw insertError;
 
-    const { error: legacyInsertError } = await supabaseAuth
-      .from('article_likes')
-      .upsert(
-        { article_id: articleId, user_id: user.id, user_id_uuid: user.id },
-        { onConflict: 'article_id,user_id' }
-      );
-    if (legacyInsertError) throw legacyInsertError;
+    await upsertLegacyLike(articleId, user.id);
     return true;
   }
 
@@ -84,12 +97,7 @@ export async function toggleLike(articleId: string): Promise<boolean> {
       .eq('id', existing.id);
     if (deleteError) throw deleteError;
 
-    const { error: legacyDeleteError } = await supabaseAuth
-      .from('article_likes')
-      .delete()
-      .eq('article_id', articleId)
-      .eq('user_id', user.id);
-    if (legacyDeleteError) throw legacyDeleteError;
+    await deleteLegacyLike(articleId, user.id);
     return false;
   }
 
@@ -99,12 +107,6 @@ export async function toggleLike(articleId: string): Promise<boolean> {
     .eq('id', existing.id);
   if (updateError) throw updateError;
 
-  const { error: legacyUpsertError } = await supabaseAuth
-    .from('article_likes')
-    .upsert(
-      { article_id: articleId, user_id: user.id, user_id_uuid: user.id },
-      { onConflict: 'article_id,user_id' }
-    );
-  if (legacyUpsertError) throw legacyUpsertError;
+  await upsertLegacyLike(articleId, user.id);
   return true;
 }

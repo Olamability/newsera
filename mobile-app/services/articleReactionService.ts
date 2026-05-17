@@ -21,6 +21,25 @@ type ReactionCountRpcRow = {
   reaction_count: number | string;
 };
 
+async function upsertLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .upsert(
+      { article_id: articleId, user_id: userId, user_id_uuid: userId },
+      { onConflict: 'article_id,user_id' }
+    );
+  if (error) throw error;
+}
+
+async function deleteLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .delete()
+    .eq('article_id', articleId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 export async function getArticleReactionSummary(articleId: string): Promise<ArticleReactionSummary> {
   const {
     data: { user },
@@ -104,6 +123,11 @@ export async function toggleArticleReaction(
       .from('article_reactions')
       .insert({ article_id: articleId, user_id: user.id, reaction_type: reaction });
     if (insertError) throw insertError;
+    if (reaction === 'like') {
+      await upsertLegacyLike(articleId, user.id);
+    } else {
+      await deleteLegacyLike(articleId, user.id);
+    }
     return reaction;
   }
 
@@ -113,6 +137,9 @@ export async function toggleArticleReaction(
       .delete()
       .eq('id', existing.id);
     if (deleteError) throw deleteError;
+    if (existing.reaction_type === 'like') {
+      await deleteLegacyLike(articleId, user.id);
+    }
     return null;
   }
 
@@ -121,5 +148,10 @@ export async function toggleArticleReaction(
     .update({ reaction_type: reaction })
     .eq('id', existing.id);
   if (updateError) throw updateError;
+  if (reaction === 'like') {
+    await upsertLegacyLike(articleId, user.id);
+  } else {
+    await deleteLegacyLike(articleId, user.id);
+  }
   return reaction;
 }

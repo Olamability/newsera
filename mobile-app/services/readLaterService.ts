@@ -3,6 +3,7 @@ import { supabaseAuth } from './supabase';
 import { NewsArticle, ReadLaterEntry } from '../types';
 
 const READ_LATER_KEY = 'newsera_read_later';
+const READ_LATER_TYPE = 'read_later';
 
 // ─── Local storage (works for guests and as offline fallback) ─────────────────
 
@@ -48,23 +49,27 @@ export async function isInLocalReadLater(articleId: string): Promise<boolean> {
 
 export async function addSupabaseReadLater(articleId: string, userId: string): Promise<void> {
   const { error } = await supabaseAuth
-    .from('read_later')
-    .upsert({ user_id: userId, article_id: articleId }, { onConflict: 'user_id,article_id' });
+    .from('bookmarks')
+    .upsert(
+      { user_id: userId, article_id: articleId, type: READ_LATER_TYPE },
+      { onConflict: 'user_id,article_id,type' }
+    );
   if (error) throw error;
 }
 
 export async function removeSupabaseReadLater(articleId: string, userId: string): Promise<void> {
   const { error } = await supabaseAuth
-    .from('read_later')
+    .from('bookmarks')
     .delete()
     .eq('user_id', userId)
-    .eq('article_id', articleId);
+    .eq('article_id', articleId)
+    .eq('type', READ_LATER_TYPE);
   if (error) throw error;
 }
 
 export async function fetchSupabaseReadLater(userId: string): Promise<NewsArticle[]> {
   const { data, error } = await supabaseAuth
-    .from('read_later')
+    .from('bookmarks')
     .select(
       `article_id,
        articles (
@@ -74,6 +79,7 @@ export async function fetchSupabaseReadLater(userId: string): Promise<NewsArticl
        )`
     )
     .eq('user_id', userId)
+    .eq('type', READ_LATER_TYPE)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

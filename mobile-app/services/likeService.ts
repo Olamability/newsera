@@ -1,5 +1,24 @@
 import { supabaseAuth } from './supabase';
-import { InteractionAuthRequiredError, isAuthRequiredInteractionError } from './interactionErrors';
+import { InteractionAuthRequiredError } from './interactionErrors';
+
+async function upsertLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .upsert(
+      { article_id: articleId, user_id: userId, user_id_uuid: userId },
+      { onConflict: 'article_id,user_id' }
+    );
+  if (error) throw error;
+}
+
+async function deleteLegacyLike(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabaseAuth
+    .from('article_likes')
+    .delete()
+    .eq('article_id', articleId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
 
 /**
  * Check whether a user (or device) has liked a given article.
@@ -12,10 +31,11 @@ export async function isLiked(articleId: string): Promise<boolean> {
   if (!user) return false;
 
   const { data, error } = await supabaseAuth
-    .from('article_likes')
+    .from('article_reactions')
     .select('id')
     .eq('article_id', articleId)
     .eq('user_id', user.id)
+    .eq('reaction_type', 'like')
     .limit(1);
 
   if (error) throw error;
@@ -27,9 +47,10 @@ export async function isLiked(articleId: string): Promise<boolean> {
  */
 export async function getLikeCount(articleId: string): Promise<number> {
   const { count, error } = await supabaseAuth
-    .from('article_likes')
+    .from('article_reactions')
     .select('id', { count: 'exact', head: true })
-    .eq('article_id', articleId);
+    .eq('article_id', articleId)
+    .eq('reaction_type', 'like');
 
   if (error) throw error;
   return count ?? 0;
@@ -50,32 +71,42 @@ export async function toggleLike(articleId: string): Promise<boolean> {
     throw new InteractionAuthRequiredError();
   }
 
-  // Attempt to insert first; if the unique constraint fires, the user already
-  // liked the article → remove the like instead.
-  const { error: insertError } = await supabaseAuth
-    .from('article_likes')
-    .insert({ article_id: articleId, user_id: user.id });
+  const { data: existing, error: existingError } = await supabaseAuth
+    .from('article_reactions')
+    .select('id, reaction_type')
+    .eq('article_id', articleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-  if (!insertError) {
-    return true; // Like added
+  if (existingError) throw existingError;
+
+  if (!existing) {
+    const { error: insertError } = await supabaseAuth
+      .from('article_reactions')
+      .insert({ article_id: articleId, user_id: user.id, reaction_type: 'like' });
+    if (insertError) throw insertError;
+
+    await upsertLegacyLike(articleId, user.id);
+    return true;
   }
 
-  // Postgres unique-constraint violation code
-  if (insertError.code === '23505') {
+  if (existing.reaction_type === 'like') {
     const { error: deleteError } = await supabaseAuth
-      .from('article_likes')
+      .from('article_reactions')
       .delete()
-      .eq('article_id', articleId)
-      .eq('user_id', user.id);
+      .eq('id', existing.id);
     if (deleteError) throw deleteError;
-    return false; // Like removed
+
+    await deleteLegacyLike(articleId, user.id);
+    return false;
   }
 
-  // Session can expire between getUser() and write attempts, so keep this
-  // guard to return a stable auth-required error for the UI layer.
-  if (isAuthRequiredInteractionError(insertError)) {
-    throw new InteractionAuthRequiredError();
-  }
+  const { error: updateError } = await supabaseAuth
+    .from('article_reactions')
+    .update({ reaction_type: 'like' })
+    .eq('id', existing.id);
+  if (updateError) throw updateError;
 
-  throw insertError;
+  await upsertLegacyLike(articleId, user.id);
+  return true;
 }

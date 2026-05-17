@@ -3,8 +3,8 @@ import { supabaseAuth, supabasePublic } from './supabase';
 
 type LikeEventPayload = {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  new: { user_id?: string | null } | null;
-  old: { user_id?: string | null } | null;
+  new: { user_id?: string | null; reaction_type?: 'like' | 'dislike' | null } | null;
+  old: { user_id?: string | null; reaction_type?: 'like' | 'dislike' | null } | null;
 };
 
 type CommentEventPayload = {
@@ -103,23 +103,26 @@ export const subscribeToArticleLikeEvents = (
   articleId: string,
   onEvent: (payload: LikeEventPayload) => void,
 ): (() => void) => {
-  const key = `article_likes:${articleId}`;
+  const key = `article_reactions_like:${articleId}`;
   let entry = articleLikeEntries.get(key);
 
   if (!entry) {
     const callbacks = new Set<(payload: LikeEventPayload) => void>();
     const channel = supabasePublic
-      .channel(`article_likes_changes:${articleId}`)
+      .channel(`article_reactions_like_changes:${articleId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'article_likes',
+          table: 'article_reactions',
           filter: `article_id=eq.${articleId}`,
         },
         (payload) => {
           if (!isLikeEventPayload(payload)) return;
+          const newType = payload.new?.reaction_type ?? null;
+          const oldType = payload.old?.reaction_type ?? null;
+          if (newType !== 'like' && oldType !== 'like') return;
           callbacks.forEach((callback) => callback(payload));
         },
       )
@@ -232,7 +235,11 @@ export const subscribeToTrendingEngagementEvents = (
     const callbacks = new Set<(payload: TrendingEventPayload) => void>();
     const channel = supabasePublic
       .channel('trending_engagement_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_likes' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'article_reactions' }, (payload) => {
+        if (!isReactionEventPayload(payload)) return;
+        const newType = payload.new?.reaction_type ?? null;
+        const oldType = payload.old?.reaction_type ?? null;
+        if (newType !== 'like' && oldType !== 'like') return;
         const articleId = extractTrendingArticleId(payload);
         callbacks.forEach((callback) => callback({ articleId }));
       })

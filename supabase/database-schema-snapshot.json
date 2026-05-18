@@ -889,6 +889,42 @@
       "is_nullable": "NO"
     },
     {
+      "table_name": "feature_flags",
+      "column_name": "name",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "feature_flags",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "feature_flags",
+      "column_name": "rollout_percent",
+      "data_type": "smallint",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "feature_flags",
+      "column_name": "description",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "feature_flags",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "feature_flags",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
       "table_name": "feedback",
       "column_name": "id",
       "data_type": "uuid",
@@ -1051,6 +1087,222 @@
       "is_nullable": "NO"
     },
     {
+      "table_name": "ingestion_jobs",
+      "column_name": "lease_token",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ingestion_jobs",
+      "column_name": "leased_by",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ingestion_jobs",
+      "column_name": "leased_until",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ingestion_jobs",
+      "column_name": "consecutive_failures",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ingestion_jobs",
+      "column_name": "backoff_seconds",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ingestion_jobs",
+      "column_name": "health_score",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "original_job_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "queue_name",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "job_type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "dedup_key",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "last_error",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "failed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "replayed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_dead_letter",
+      "column_name": "replayed_job_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "queue_name",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "job_type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "dedup_key",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "priority",
+      "data_type": "smallint",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "status",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "max_attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "lease_token",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "leased_by",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "leased_until",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "next_attempt_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "last_error",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "available_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "started_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "finished_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "job_queue",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
       "table_name": "news",
       "column_name": "id",
       "data_type": "uuid",
@@ -1105,6 +1357,276 @@
       "is_nullable": "YES"
     },
     {
+      "table_name": "notification_deliveries",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "event_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "notification_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "device_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "push_token",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "channel",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "status",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "provider",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "provider_message_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "error_message",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "scheduled_for",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "sent_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "delivered_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_deliveries",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "event_type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "priority",
+      "data_type": "smallint",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "article_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "target_user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "target_audience",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "title",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "body",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "dedup_key",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "status",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "channels",
+      "data_type": "ARRAY",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "scheduled_for",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "processed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "recipient_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "delivery_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "failure_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "last_error",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_events",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "notification_type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "window_started_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "window_seconds",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notification_rate_limits",
+      "column_name": "max_per_window",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
       "table_name": "notifications",
       "column_name": "id",
       "data_type": "uuid",
@@ -1147,6 +1669,48 @@
       "is_nullable": "NO"
     },
     {
+      "table_name": "notifications",
+      "column_name": "type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "priority",
+      "data_type": "smallint",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "channel",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "event_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "dedup_key",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "delivered_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
       "table_name": "_deprecated_read_later",
       "column_name": "id",
       "data_type": "uuid",
@@ -1167,6 +1731,204 @@
     {
       "table_name": "_deprecated_read_later",
       "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "personalization_recompute_queue",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "personalization_recompute_queue",
+      "column_name": "enqueued_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "personalization_recompute_queue",
+      "column_name": "reason",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "article_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "title",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "source_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "published_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "clicks_last_15m",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_breaking",
+      "column_name": "breaking_score",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "article_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "source_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "published_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "final_score",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "category_rank",
+      "data_type": "bigint",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_category",
+      "column_name": "computed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "article_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "source_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "published_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "ranking_score",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "source_reliability",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "freshness_factor",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "final_score",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_global",
+      "column_name": "computed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "article_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "rank",
+      "data_type": "smallint",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "personal_score",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "source_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "ranked_feed_personalized",
+      "column_name": "computed_at",
       "data_type": "timestamp with time zone",
       "is_nullable": "NO"
     },
@@ -1283,6 +2045,66 @@
       "column_name": "source_id",
       "data_type": "uuid",
       "is_nullable": "YES"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "last_success_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "last_failure_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "success_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "consecutive_failures",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "average_latency_ms",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "reliability_score",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "fetch_interval_seconds",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "backoff_seconds",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "next_fetch_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "rss_feed_sources",
+      "column_name": "priority",
+      "data_type": "smallint",
+      "is_nullable": "NO"
     },
     {
       "table_name": "rss_ingestion_log",
@@ -1431,6 +2253,48 @@
     {
       "table_name": "tags",
       "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "score",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "raw_signal_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "last_interaction_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_category_affinity",
+      "column_name": "recomputed_at",
       "data_type": "timestamp with time zone",
       "is_nullable": "NO"
     },
@@ -1661,13 +2525,151 @@
       "column_name": "updated_at",
       "data_type": "timestamp with time zone",
       "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "source_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "score",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "raw_signal_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "last_interaction_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_source_affinity",
+      "column_name": "recomputed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "category_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "category_name",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "category_slug",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "score",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "raw_signal_count",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "user_top_categories",
+      "column_name": "last_interaction_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "worker_id",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "worker_type",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "hostname",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "pid",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "status",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "started_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "last_heartbeat_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "worker_heartbeats",
+      "column_name": "metadata",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
     }
   ],
   "relationship_maps": [
     {
       "relationship_map": {
-        "version": "2026-05-17-fk-reconstruction",
-        "status": "reconstructed",
+        "version": "2026-05-18-migrations-037-045",
+        "status": "reconstructed_through_045",
         "strategy": "additive_not_valid_then_validate_when_clean",
         "foreign_keys": [
           {
@@ -2227,6 +3229,46 @@
   "rls_policies": [
     {
       "schemaname": "public",
+      "tablename": "_deprecated_article_likes",
+      "policyname": "Allow delete own like",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "DELETE",
+      "qual": "(user_id = COALESCE((auth.uid())::text, device_id))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_article_likes",
+      "policyname": "Allow insert like (auth)",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((auth.uid() IS NOT NULL) AND (user_id = (auth.uid())::text))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_article_likes",
+      "policyname": "Allow insert like (guest)",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((auth.uid() IS NULL) AND (device_id IS NOT NULL) AND (user_id IS NOT NULL))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_article_likes",
+      "policyname": "Allow read _deprecated_article_likes",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
       "tablename": "_deprecated_comments",
       "policyname": "Allow authenticated insert",
       "permissive": "PERMISSIVE",
@@ -2234,16 +3276,6 @@
       "cmd": "INSERT",
       "qual": null,
       "with_check": "((auth.uid())::text = (user_id)::text)"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_comments",
-      "policyname": "Allow read comments",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
-      "qual": "true",
-      "with_check": null
     },
     {
       "schemaname": "public",
@@ -2267,6 +3299,46 @@
     },
     {
       "schemaname": "public",
+      "tablename": "_deprecated_comments",
+      "policyname": "Allow read comments",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_inbox_messages",
+      "policyname": "Users delete own messages",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_inbox_messages",
+      "policyname": "Users read own messages",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "((auth.uid() = user_id) OR (user_id IS NULL))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_inbox_messages",
+      "policyname": "Users update own messages",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
       "tablename": "_deprecated_news",
       "policyname": "news_select_all",
       "permissive": "PERMISSIVE",
@@ -2274,6 +3346,16 @@
       "cmd": "SELECT",
       "qual": "true",
       "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "_deprecated_read_later",
+      "policyname": "Users manage _deprecated_read_later",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
     },
     {
       "schemaname": "public",
@@ -2298,16 +3380,6 @@
     {
       "schemaname": "public",
       "tablename": "article_clicks",
-      "policyname": "article_clicks_select_all",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
-      "qual": "true",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "article_clicks",
       "policyname": "article_clicks_insert_all",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
@@ -2317,12 +3389,12 @@
     },
     {
       "schemaname": "public",
-      "tablename": "article_comments",
-      "policyname": "Allow users delete own comments",
+      "tablename": "article_clicks",
+      "policyname": "article_clicks_select_all",
       "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "DELETE",
-      "qual": "(auth.uid() = user_id)",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
       "with_check": null
     },
     {
@@ -2348,6 +3420,16 @@
     {
       "schemaname": "public",
       "tablename": "article_comments",
+      "policyname": "Allow users delete own comments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "article_comments",
       "policyname": "Allow users update own comments",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
@@ -2357,52 +3439,22 @@
     },
     {
       "schemaname": "public",
-      "tablename": "_deprecated_article_likes",
-      "policyname": "Allow insert like (guest)",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "((auth.uid() IS NULL) AND (device_id IS NOT NULL) AND (user_id IS NOT NULL))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_article_likes",
-      "policyname": "Allow delete own like",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "DELETE",
-      "qual": "(user_id = COALESCE((auth.uid())::text, device_id))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_article_likes",
-      "policyname": "Allow read _deprecated_article_likes",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
-      "qual": "true",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_article_likes",
-      "policyname": "Allow insert like (auth)",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "((auth.uid() IS NOT NULL) AND (user_id = (auth.uid())::text))"
-    },
-    {
-      "schemaname": "public",
       "tablename": "article_reactions",
       "policyname": "article_reactions_select_authenticated",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "SELECT",
       "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "article_shares",
+      "policyname": "article_shares_delete_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
       "with_check": null
     },
     {
@@ -2418,27 +3470,7 @@
     {
       "schemaname": "public",
       "tablename": "article_shares",
-      "policyname": "article_shares_delete_own",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "DELETE",
-      "qual": "(auth.uid() = user_id)",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "article_shares",
       "policyname": "article_shares_select_all",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
-      "qual": "true",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "article_tags",
-      "policyname": "article_tags_select_all",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
       "cmd": "SELECT",
@@ -2454,6 +3486,16 @@
       "cmd": "ALL",
       "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
       "with_check": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "article_tags",
+      "policyname": "article_tags_select_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
     },
     {
       "schemaname": "public",
@@ -2518,22 +3560,22 @@
     {
       "schemaname": "public",
       "tablename": "categories",
-      "policyname": "categories_select_all",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
-      "qual": "true",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "categories",
       "policyname": "categories_admin_write",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "ALL",
       "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
       "with_check": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "categories",
+      "policyname": "categories_select_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
     },
     {
       "schemaname": "public",
@@ -2567,13 +3609,33 @@
     },
     {
       "schemaname": "public",
-      "tablename": "feedback",
-      "policyname": "Users read own feedback",
+      "tablename": "feature_flags",
+      "policyname": "feature_flags_select_all",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
       "cmd": "SELECT",
-      "qual": "(auth.uid() = user_id)",
+      "qual": "true",
       "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "feature_flags",
+      "policyname": "feature_flags_write_admin",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "feature_flags",
+      "policyname": "feature_flags_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
     },
     {
       "schemaname": "public",
@@ -2587,33 +3649,13 @@
     },
     {
       "schemaname": "public",
-      "tablename": "_deprecated_inbox_messages",
-      "policyname": "Users delete own messages",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "DELETE",
-      "qual": "(auth.uid() = user_id)",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_inbox_messages",
-      "policyname": "Users read own messages",
+      "tablename": "feedback",
+      "policyname": "Users read own feedback",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
       "cmd": "SELECT",
-      "qual": "((auth.uid() = user_id) OR (user_id IS NULL))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "_deprecated_inbox_messages",
-      "policyname": "Users update own messages",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "UPDATE",
       "qual": "(auth.uid() = user_id)",
-      "with_check": "(auth.uid() = user_id)"
+      "with_check": null
     },
     {
       "schemaname": "public",
@@ -2637,13 +3679,93 @@
     },
     {
       "schemaname": "public",
-      "tablename": "notifications",
-      "policyname": "Allow update own notifications",
+      "tablename": "job_dead_letter",
+      "policyname": "job_dead_letter_select_admin",
       "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "UPDATE",
-      "qual": "(auth.uid() = user_id)",
-      "with_check": "(auth.uid() = user_id)"
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "job_dead_letter",
+      "policyname": "job_dead_letter_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "job_queue",
+      "policyname": "job_queue_select_admin",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "job_queue",
+      "policyname": "job_queue_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notification_deliveries",
+      "policyname": "notification_deliveries_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "((auth.uid() = user_id) OR (COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notification_deliveries",
+      "policyname": "notification_deliveries_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notification_events",
+      "policyname": "notification_events_select_admin",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notification_events",
+      "policyname": "notification_events_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notification_rate_limits",
+      "policyname": "notification_rate_limits_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
     },
     {
       "schemaname": "public",
@@ -2667,12 +3789,52 @@
     },
     {
       "schemaname": "public",
-      "tablename": "_deprecated_read_later",
-      "policyname": "Users manage _deprecated_read_later",
+      "tablename": "notifications",
+      "policyname": "Allow update own notifications",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
-      "cmd": "ALL",
+      "cmd": "UPDATE",
       "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "personalization_recompute_queue",
+      "policyname": "personalization_recompute_queue_service",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ranked_feed_personalized",
+      "policyname": "ranked_feed_personalized_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ranked_feed_personalized",
+      "policyname": "ranked_feed_personalized_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reward_events",
+      "policyname": "Users insert own reward events",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
       "with_check": "(auth.uid() = user_id)"
     },
     {
@@ -2687,26 +3849,6 @@
     },
     {
       "schemaname": "public",
-      "tablename": "reward_events",
-      "policyname": "Users insert own reward events",
-      "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "(auth.uid() = user_id)"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "rss_feed_sources",
-      "policyname": "rss_feed_sources_write_service_role",
-      "permissive": "PERMISSIVE",
-      "roles": "{service_role}",
-      "cmd": "ALL",
-      "qual": "true",
-      "with_check": "true"
-    },
-    {
-      "schemaname": "public",
       "tablename": "rss_feed_sources",
       "policyname": "rss_feed_sources_select_admin",
       "permissive": "PERMISSIVE",
@@ -2717,8 +3859,8 @@
     },
     {
       "schemaname": "public",
-      "tablename": "rss_ingestion_log",
-      "policyname": "rss_ingestion_log_write_service_role",
+      "tablename": "rss_feed_sources",
+      "policyname": "rss_feed_sources_write_service_role",
       "permissive": "PERMISSIVE",
       "roles": "{service_role}",
       "cmd": "ALL",
@@ -2737,13 +3879,13 @@
     },
     {
       "schemaname": "public",
-      "tablename": "sources",
-      "policyname": "sources_select_all",
+      "tablename": "rss_ingestion_log",
+      "policyname": "rss_ingestion_log_write_service_role",
       "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "SELECT",
+      "roles": "{service_role}",
+      "cmd": "ALL",
       "qual": "true",
-      "with_check": null
+      "with_check": "true"
     },
     {
       "schemaname": "public",
@@ -2768,16 +3910,6 @@
     {
       "schemaname": "public",
       "tablename": "sources",
-      "policyname": "sources_admin_write",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "ALL",
-      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
-      "with_check": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "sources",
       "policyname": "Allow update sources",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
@@ -2798,6 +3930,16 @@
     {
       "schemaname": "public",
       "tablename": "sources",
+      "policyname": "insert_sources",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(status = 'pending'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "sources",
       "policyname": "select_sources",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
@@ -2808,17 +3950,17 @@
     {
       "schemaname": "public",
       "tablename": "sources",
-      "policyname": "insert_sources",
+      "policyname": "sources_admin_write",
       "permissive": "PERMISSIVE",
-      "roles": "{public}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "(status = 'pending'::text)"
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)"
     },
     {
       "schemaname": "public",
-      "tablename": "tags",
-      "policyname": "tags_select_all",
+      "tablename": "sources",
+      "policyname": "sources_select_all",
       "permissive": "PERMISSIVE",
       "roles": "{public}",
       "cmd": "SELECT",
@@ -2837,8 +3979,18 @@
     },
     {
       "schemaname": "public",
-      "tablename": "user_devices",
-      "policyname": "user_devices_select_own",
+      "tablename": "tags",
+      "policyname": "tags_select_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_category_affinity",
+      "policyname": "user_category_affinity_select_own",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "SELECT",
@@ -2847,13 +3999,13 @@
     },
     {
       "schemaname": "public",
-      "tablename": "user_devices",
-      "policyname": "user_devices_update_own",
+      "tablename": "user_category_affinity",
+      "policyname": "user_category_affinity_write_service_role",
       "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "UPDATE",
-      "qual": "(auth.uid() = user_id)",
-      "with_check": "(auth.uid() = user_id)"
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
     },
     {
       "schemaname": "public",
@@ -2877,23 +4029,23 @@
     },
     {
       "schemaname": "public",
-      "tablename": "user_interests",
-      "policyname": "user_interests_insert_own",
+      "tablename": "user_devices",
+      "policyname": "user_devices_select_own",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))"
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
     },
     {
       "schemaname": "public",
-      "tablename": "user_interests",
-      "policyname": "user_interests_update_own",
+      "tablename": "user_devices",
+      "policyname": "user_devices_update_own",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "UPDATE",
-      "qual": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))",
-      "with_check": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))"
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
     },
     {
       "schemaname": "public",
@@ -2908,12 +4060,32 @@
     {
       "schemaname": "public",
       "tablename": "user_interests",
+      "policyname": "user_interests_insert_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_interests",
       "policyname": "user_interests_select_own",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "SELECT",
       "qual": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))",
       "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_interests",
+      "policyname": "user_interests_update_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))",
+      "with_check": "((auth.uid() = user_id_uuid) OR ((auth.uid())::text = user_id))"
     },
     {
       "schemaname": "public",
@@ -2924,16 +4096,6 @@
       "cmd": "ALL",
       "qual": "(auth.uid() = user_id)",
       "with_check": "(auth.uid() = user_id)"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "user_read_history",
-      "policyname": "user_read_history_select_own",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "SELECT",
-      "qual": "(auth.uid() = user_id)",
-      "with_check": null
     },
     {
       "schemaname": "public",
@@ -2958,6 +4120,16 @@
     {
       "schemaname": "public",
       "tablename": "user_read_history",
+      "policyname": "user_read_history_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_read_history",
       "policyname": "user_read_history_update_own",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
@@ -2974,9 +4146,89 @@
       "cmd": "ALL",
       "qual": "(auth.uid() = user_id)",
       "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_source_affinity",
+      "policyname": "user_source_affinity_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_source_affinity",
+      "policyname": "user_source_affinity_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "worker_heartbeats",
+      "policyname": "worker_heartbeats_select_admin",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(COALESCE(((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text), ''::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "worker_heartbeats",
+      "policyname": "worker_heartbeats_write_service_role",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
     }
   ],
   "indexes": [
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "article_likes_article_id_user_id_key",
+      "indexdef": "CREATE UNIQUE INDEX article_likes_article_id_user_id_key ON public._deprecated_article_likes USING btree (article_id, user_id)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "article_likes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX article_likes_pkey ON public._deprecated_article_likes USING btree (id)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "idx_article_likes_article_id",
+      "indexdef": "CREATE INDEX idx_article_likes_article_id ON public._deprecated_article_likes USING btree (article_id)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "idx_article_likes_article_user_uuid_unique",
+      "indexdef": "CREATE UNIQUE INDEX idx_article_likes_article_user_uuid_unique ON public._deprecated_article_likes USING btree (article_id, user_id_uuid) WHERE (user_id_uuid IS NOT NULL)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "idx_article_likes_user_id_uuid",
+      "indexdef": "CREATE INDEX idx_article_likes_user_id_uuid ON public._deprecated_article_likes USING btree (user_id_uuid) WHERE (user_id_uuid IS NOT NULL)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "unique_like_per_device",
+      "indexdef": "CREATE UNIQUE INDEX unique_like_per_device ON public._deprecated_article_likes USING btree (article_id, device_id) WHERE (device_id IS NOT NULL)"
+    },
+    {
+      "tablename": "_deprecated_article_likes",
+      "indexname": "unique_like_per_user",
+      "indexdef": "CREATE UNIQUE INDEX unique_like_per_user ON public._deprecated_article_likes USING btree (article_id, user_id) WHERE (user_id IS NOT NULL)"
+    },
+    {
+      "tablename": "_deprecated_comments",
+      "indexname": "comments_pkey",
+      "indexdef": "CREATE UNIQUE INDEX comments_pkey ON public._deprecated_comments USING btree (id)"
+    },
     {
       "tablename": "_deprecated_comments",
       "indexname": "idx_comments_article_id",
@@ -2988,24 +4240,24 @@
       "indexdef": "CREATE INDEX idx_comments_user_id ON public._deprecated_comments USING btree (user_id)"
     },
     {
-      "tablename": "_deprecated_comments",
-      "indexname": "comments_pkey",
-      "indexdef": "CREATE UNIQUE INDEX comments_pkey ON public._deprecated_comments USING btree (id)"
+      "tablename": "_deprecated_inbox_messages",
+      "indexname": "idx_inbox_messages_article_id",
+      "indexdef": "CREATE INDEX idx_inbox_messages_article_id ON public._deprecated_inbox_messages USING btree (article_id)"
     },
     {
-      "tablename": "_deprecated_news",
-      "indexname": "news_pkey",
-      "indexdef": "CREATE UNIQUE INDEX news_pkey ON public._deprecated_news USING btree (id)"
+      "tablename": "_deprecated_inbox_messages",
+      "indexname": "idx_inbox_messages_user_created_desc",
+      "indexdef": "CREATE INDEX idx_inbox_messages_user_created_desc ON public._deprecated_inbox_messages USING btree (user_id, created_at DESC)"
     },
     {
-      "tablename": "_deprecated_news",
-      "indexname": "news_url_unique",
-      "indexdef": "CREATE UNIQUE INDEX news_url_unique ON public._deprecated_news USING btree (url)"
+      "tablename": "_deprecated_inbox_messages",
+      "indexname": "idx_inbox_messages_user_id",
+      "indexdef": "CREATE INDEX idx_inbox_messages_user_id ON public._deprecated_inbox_messages USING btree (user_id)"
     },
     {
-      "tablename": "_deprecated_news",
-      "indexname": "idx_news_source_id",
-      "indexdef": "CREATE INDEX idx_news_source_id ON public._deprecated_news USING btree (source_id)"
+      "tablename": "_deprecated_inbox_messages",
+      "indexname": "inbox_messages_pkey",
+      "indexdef": "CREATE UNIQUE INDEX inbox_messages_pkey ON public._deprecated_inbox_messages USING btree (id)"
     },
     {
       "tablename": "_deprecated_news",
@@ -3019,13 +4271,48 @@
     },
     {
       "tablename": "_deprecated_news",
+      "indexname": "idx_news_source_id",
+      "indexdef": "CREATE INDEX idx_news_source_id ON public._deprecated_news USING btree (source_id)"
+    },
+    {
+      "tablename": "_deprecated_news",
+      "indexname": "news_pkey",
+      "indexdef": "CREATE UNIQUE INDEX news_pkey ON public._deprecated_news USING btree (id)"
+    },
+    {
+      "tablename": "_deprecated_news",
+      "indexname": "news_url_unique",
+      "indexdef": "CREATE UNIQUE INDEX news_url_unique ON public._deprecated_news USING btree (url)"
+    },
+    {
+      "tablename": "_deprecated_news",
       "indexname": "unique_news_url",
       "indexdef": "CREATE UNIQUE INDEX unique_news_url ON public._deprecated_news USING btree (url)"
     },
     {
+      "tablename": "_deprecated_read_later",
+      "indexname": "idx_read_later_article_id",
+      "indexdef": "CREATE INDEX idx_read_later_article_id ON public._deprecated_read_later USING btree (article_id)"
+    },
+    {
+      "tablename": "_deprecated_read_later",
+      "indexname": "idx_read_later_user_id",
+      "indexdef": "CREATE INDEX idx_read_later_user_id ON public._deprecated_read_later USING btree (user_id)"
+    },
+    {
+      "tablename": "_deprecated_read_later",
+      "indexname": "read_later_pkey",
+      "indexdef": "CREATE UNIQUE INDEX read_later_pkey ON public._deprecated_read_later USING btree (id)"
+    },
+    {
+      "tablename": "_deprecated_read_later",
+      "indexname": "read_later_user_id_article_id_key",
+      "indexdef": "CREATE UNIQUE INDEX read_later_user_id_article_id_key ON public._deprecated_read_later USING btree (user_id, article_id)"
+    },
+    {
       "tablename": "admin_audit_log",
-      "indexname": "idx_admin_audit_log_entity",
-      "indexdef": "CREATE INDEX idx_admin_audit_log_entity ON public.admin_audit_log USING btree (entity_type, entity_id, created_at DESC)"
+      "indexname": "admin_audit_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX admin_audit_log_pkey ON public.admin_audit_log USING btree (id)"
     },
     {
       "tablename": "admin_audit_log",
@@ -3034,13 +4321,18 @@
     },
     {
       "tablename": "admin_audit_log",
-      "indexname": "admin_audit_log_pkey",
-      "indexdef": "CREATE UNIQUE INDEX admin_audit_log_pkey ON public.admin_audit_log USING btree (id)"
+      "indexname": "idx_admin_audit_log_entity",
+      "indexdef": "CREATE INDEX idx_admin_audit_log_entity ON public.admin_audit_log USING btree (entity_type, entity_id, created_at DESC)"
     },
     {
       "tablename": "article_clicks",
       "indexname": "article_clicks_pkey",
       "indexdef": "CREATE UNIQUE INDEX article_clicks_pkey ON public.article_clicks USING btree (id)"
+    },
+    {
+      "tablename": "article_clicks",
+      "indexname": "idx_article_clicks_article_id",
+      "indexdef": "CREATE INDEX idx_article_clicks_article_id ON public.article_clicks USING btree (article_id)"
     },
     {
       "tablename": "article_clicks",
@@ -3054,8 +4346,8 @@
     },
     {
       "tablename": "article_clicks",
-      "indexname": "idx_article_clicks_article_id",
-      "indexdef": "CREATE INDEX idx_article_clicks_article_id ON public.article_clicks USING btree (article_id)"
+      "indexname": "idx_article_clicks_user_clicked",
+      "indexdef": "CREATE INDEX idx_article_clicks_user_clicked ON public.article_clicks USING btree (user_id, clicked_at DESC) WHERE (user_id IS NOT NULL)"
     },
     {
       "tablename": "article_clicks_p_202604",
@@ -3069,13 +4361,13 @@
     },
     {
       "tablename": "article_clicks_p_202604",
-      "indexname": "article_clicks_p_202604_user_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202604_user_id_clicked_at_idx ON public.article_clicks_p_202604 USING btree (user_id, clicked_at DESC)"
+      "indexname": "article_clicks_p_202604_source_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202604_source_id_clicked_at_idx ON public.article_clicks_p_202604 USING btree (source_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_p_202604",
-      "indexname": "article_clicks_p_202604_source_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202604_source_id_clicked_at_idx ON public.article_clicks_p_202604 USING btree (source_id, clicked_at DESC)"
+      "indexname": "article_clicks_p_202604_user_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202604_user_id_clicked_at_idx ON public.article_clicks_p_202604 USING btree (user_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_p_202605",
@@ -3084,8 +4376,8 @@
     },
     {
       "tablename": "article_clicks_p_202605",
-      "indexname": "article_clicks_p_202605_user_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202605_user_id_clicked_at_idx ON public.article_clicks_p_202605 USING btree (user_id, clicked_at DESC)"
+      "indexname": "article_clicks_p_202605_pkey",
+      "indexdef": "CREATE UNIQUE INDEX article_clicks_p_202605_pkey ON public.article_clicks_p_202605 USING btree (id, clicked_at)"
     },
     {
       "tablename": "article_clicks_p_202605",
@@ -3094,13 +4386,8 @@
     },
     {
       "tablename": "article_clicks_p_202605",
-      "indexname": "article_clicks_p_202605_pkey",
-      "indexdef": "CREATE UNIQUE INDEX article_clicks_p_202605_pkey ON public.article_clicks_p_202605 USING btree (id, clicked_at)"
-    },
-    {
-      "tablename": "article_clicks_p_202606",
-      "indexname": "article_clicks_p_202606_source_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202606_source_id_clicked_at_idx ON public.article_clicks_p_202606 USING btree (source_id, clicked_at DESC)"
+      "indexname": "article_clicks_p_202605_user_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202605_user_id_clicked_at_idx ON public.article_clicks_p_202605 USING btree (user_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_p_202606",
@@ -3114,8 +4401,18 @@
     },
     {
       "tablename": "article_clicks_p_202606",
+      "indexname": "article_clicks_p_202606_source_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202606_source_id_clicked_at_idx ON public.article_clicks_p_202606 USING btree (source_id, clicked_at DESC)"
+    },
+    {
+      "tablename": "article_clicks_p_202606",
       "indexname": "article_clicks_p_202606_user_id_clicked_at_idx",
       "indexdef": "CREATE INDEX article_clicks_p_202606_user_id_clicked_at_idx ON public.article_clicks_p_202606 USING btree (user_id, clicked_at DESC)"
+    },
+    {
+      "tablename": "article_clicks_p_202607",
+      "indexname": "article_clicks_p_202607_article_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202607_article_id_clicked_at_idx ON public.article_clicks_p_202607 USING btree (article_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_p_202607",
@@ -3124,18 +4421,13 @@
     },
     {
       "tablename": "article_clicks_p_202607",
-      "indexname": "article_clicks_p_202607_user_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202607_user_id_clicked_at_idx ON public.article_clicks_p_202607 USING btree (user_id, clicked_at DESC)"
-    },
-    {
-      "tablename": "article_clicks_p_202607",
       "indexname": "article_clicks_p_202607_source_id_clicked_at_idx",
       "indexdef": "CREATE INDEX article_clicks_p_202607_source_id_clicked_at_idx ON public.article_clicks_p_202607 USING btree (source_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_p_202607",
-      "indexname": "article_clicks_p_202607_article_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_p_202607_article_id_clicked_at_idx ON public.article_clicks_p_202607 USING btree (article_id, clicked_at DESC)"
+      "indexname": "article_clicks_p_202607_user_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_p_202607_user_id_clicked_at_idx ON public.article_clicks_p_202607 USING btree (user_id, clicked_at DESC)"
     },
     {
       "tablename": "article_clicks_partitioned",
@@ -3159,18 +4451,13 @@
     },
     {
       "tablename": "article_clicks_partitioned_default",
-      "indexname": "article_clicks_partitioned_default_pkey",
-      "indexdef": "CREATE UNIQUE INDEX article_clicks_partitioned_default_pkey ON public.article_clicks_partitioned_default USING btree (id, clicked_at)"
-    },
-    {
-      "tablename": "article_clicks_partitioned_default",
-      "indexname": "article_clicks_partitioned_default_user_id_clicked_at_idx",
-      "indexdef": "CREATE INDEX article_clicks_partitioned_default_user_id_clicked_at_idx ON public.article_clicks_partitioned_default USING btree (user_id, clicked_at DESC)"
-    },
-    {
-      "tablename": "article_clicks_partitioned_default",
       "indexname": "article_clicks_partitioned_default_article_id_clicked_at_idx",
       "indexdef": "CREATE INDEX article_clicks_partitioned_default_article_id_clicked_at_idx ON public.article_clicks_partitioned_default USING btree (article_id, clicked_at DESC)"
+    },
+    {
+      "tablename": "article_clicks_partitioned_default",
+      "indexname": "article_clicks_partitioned_default_pkey",
+      "indexdef": "CREATE UNIQUE INDEX article_clicks_partitioned_default_pkey ON public.article_clicks_partitioned_default USING btree (id, clicked_at)"
     },
     {
       "tablename": "article_clicks_partitioned_default",
@@ -3178,9 +4465,9 @@
       "indexdef": "CREATE INDEX article_clicks_partitioned_default_source_id_clicked_at_idx ON public.article_clicks_partitioned_default USING btree (source_id, clicked_at DESC)"
     },
     {
-      "tablename": "article_comments",
-      "indexname": "idx_article_comments_article_created_desc",
-      "indexdef": "CREATE INDEX idx_article_comments_article_created_desc ON public.article_comments USING btree (article_id, created_at DESC)"
+      "tablename": "article_clicks_partitioned_default",
+      "indexname": "article_clicks_partitioned_default_user_id_clicked_at_idx",
+      "indexdef": "CREATE INDEX article_clicks_partitioned_default_user_id_clicked_at_idx ON public.article_clicks_partitioned_default USING btree (user_id, clicked_at DESC)"
     },
     {
       "tablename": "article_comments",
@@ -3189,8 +4476,18 @@
     },
     {
       "tablename": "article_comments",
+      "indexname": "idx_article_comments_article_created_desc",
+      "indexdef": "CREATE INDEX idx_article_comments_article_created_desc ON public.article_comments USING btree (article_id, created_at DESC)"
+    },
+    {
+      "tablename": "article_comments",
       "indexname": "idx_article_comments_article_id",
       "indexdef": "CREATE INDEX idx_article_comments_article_id ON public.article_comments USING btree (article_id)"
+    },
+    {
+      "tablename": "article_comments",
+      "indexname": "idx_article_comments_created_at_desc",
+      "indexdef": "CREATE INDEX idx_article_comments_created_at_desc ON public.article_comments USING btree (created_at DESC)"
     },
     {
       "tablename": "article_comments",
@@ -3199,43 +4496,8 @@
     },
     {
       "tablename": "article_comments",
-      "indexname": "idx_article_comments_created_at_desc",
-      "indexdef": "CREATE INDEX idx_article_comments_created_at_desc ON public.article_comments USING btree (created_at DESC)"
-    },
-    {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "unique_like_per_user",
-      "indexdef": "CREATE UNIQUE INDEX unique_like_per_user ON public._deprecated_article_likes USING btree (article_id, user_id) WHERE (user_id IS NOT NULL)"
-    },
-    {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "idx_article_likes_article_user_uuid_unique",
-      "indexdef": "CREATE UNIQUE INDEX idx_article_likes_article_user_uuid_unique ON public._deprecated_article_likes USING btree (article_id, user_id_uuid) WHERE (user_id_uuid IS NOT NULL)"
-    },
-    {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "article_likes_pkey",
-      "indexdef": "CREATE UNIQUE INDEX article_likes_pkey ON public._deprecated_article_likes USING btree (id)"
-    },
-    {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "article_likes_article_id_user_id_key",
-      "indexdef": "CREATE UNIQUE INDEX article_likes_article_id_user_id_key ON public._deprecated_article_likes USING btree (article_id, user_id)"
-    },
-    {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "unique_like_per_device",
-      "indexdef": "CREATE UNIQUE INDEX unique_like_per_device ON public._deprecated_article_likes USING btree (article_id, device_id) WHERE (device_id IS NOT NULL)"
-    },
-    {
-      "tablename": "article_reactions",
-      "indexname": "idx_article_reactions_article_type_updated_desc",
-      "indexdef": "CREATE INDEX idx_article_reactions_article_type_updated_desc ON public.article_reactions USING btree (article_id, reaction_type, updated_at DESC)"
-    },
-    {
-      "tablename": "article_reactions",
-      "indexname": "article_reactions_pkey",
-      "indexdef": "CREATE UNIQUE INDEX article_reactions_pkey ON public.article_reactions USING btree (id)"
+      "indexname": "idx_article_comments_user_id",
+      "indexdef": "CREATE INDEX idx_article_comments_user_id ON public.article_comments USING btree (user_id)"
     },
     {
       "tablename": "article_reactions",
@@ -3244,13 +4506,23 @@
     },
     {
       "tablename": "article_reactions",
+      "indexname": "article_reactions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX article_reactions_pkey ON public.article_reactions USING btree (id)"
+    },
+    {
+      "tablename": "article_reactions",
+      "indexname": "idx_article_reactions_article_type_updated_desc",
+      "indexdef": "CREATE INDEX idx_article_reactions_article_type_updated_desc ON public.article_reactions USING btree (article_id, reaction_type, updated_at DESC)"
+    },
+    {
+      "tablename": "article_reactions",
       "indexname": "idx_article_reactions_article_user_unique",
       "indexdef": "CREATE UNIQUE INDEX idx_article_reactions_article_user_unique ON public.article_reactions USING btree (article_id, user_id)"
     },
     {
-      "tablename": "article_shares",
-      "indexname": "idx_article_shares_user_created",
-      "indexdef": "CREATE INDEX idx_article_shares_user_created ON public.article_shares USING btree (user_id, created_at DESC)"
+      "tablename": "article_reactions",
+      "indexname": "idx_article_reactions_user_updated",
+      "indexdef": "CREATE INDEX idx_article_reactions_user_updated ON public.article_reactions USING btree (user_id, updated_at DESC)"
     },
     {
       "tablename": "article_shares",
@@ -3259,13 +4531,18 @@
     },
     {
       "tablename": "article_shares",
+      "indexname": "idx_article_shares_article_created",
+      "indexdef": "CREATE INDEX idx_article_shares_article_created ON public.article_shares USING btree (article_id, created_at DESC)"
+    },
+    {
+      "tablename": "article_shares",
       "indexname": "idx_article_shares_article_created_desc",
       "indexdef": "CREATE INDEX idx_article_shares_article_created_desc ON public.article_shares USING btree (article_id, created_at DESC)"
     },
     {
       "tablename": "article_shares",
-      "indexname": "idx_article_shares_article_created",
-      "indexdef": "CREATE INDEX idx_article_shares_article_created ON public.article_shares USING btree (article_id, created_at DESC)"
+      "indexname": "idx_article_shares_user_created",
+      "indexdef": "CREATE INDEX idx_article_shares_user_created ON public.article_shares USING btree (user_id, created_at DESC)"
     },
     {
       "tablename": "article_tags",
@@ -3279,8 +4556,33 @@
     },
     {
       "tablename": "articles",
-      "indexname": "idx_articles_published_at",
-      "indexdef": "CREATE INDEX idx_articles_published_at ON public.articles USING btree (published_at DESC NULLS LAST)"
+      "indexname": "articles_pkey",
+      "indexdef": "CREATE UNIQUE INDEX articles_pkey ON public.articles USING btree (id)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "articles_url_key",
+      "indexdef": "CREATE UNIQUE INDEX articles_url_key ON public.articles USING btree (url)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "articles_url_unique",
+      "indexdef": "CREATE UNIQUE INDEX articles_url_unique ON public.articles USING btree (url)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_category_published",
+      "indexdef": "CREATE INDEX idx_articles_category_published ON public.articles USING btree (category_id, published_at DESC NULLS LAST)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_category_published_at",
+      "indexdef": "CREATE INDEX idx_articles_category_published_at ON public.articles USING btree (category_id, published_at DESC NULLS LAST) WHERE (status = 'published'::text)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_feed_lookup",
+      "indexdef": "CREATE INDEX idx_articles_feed_lookup ON public.articles USING btree (category_id, status, published_at DESC)"
     },
     {
       "tablename": "articles",
@@ -3294,33 +4596,23 @@
     },
     {
       "tablename": "articles",
-      "indexname": "idx_articles_category_published",
-      "indexdef": "CREATE INDEX idx_articles_category_published ON public.articles USING btree (category_id, published_at DESC NULLS LAST)"
-    },
-    {
-      "tablename": "articles",
-      "indexname": "articles_url_key",
-      "indexdef": "CREATE UNIQUE INDEX articles_url_key ON public.articles USING btree (url)"
-    },
-    {
-      "tablename": "articles",
-      "indexname": "idx_articles_feed_lookup",
-      "indexdef": "CREATE INDEX idx_articles_feed_lookup ON public.articles USING btree (category_id, status, published_at DESC)"
-    },
-    {
-      "tablename": "articles",
-      "indexname": "articles_pkey",
-      "indexdef": "CREATE UNIQUE INDEX articles_pkey ON public.articles USING btree (id)"
-    },
-    {
-      "tablename": "articles",
-      "indexname": "articles_url_unique",
-      "indexdef": "CREATE UNIQUE INDEX articles_url_unique ON public.articles USING btree (url)"
-    },
-    {
-      "tablename": "articles",
       "indexname": "idx_articles_fts_title_snippet",
       "indexdef": "CREATE INDEX idx_articles_fts_title_snippet ON public.articles USING gin (fts_title_snippet)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_published_at",
+      "indexdef": "CREATE INDEX idx_articles_published_at ON public.articles USING btree (published_at DESC NULLS LAST)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_source_published_at",
+      "indexdef": "CREATE INDEX idx_articles_source_published_at ON public.articles USING btree (source_id, published_at DESC NULLS LAST) WHERE (status = 'published'::text)"
+    },
+    {
+      "tablename": "articles",
+      "indexname": "idx_articles_status_published_at",
+      "indexdef": "CREATE INDEX idx_articles_status_published_at ON public.articles USING btree (status, published_at DESC NULLS LAST) WHERE (status = 'published'::text)"
     },
     {
       "tablename": "articles_engagement_feed",
@@ -3329,8 +4621,8 @@
     },
     {
       "tablename": "articles_engagement_feed",
-      "indexname": "idx_aef_id",
-      "indexdef": "CREATE UNIQUE INDEX idx_aef_id ON public.articles_engagement_feed USING btree (id)"
+      "indexname": "idx_aef_engagement_published",
+      "indexdef": "CREATE INDEX idx_aef_engagement_published ON public.articles_engagement_feed USING btree (engagement_score DESC NULLS LAST, published_at DESC NULLS LAST)"
     },
     {
       "tablename": "articles_engagement_feed",
@@ -3339,18 +4631,13 @@
     },
     {
       "tablename": "articles_engagement_feed",
-      "indexname": "idx_aef_engagement_published",
-      "indexdef": "CREATE INDEX idx_aef_engagement_published ON public.articles_engagement_feed USING btree (engagement_score DESC NULLS LAST, published_at DESC NULLS LAST)"
+      "indexname": "idx_aef_id",
+      "indexdef": "CREATE UNIQUE INDEX idx_aef_id ON public.articles_engagement_feed USING btree (id)"
     },
     {
       "tablename": "blocked_users",
       "indexname": "blocked_users_pkey",
       "indexdef": "CREATE UNIQUE INDEX blocked_users_pkey ON public.blocked_users USING btree (id)"
-    },
-    {
-      "tablename": "blocked_users",
-      "indexname": "idx_blocked_users_user_id",
-      "indexdef": "CREATE INDEX idx_blocked_users_user_id ON public.blocked_users USING btree (user_id)"
     },
     {
       "tablename": "blocked_users",
@@ -3361,6 +4648,31 @@
       "tablename": "blocked_users",
       "indexname": "blocked_users_user_id_blocked_user_id_key",
       "indexdef": "CREATE UNIQUE INDEX blocked_users_user_id_blocked_user_id_key ON public.blocked_users USING btree (user_id, blocked_user_id)"
+    },
+    {
+      "tablename": "blocked_users",
+      "indexname": "idx_blocked_users_blocked_source_id",
+      "indexdef": "CREATE INDEX idx_blocked_users_blocked_source_id ON public.blocked_users USING btree (blocked_source_id)"
+    },
+    {
+      "tablename": "blocked_users",
+      "indexname": "idx_blocked_users_blocked_user_id",
+      "indexdef": "CREATE INDEX idx_blocked_users_blocked_user_id ON public.blocked_users USING btree (blocked_user_id)"
+    },
+    {
+      "tablename": "blocked_users",
+      "indexname": "idx_blocked_users_user_id",
+      "indexdef": "CREATE INDEX idx_blocked_users_user_id ON public.blocked_users USING btree (user_id)"
+    },
+    {
+      "tablename": "bookmarks",
+      "indexname": "bookmarks_pkey",
+      "indexdef": "CREATE UNIQUE INDEX bookmarks_pkey ON public.bookmarks USING btree (id)"
+    },
+    {
+      "tablename": "bookmarks",
+      "indexname": "bookmarks_user_article_type_unique",
+      "indexdef": "CREATE UNIQUE INDEX bookmarks_user_article_type_unique ON public.bookmarks USING btree (user_id, article_id, type)"
     },
     {
       "tablename": "bookmarks",
@@ -3384,23 +4696,8 @@
     },
     {
       "tablename": "bookmarks",
-      "indexname": "bookmarks_pkey",
-      "indexdef": "CREATE UNIQUE INDEX bookmarks_pkey ON public.bookmarks USING btree (id)"
-    },
-    {
-      "tablename": "bookmarks",
       "indexname": "idx_bookmarks_user_type_created",
       "indexdef": "CREATE INDEX idx_bookmarks_user_type_created ON public.bookmarks USING btree (user_id, type, created_at DESC)"
-    },
-    {
-      "tablename": "bookmarks",
-      "indexname": "bookmarks_user_article_type_unique",
-      "indexdef": "CREATE UNIQUE INDEX bookmarks_user_article_type_unique ON public.bookmarks USING btree (user_id, article_id, type)"
-    },
-    {
-      "tablename": "categories",
-      "indexname": "categories_pkey",
-      "indexdef": "CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id)"
     },
     {
       "tablename": "categories",
@@ -3409,8 +4706,28 @@
     },
     {
       "tablename": "categories",
+      "indexname": "categories_pkey",
+      "indexdef": "CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id)"
+    },
+    {
+      "tablename": "categories",
       "indexname": "categories_slug_unique",
       "indexdef": "CREATE UNIQUE INDEX categories_slug_unique ON public.categories USING btree (slug)"
+    },
+    {
+      "tablename": "content_flags",
+      "indexname": "content_flags_pkey",
+      "indexdef": "CREATE UNIQUE INDEX content_flags_pkey ON public.content_flags USING btree (id)"
+    },
+    {
+      "tablename": "content_flags",
+      "indexname": "idx_content_flags_article_id",
+      "indexdef": "CREATE INDEX idx_content_flags_article_id ON public.content_flags USING btree (article_id)"
+    },
+    {
+      "tablename": "content_flags",
+      "indexname": "idx_content_flags_comment_id",
+      "indexdef": "CREATE INDEX idx_content_flags_comment_id ON public.content_flags USING btree (comment_id)"
     },
     {
       "tablename": "content_flags",
@@ -3419,13 +4736,18 @@
     },
     {
       "tablename": "content_flags",
+      "indexname": "idx_content_flags_source_id",
+      "indexdef": "CREATE INDEX idx_content_flags_source_id ON public.content_flags USING btree (source_id)"
+    },
+    {
+      "tablename": "content_flags",
       "indexname": "idx_content_flags_status_created",
       "indexdef": "CREATE INDEX idx_content_flags_status_created ON public.content_flags USING btree (status, created_at DESC)"
     },
     {
-      "tablename": "content_flags",
-      "indexname": "content_flags_pkey",
-      "indexdef": "CREATE UNIQUE INDEX content_flags_pkey ON public.content_flags USING btree (id)"
+      "tablename": "feature_flags",
+      "indexname": "feature_flags_pkey",
+      "indexdef": "CREATE UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (name)"
     },
     {
       "tablename": "feedback",
@@ -3433,24 +4755,9 @@
       "indexdef": "CREATE UNIQUE INDEX feedback_pkey ON public.feedback USING btree (id)"
     },
     {
-      "tablename": "_deprecated_inbox_messages",
-      "indexname": "idx_inbox_messages_user_created_desc",
-      "indexdef": "CREATE INDEX idx_inbox_messages_user_created_desc ON public._deprecated_inbox_messages USING btree (user_id, created_at DESC)"
-    },
-    {
-      "tablename": "_deprecated_inbox_messages",
-      "indexname": "inbox_messages_pkey",
-      "indexdef": "CREATE UNIQUE INDEX inbox_messages_pkey ON public._deprecated_inbox_messages USING btree (id)"
-    },
-    {
-      "tablename": "_deprecated_inbox_messages",
-      "indexname": "idx_inbox_messages_user_id",
-      "indexdef": "CREATE INDEX idx_inbox_messages_user_id ON public._deprecated_inbox_messages USING btree (user_id)"
-    },
-    {
-      "tablename": "ingestion_jobs",
-      "indexname": "ingestion_jobs_feed_id_key",
-      "indexdef": "CREATE UNIQUE INDEX ingestion_jobs_feed_id_key ON public.ingestion_jobs USING btree (feed_id)"
+      "tablename": "feedback",
+      "indexname": "idx_feedback_user_id",
+      "indexdef": "CREATE INDEX idx_feedback_user_id ON public.feedback USING btree (user_id)"
     },
     {
       "tablename": "ingestion_jobs",
@@ -3459,8 +4766,143 @@
     },
     {
       "tablename": "ingestion_jobs",
+      "indexname": "idx_ingestion_jobs_lease",
+      "indexdef": "CREATE INDEX idx_ingestion_jobs_lease ON public.ingestion_jobs USING btree (last_status, leased_until) WHERE (last_status = ANY (ARRAY['queued'::text, 'running'::text]))"
+    },
+    {
+      "tablename": "ingestion_jobs",
+      "indexname": "idx_ingestion_jobs_source_id",
+      "indexdef": "CREATE INDEX idx_ingestion_jobs_source_id ON public.ingestion_jobs USING btree (source_id)"
+    },
+    {
+      "tablename": "ingestion_jobs",
+      "indexname": "ingestion_jobs_feed_id_key",
+      "indexdef": "CREATE UNIQUE INDEX ingestion_jobs_feed_id_key ON public.ingestion_jobs USING btree (feed_id)"
+    },
+    {
+      "tablename": "ingestion_jobs",
       "indexname": "ingestion_jobs_pkey",
       "indexdef": "CREATE UNIQUE INDEX ingestion_jobs_pkey ON public.ingestion_jobs USING btree (id)"
+    },
+    {
+      "tablename": "job_dead_letter",
+      "indexname": "idx_job_dead_letter_queue_failed",
+      "indexdef": "CREATE INDEX idx_job_dead_letter_queue_failed ON public.job_dead_letter USING btree (queue_name, failed_at DESC)"
+    },
+    {
+      "tablename": "job_dead_letter",
+      "indexname": "job_dead_letter_pkey",
+      "indexdef": "CREATE UNIQUE INDEX job_dead_letter_pkey ON public.job_dead_letter USING btree (id)"
+    },
+    {
+      "tablename": "job_queue",
+      "indexname": "idx_job_queue_created_at",
+      "indexdef": "CREATE INDEX idx_job_queue_created_at ON public.job_queue USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "job_queue",
+      "indexname": "idx_job_queue_dedup_active",
+      "indexdef": "CREATE UNIQUE INDEX idx_job_queue_dedup_active ON public.job_queue USING btree (queue_name, job_type, dedup_key) WHERE (dedup_key IS NOT NULL AND status = ANY (ARRAY['queued'::text, 'leased'::text, 'running'::text]))"
+    },
+    {
+      "tablename": "job_queue",
+      "indexname": "idx_job_queue_dispatch",
+      "indexdef": "CREATE INDEX idx_job_queue_dispatch ON public.job_queue USING btree (queue_name, status, priority DESC, next_attempt_at) WHERE (status = 'queued'::text)"
+    },
+    {
+      "tablename": "job_queue",
+      "indexname": "idx_job_queue_lease_expiry",
+      "indexdef": "CREATE INDEX idx_job_queue_lease_expiry ON public.job_queue USING btree (status, leased_until) WHERE (status = ANY (ARRAY['leased'::text, 'running'::text]))"
+    },
+    {
+      "tablename": "job_queue",
+      "indexname": "job_queue_pkey",
+      "indexdef": "CREATE UNIQUE INDEX job_queue_pkey ON public.job_queue USING btree (id)"
+    },
+    {
+      "tablename": "notification_deliveries",
+      "indexname": "idx_notification_deliveries_event",
+      "indexdef": "CREATE INDEX idx_notification_deliveries_event ON public.notification_deliveries USING btree (event_id, status)"
+    },
+    {
+      "tablename": "notification_deliveries",
+      "indexname": "idx_notification_deliveries_pending",
+      "indexdef": "CREATE INDEX idx_notification_deliveries_pending ON public.notification_deliveries USING btree (status, scheduled_for) WHERE (status = 'pending'::text)"
+    },
+    {
+      "tablename": "notification_deliveries",
+      "indexname": "idx_notification_deliveries_user_channel",
+      "indexdef": "CREATE INDEX idx_notification_deliveries_user_channel ON public.notification_deliveries USING btree (user_id, channel, created_at DESC)"
+    },
+    {
+      "tablename": "notification_deliveries",
+      "indexname": "notification_deliveries_pkey",
+      "indexdef": "CREATE UNIQUE INDEX notification_deliveries_pkey ON public.notification_deliveries USING btree (id)"
+    },
+    {
+      "tablename": "notification_events",
+      "indexname": "idx_notification_events_article",
+      "indexdef": "CREATE INDEX idx_notification_events_article ON public.notification_events USING btree (article_id)"
+    },
+    {
+      "tablename": "notification_events",
+      "indexname": "idx_notification_events_dedup_pending",
+      "indexdef": "CREATE UNIQUE INDEX idx_notification_events_dedup_pending ON public.notification_events USING btree (event_type, dedup_key) WHERE ((dedup_key IS NOT NULL) AND (status = ANY (ARRAY['pending'::text, 'processing'::text])))"
+    },
+    {
+      "tablename": "notification_events",
+      "indexname": "idx_notification_events_dispatch",
+      "indexdef": "CREATE INDEX idx_notification_events_dispatch ON public.notification_events USING btree (status, priority DESC, scheduled_for) WHERE (status = 'pending'::text)"
+    },
+    {
+      "tablename": "notification_events",
+      "indexname": "idx_notification_events_target_user",
+      "indexdef": "CREATE INDEX idx_notification_events_target_user ON public.notification_events USING btree (target_user_id, created_at DESC) WHERE (target_user_id IS NOT NULL)"
+    },
+    {
+      "tablename": "notification_events",
+      "indexname": "notification_events_pkey",
+      "indexdef": "CREATE UNIQUE INDEX notification_events_pkey ON public.notification_events USING btree (id)"
+    },
+    {
+      "tablename": "notification_rate_limits",
+      "indexname": "idx_notification_rate_limits_user",
+      "indexdef": "CREATE INDEX idx_notification_rate_limits_user ON public.notification_rate_limits USING btree (user_id, notification_type)"
+    },
+    {
+      "tablename": "notification_rate_limits",
+      "indexname": "notification_rate_limits_pkey",
+      "indexdef": "CREATE UNIQUE INDEX notification_rate_limits_pkey ON public.notification_rate_limits USING btree (id)"
+    },
+    {
+      "tablename": "notification_rate_limits",
+      "indexname": "notification_rate_limits_user_id_notification_type_key",
+      "indexdef": "CREATE UNIQUE INDEX notification_rate_limits_user_id_notification_type_key ON public.notification_rate_limits USING btree (user_id, notification_type)"
+    },
+    {
+      "tablename": "notifications",
+      "indexname": "idx_notifications_article_id",
+      "indexdef": "CREATE INDEX idx_notifications_article_id ON public.notifications USING btree (article_id)"
+    },
+    {
+      "tablename": "notifications",
+      "indexname": "idx_notifications_type_created",
+      "indexdef": "CREATE INDEX idx_notifications_type_created ON public.notifications USING btree (type, created_at DESC)"
+    },
+    {
+      "tablename": "notifications",
+      "indexname": "idx_notifications_unread_user",
+      "indexdef": "CREATE INDEX idx_notifications_unread_user ON public.notifications USING btree (user_id, read, created_at DESC) WHERE (read = false)"
+    },
+    {
+      "tablename": "notifications",
+      "indexname": "idx_notifications_user_created_desc",
+      "indexdef": "CREATE INDEX idx_notifications_user_created_desc ON public.notifications USING btree (user_id, created_at DESC)"
+    },
+    {
+      "tablename": "notifications",
+      "indexname": "idx_notifications_user_dedup_unique",
+      "indexdef": "CREATE UNIQUE INDEX idx_notifications_user_dedup_unique ON public.notifications USING btree (user_id, dedup_key) WHERE ((dedup_key IS NOT NULL) AND (user_id IS NOT NULL))"
     },
     {
       "tablename": "notifications",
@@ -3473,29 +4915,54 @@
       "indexdef": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
     },
     {
-      "tablename": "notifications",
-      "indexname": "idx_notifications_user_created_desc",
-      "indexdef": "CREATE INDEX idx_notifications_user_created_desc ON public.notifications USING btree (user_id, created_at DESC)"
+      "tablename": "personalization_recompute_queue",
+      "indexname": "personalization_recompute_queue_pkey",
+      "indexdef": "CREATE UNIQUE INDEX personalization_recompute_queue_pkey ON public.personalization_recompute_queue USING btree (user_id)"
     },
     {
-      "tablename": "notifications",
-      "indexname": "idx_notifications_article_id",
-      "indexdef": "CREATE INDEX idx_notifications_article_id ON public.notifications USING btree (article_id)"
+      "tablename": "ranked_feed_category",
+      "indexname": "idx_ranked_feed_category_rank",
+      "indexdef": "CREATE INDEX idx_ranked_feed_category_rank ON public.ranked_feed_category USING btree (category_id, category_rank)"
     },
     {
-      "tablename": "_deprecated_read_later",
-      "indexname": "read_later_pkey",
-      "indexdef": "CREATE UNIQUE INDEX read_later_pkey ON public._deprecated_read_later USING btree (id)"
+      "tablename": "ranked_feed_category",
+      "indexname": "idx_ranked_feed_category_unique",
+      "indexdef": "CREATE UNIQUE INDEX idx_ranked_feed_category_unique ON public.ranked_feed_category USING btree (category_id, article_id)"
     },
     {
-      "tablename": "_deprecated_read_later",
-      "indexname": "idx_read_later_user_id",
-      "indexdef": "CREATE INDEX idx_read_later_user_id ON public._deprecated_read_later USING btree (user_id)"
+      "tablename": "ranked_feed_global",
+      "indexname": "idx_ranked_feed_global_article",
+      "indexdef": "CREATE UNIQUE INDEX idx_ranked_feed_global_article ON public.ranked_feed_global USING btree (article_id)"
     },
     {
-      "tablename": "_deprecated_read_later",
-      "indexname": "read_later_user_id_article_id_key",
-      "indexdef": "CREATE UNIQUE INDEX read_later_user_id_article_id_key ON public._deprecated_read_later USING btree (user_id, article_id)"
+      "tablename": "ranked_feed_global",
+      "indexname": "idx_ranked_feed_global_category_final",
+      "indexdef": "CREATE INDEX idx_ranked_feed_global_category_final ON public.ranked_feed_global USING btree (category_id, final_score DESC NULLS LAST)"
+    },
+    {
+      "tablename": "ranked_feed_global",
+      "indexname": "idx_ranked_feed_global_final_score",
+      "indexdef": "CREATE INDEX idx_ranked_feed_global_final_score ON public.ranked_feed_global USING btree (final_score DESC NULLS LAST)"
+    },
+    {
+      "tablename": "ranked_feed_personalized",
+      "indexname": "idx_ranked_feed_personalized_computed",
+      "indexdef": "CREATE INDEX idx_ranked_feed_personalized_computed ON public.ranked_feed_personalized USING btree (computed_at)"
+    },
+    {
+      "tablename": "ranked_feed_personalized",
+      "indexname": "idx_ranked_feed_personalized_user_rank",
+      "indexdef": "CREATE INDEX idx_ranked_feed_personalized_user_rank ON public.ranked_feed_personalized USING btree (user_id, rank)"
+    },
+    {
+      "tablename": "ranked_feed_personalized",
+      "indexname": "ranked_feed_personalized_pkey",
+      "indexdef": "CREATE UNIQUE INDEX ranked_feed_personalized_pkey ON public.ranked_feed_personalized USING btree (user_id, article_id)"
+    },
+    {
+      "tablename": "reward_events",
+      "indexname": "idx_reward_events_user_id",
+      "indexdef": "CREATE INDEX idx_reward_events_user_id ON public.reward_events USING btree (user_id)"
     },
     {
       "tablename": "reward_events",
@@ -3503,9 +4970,14 @@
       "indexdef": "CREATE UNIQUE INDEX reward_events_pkey ON public.reward_events USING btree (id)"
     },
     {
-      "tablename": "reward_events",
-      "indexname": "idx_reward_events_user_id",
-      "indexdef": "CREATE INDEX idx_reward_events_user_id ON public.reward_events USING btree (user_id)"
+      "tablename": "rss_feed_sources",
+      "indexname": "idx_rss_feed_sources_active_next_fetch",
+      "indexdef": "CREATE INDEX idx_rss_feed_sources_active_next_fetch ON public.rss_feed_sources USING btree (is_active, next_fetch_at) WHERE (is_active = true)"
+    },
+    {
+      "tablename": "rss_feed_sources",
+      "indexname": "idx_rss_feed_sources_reliability",
+      "indexdef": "CREATE INDEX idx_rss_feed_sources_reliability ON public.rss_feed_sources USING btree (reliability_score DESC NULLS LAST)"
     },
     {
       "tablename": "rss_feed_sources",
@@ -3514,18 +4986,18 @@
     },
     {
       "tablename": "rss_feed_sources",
-      "indexname": "rss_feed_sources_url_key",
-      "indexdef": "CREATE UNIQUE INDEX rss_feed_sources_url_key ON public.rss_feed_sources USING btree (url)"
-    },
-    {
-      "tablename": "rss_feed_sources",
       "indexname": "rss_feed_sources_pkey",
       "indexdef": "CREATE UNIQUE INDEX rss_feed_sources_pkey ON public.rss_feed_sources USING btree (id)"
     },
     {
+      "tablename": "rss_feed_sources",
+      "indexname": "rss_feed_sources_url_key",
+      "indexdef": "CREATE UNIQUE INDEX rss_feed_sources_url_key ON public.rss_feed_sources USING btree (url)"
+    },
+    {
       "tablename": "rss_ingestion_log",
-      "indexname": "rss_ingestion_log_pkey",
-      "indexdef": "CREATE UNIQUE INDEX rss_ingestion_log_pkey ON public.rss_ingestion_log USING btree (id)"
+      "indexname": "idx_rss_ingestion_log_feed_id",
+      "indexdef": "CREATE INDEX idx_rss_ingestion_log_feed_id ON public.rss_ingestion_log USING btree (feed_id)"
     },
     {
       "tablename": "rss_ingestion_log",
@@ -3534,18 +5006,8 @@
     },
     {
       "tablename": "rss_ingestion_log",
-      "indexname": "idx_rss_ingestion_log_feed_id",
-      "indexdef": "CREATE INDEX idx_rss_ingestion_log_feed_id ON public.rss_ingestion_log USING btree (feed_id)"
-    },
-    {
-      "tablename": "sources",
-      "indexname": "sources_rss_url_unique",
-      "indexdef": "CREATE UNIQUE INDEX sources_rss_url_unique ON public.sources USING btree (rss_url)"
-    },
-    {
-      "tablename": "sources",
-      "indexname": "sources_pkey",
-      "indexdef": "CREATE UNIQUE INDEX sources_pkey ON public.sources USING btree (id)"
+      "indexname": "rss_ingestion_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX rss_ingestion_log_pkey ON public.rss_ingestion_log USING btree (id)"
     },
     {
       "tablename": "sources",
@@ -3559,13 +5021,18 @@
     },
     {
       "tablename": "sources",
-      "indexname": "unique_rss_url",
-      "indexdef": "CREATE UNIQUE INDEX unique_rss_url ON public.sources USING btree (rss_url)"
+      "indexname": "sources_pkey",
+      "indexdef": "CREATE UNIQUE INDEX sources_pkey ON public.sources USING btree (id)"
     },
     {
-      "tablename": "tags",
-      "indexname": "tags_pkey",
-      "indexdef": "CREATE UNIQUE INDEX tags_pkey ON public.tags USING btree (id)"
+      "tablename": "sources",
+      "indexname": "sources_rss_url_unique",
+      "indexdef": "CREATE UNIQUE INDEX sources_rss_url_unique ON public.sources USING btree (rss_url)"
+    },
+    {
+      "tablename": "sources",
+      "indexname": "unique_rss_url",
+      "indexdef": "CREATE UNIQUE INDEX unique_rss_url ON public.sources USING btree (rss_url)"
     },
     {
       "tablename": "tags",
@@ -3574,8 +5041,33 @@
     },
     {
       "tablename": "tags",
+      "indexname": "tags_pkey",
+      "indexdef": "CREATE UNIQUE INDEX tags_pkey ON public.tags USING btree (id)"
+    },
+    {
+      "tablename": "tags",
       "indexname": "tags_slug_unique",
       "indexdef": "CREATE UNIQUE INDEX tags_slug_unique ON public.tags USING btree (slug)"
+    },
+    {
+      "tablename": "user_category_affinity",
+      "indexname": "idx_user_category_affinity_category_score",
+      "indexdef": "CREATE INDEX idx_user_category_affinity_category_score ON public.user_category_affinity USING btree (category_id, score DESC)"
+    },
+    {
+      "tablename": "user_category_affinity",
+      "indexname": "idx_user_category_affinity_user_score",
+      "indexdef": "CREATE INDEX idx_user_category_affinity_user_score ON public.user_category_affinity USING btree (user_id, score DESC)"
+    },
+    {
+      "tablename": "user_category_affinity",
+      "indexname": "user_category_affinity_pkey",
+      "indexdef": "CREATE UNIQUE INDEX user_category_affinity_pkey ON public.user_category_affinity USING btree (id)"
+    },
+    {
+      "tablename": "user_category_affinity",
+      "indexname": "user_category_affinity_user_id_category_id_key",
+      "indexdef": "CREATE UNIQUE INDEX user_category_affinity_user_id_category_id_key ON public.user_category_affinity USING btree (user_id, category_id)"
     },
     {
       "tablename": "user_devices",
@@ -3599,8 +5091,8 @@
     },
     {
       "tablename": "user_interests",
-      "indexname": "user_interests_user_category_unique",
-      "indexdef": "CREATE UNIQUE INDEX user_interests_user_category_unique ON public.user_interests USING btree (user_id, category_id)"
+      "indexname": "idx_user_interests_user_uuid_category_unique",
+      "indexdef": "CREATE UNIQUE INDEX idx_user_interests_user_uuid_category_unique ON public.user_interests USING btree (user_id_uuid, category_id) WHERE (user_id_uuid IS NOT NULL)"
     },
     {
       "tablename": "user_interests",
@@ -3609,18 +5101,18 @@
     },
     {
       "tablename": "user_interests",
-      "indexname": "idx_user_interests_user_uuid_category_unique",
-      "indexdef": "CREATE UNIQUE INDEX idx_user_interests_user_uuid_category_unique ON public.user_interests USING btree (user_id_uuid, category_id) WHERE (user_id_uuid IS NOT NULL)"
-    },
-    {
-      "tablename": "user_preferences",
-      "indexname": "user_preferences_user_id_key",
-      "indexdef": "CREATE UNIQUE INDEX user_preferences_user_id_key ON public.user_preferences USING btree (user_id)"
+      "indexname": "user_interests_user_category_unique",
+      "indexdef": "CREATE UNIQUE INDEX user_interests_user_category_unique ON public.user_interests USING btree (user_id, category_id)"
     },
     {
       "tablename": "user_preferences",
       "indexname": "user_preferences_pkey",
       "indexdef": "CREATE UNIQUE INDEX user_preferences_pkey ON public.user_preferences USING btree (id)"
+    },
+    {
+      "tablename": "user_preferences",
+      "indexname": "user_preferences_user_id_key",
+      "indexdef": "CREATE UNIQUE INDEX user_preferences_user_id_key ON public.user_preferences USING btree (user_id)"
     },
     {
       "tablename": "user_read_history",
@@ -3634,18 +5126,13 @@
     },
     {
       "tablename": "user_read_history",
-      "indexname": "user_read_history_user_id_article_id_key",
-      "indexdef": "CREATE UNIQUE INDEX user_read_history_user_id_article_id_key ON public.user_read_history USING btree (user_id, article_id)"
-    },
-    {
-      "tablename": "user_read_history",
       "indexname": "user_read_history_pkey",
       "indexdef": "CREATE UNIQUE INDEX user_read_history_pkey ON public.user_read_history USING btree (id)"
     },
     {
-      "tablename": "user_rewards",
-      "indexname": "user_rewards_user_id_key",
-      "indexdef": "CREATE UNIQUE INDEX user_rewards_user_id_key ON public.user_rewards USING btree (user_id)"
+      "tablename": "user_read_history",
+      "indexname": "user_read_history_user_id_article_id_key",
+      "indexdef": "CREATE UNIQUE INDEX user_read_history_user_id_article_id_key ON public.user_read_history USING btree (user_id, article_id)"
     },
     {
       "tablename": "user_rewards",
@@ -3653,69 +5140,97 @@
       "indexdef": "CREATE UNIQUE INDEX user_rewards_pkey ON public.user_rewards USING btree (id)"
     },
     {
-      "tablename": "article_comments",
-      "indexname": "idx_article_comments_user_id",
-      "indexdef": "CREATE INDEX idx_article_comments_user_id ON public.article_comments USING btree (user_id)"
+      "tablename": "user_rewards",
+      "indexname": "user_rewards_user_id_key",
+      "indexdef": "CREATE UNIQUE INDEX user_rewards_user_id_key ON public.user_rewards USING btree (user_id)"
     },
     {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "idx_article_likes_article_id",
-      "indexdef": "CREATE INDEX idx_article_likes_article_id ON public._deprecated_article_likes USING btree (article_id)"
+      "tablename": "user_source_affinity",
+      "indexname": "idx_user_source_affinity_source_score",
+      "indexdef": "CREATE INDEX idx_user_source_affinity_source_score ON public.user_source_affinity USING btree (source_id, score DESC)"
     },
     {
-      "tablename": "_deprecated_article_likes",
-      "indexname": "idx_article_likes_user_id_uuid",
-      "indexdef": "CREATE INDEX idx_article_likes_user_id_uuid ON public._deprecated_article_likes USING btree (user_id_uuid) WHERE (user_id_uuid IS NOT NULL)"
+      "tablename": "user_source_affinity",
+      "indexname": "idx_user_source_affinity_user_score",
+      "indexdef": "CREATE INDEX idx_user_source_affinity_user_score ON public.user_source_affinity USING btree (user_id, score DESC)"
     },
     {
-      "tablename": "blocked_users",
-      "indexname": "idx_blocked_users_blocked_user_id",
-      "indexdef": "CREATE INDEX idx_blocked_users_blocked_user_id ON public.blocked_users USING btree (blocked_user_id)"
+      "tablename": "user_source_affinity",
+      "indexname": "user_source_affinity_pkey",
+      "indexdef": "CREATE UNIQUE INDEX user_source_affinity_pkey ON public.user_source_affinity USING btree (id)"
     },
     {
-      "tablename": "blocked_users",
-      "indexname": "idx_blocked_users_blocked_source_id",
-      "indexdef": "CREATE INDEX idx_blocked_users_blocked_source_id ON public.blocked_users USING btree (blocked_source_id)"
+      "tablename": "user_source_affinity",
+      "indexname": "user_source_affinity_user_id_source_id_key",
+      "indexdef": "CREATE UNIQUE INDEX user_source_affinity_user_id_source_id_key ON public.user_source_affinity USING btree (user_id, source_id)"
     },
     {
-      "tablename": "feedback",
-      "indexname": "idx_feedback_user_id",
-      "indexdef": "CREATE INDEX idx_feedback_user_id ON public.feedback USING btree (user_id)"
+      "tablename": "worker_heartbeats",
+      "indexname": "idx_worker_heartbeats_type_status",
+      "indexdef": "CREATE INDEX idx_worker_heartbeats_type_status ON public.worker_heartbeats USING btree (worker_type, status, last_heartbeat_at DESC)"
     },
     {
-      "tablename": "_deprecated_inbox_messages",
-      "indexname": "idx_inbox_messages_article_id",
-      "indexdef": "CREATE INDEX idx_inbox_messages_article_id ON public._deprecated_inbox_messages USING btree (article_id)"
+      "tablename": "worker_heartbeats",
+      "indexname": "worker_heartbeats_pkey",
+      "indexdef": "CREATE UNIQUE INDEX worker_heartbeats_pkey ON public.worker_heartbeats USING btree (id)"
     },
     {
-      "tablename": "_deprecated_read_later",
-      "indexname": "idx_read_later_article_id",
-      "indexdef": "CREATE INDEX idx_read_later_article_id ON public._deprecated_read_later USING btree (article_id)"
-    },
-    {
-      "tablename": "content_flags",
-      "indexname": "idx_content_flags_article_id",
-      "indexdef": "CREATE INDEX idx_content_flags_article_id ON public.content_flags USING btree (article_id)"
-    },
-    {
-      "tablename": "content_flags",
-      "indexname": "idx_content_flags_comment_id",
-      "indexdef": "CREATE INDEX idx_content_flags_comment_id ON public.content_flags USING btree (comment_id)"
-    },
-    {
-      "tablename": "content_flags",
-      "indexname": "idx_content_flags_source_id",
-      "indexdef": "CREATE INDEX idx_content_flags_source_id ON public.content_flags USING btree (source_id)"
-    },
-    {
-      "tablename": "ingestion_jobs",
-      "indexname": "idx_ingestion_jobs_source_id",
-      "indexdef": "CREATE INDEX idx_ingestion_jobs_source_id ON public.ingestion_jobs USING btree (source_id)"
+      "tablename": "worker_heartbeats",
+      "indexname": "worker_heartbeats_worker_id_worker_type_key",
+      "indexdef": "CREATE UNIQUE INDEX worker_heartbeats_worker_id_worker_type_key ON public.worker_heartbeats USING btree (worker_id, worker_type)"
     }
   ],
   "routines": [
     {
+      "routine_name": "check_notification_rate_limit",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_job_dead_letter",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_job_queue",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_notification_deliveries",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_notification_events",
+      "routine_type": "FUNCTION"
+    },
+    {
       "routine_name": "cleanup_rss_ingestion_log",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_stale_personalized_feeds",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "cleanup_worker_heartbeats",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "complete_job",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "enqueue_job",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "enqueue_notification_event",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "enqueue_personalization_recompute",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "fail_job",
       "routine_type": "FUNCTION"
     },
     {
@@ -3723,7 +5238,39 @@
       "routine_type": "FUNCTION"
     },
     {
+      "routine_name": "get_notification_unread_count",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "heartbeat_job",
+      "routine_type": "FUNCTION"
+    },
+    {
       "routine_name": "increment_user_interest",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "is_feature_enabled",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "is_feature_enabled_for_user",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "lease_due_feeds",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "lease_jobs",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "mark_stale_workers_crashed",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "materialize_notification_event",
       "routine_type": "FUNCTION"
     },
     {
@@ -3731,7 +5278,51 @@
       "routine_type": "FUNCTION"
     },
     {
+      "routine_name": "process_pending_personalization",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "reap_expired_job_leases",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "recompute_user_affinity",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "record_feed_ingestion_outcome",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "record_notification_delivery",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "refresh_active_users_personalized_feeds",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "refresh_personalized_feed_for_user",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "refresh_ranked_feeds",
+      "routine_type": "FUNCTION"
+    },
+    {
       "routine_name": "refresh_trending_feed",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "release_ingestion_job",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "replay_dead_letter",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "sync_article_reactions_to_legacy_likes",
       "routine_type": "FUNCTION"
     },
     {
@@ -3740,6 +5331,14 @@
     },
     {
       "routine_name": "sync_read_later_to_bookmarks",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "touch_updated_at",
+      "routine_type": "FUNCTION"
+    },
+    {
+      "routine_name": "worker_heartbeat",
       "routine_type": "FUNCTION"
     }
   ],

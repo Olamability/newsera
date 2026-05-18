@@ -9,6 +9,8 @@
     "rss:start": "corepack pnpm --filter @newsera/rss-engine start",
     "rss:worker": "corepack pnpm --filter @newsera/rss-engine worker",
     "rss:worker:v2": "corepack pnpm --filter @newsera/rss-engine worker:v2",
+    "queue:runner": "corepack pnpm --filter @newsera/rss-engine queue:runner",
+    "test:queue": "corepack pnpm --filter @newsera/rss-engine test:queue",
     "lint": "corepack pnpm -r --if-present run lint",
     "typecheck": "corepack pnpm -r --if-present run typecheck"
   },

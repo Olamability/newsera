@@ -10,8 +10,14 @@
  *
  * Format:
  *   `${source_id}:${external_article_id}`     when the feed exposes a stable ID
- *   `${source_id}:url:${sha256(article_url)}` fallback when only a URL is known
- *   `url:${sha256(article_url)}`              last-resort when source_id is missing
+ *   `ext:${external_article_id}`              when only an external id is known
+ *   `${source_id}:url:${sha256_128(article_url)}` fallback when only a URL is known
+ *   `url:${sha256_128(article_url)}`          last-resort when source_id is missing
+ *
+ * The URL digest is the first 32 hex chars (128 bits) of SHA-256. That is more
+ * than sufficient for collision-resistance in this namespace (keys are scoped
+ * by `source_id` and only used to identify articles ingested by this worker),
+ * and keeps the key short enough for compact log lines and structured fields.
  *
  * The key is always a short ASCII string safe for logs, DB lookups, and
  * structured metadata.

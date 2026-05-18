@@ -101,7 +101,10 @@ async function saveArticles(articles, context = {}) {
     for (const entry of annotated) {
       if (existing.has(entry.article.url)) {
         skippedDuplicates += 1;
-        emitStructuredLog('info', 'duplicate_ingestion_skipped', {
+        // Debug-level: high-duplication scenarios (feed re-ingestion, worker
+        // restart replays) can otherwise produce excessive log volume. The
+        // per-feed completion log already reports the aggregated count.
+        emitStructuredLog('debug', 'duplicate_ingestion_skipped', {
           worker_id: workerId,
           trace_id: traceId,
           source_id: entry.article.source_id || null,

@@ -24,6 +24,7 @@
  */
 
 import type { LogFn } from './logger';
+import type { QueueVelocityTracker } from './queueVelocity';
 import type { QueueConfig, QueueName, SupabaseLike } from './types';
 
 export interface BackpressureSnapshot {
@@ -32,6 +33,13 @@ export interface BackpressureSnapshot {
   ratio: number;
   concurrency: number;
   pollIntervalMs: number;
+  /**
+   * Phase C — set when throttling was engaged *predictively* because the
+   * velocity tracker reported sustained queue growth, BEFORE the depth
+   * actually crossed `backpressureThreshold`. Always false on the legacy
+   * depth-only path so existing dashboards keep their meaning.
+   */
+  predictive: boolean;
 }
 
 export interface BackpressureController {
@@ -44,6 +52,16 @@ export interface BackpressureController {
 export interface BackpressureOptions {
   /** Minimum gap between depth samples per queue. Default 5s. */
   sampleIntervalMs?: number;
+  /**
+   * Phase C — predictive throttle. When provided, the controller consults
+   * the velocity tracker each cycle and engages backpressure early if the
+   * EMA-smoothed growth delta exceeds `predictiveGrowthPerMin` for at least
+   * `predictiveMinSamples` cycles, even when current depth is still below
+   * the configured threshold.
+   */
+  velocity?: QueueVelocityTracker;
+  predictiveGrowthPerMin?: number;
+  predictiveMinSamples?: number;
 }
 
 interface InternalSnapshot extends BackpressureSnapshot {
@@ -58,6 +76,7 @@ function emptySnapshot(cfg: QueueConfig): InternalSnapshot {
     ratio: 0,
     concurrency: cfg.baseConcurrency,
     pollIntervalMs: cfg.idlePollMs,
+    predictive: false,
     lastSampledAt: 0,
     wasActive: false,
   };
@@ -105,6 +124,25 @@ export function deriveBackpressure(
   };
 }
 
+/**
+ * Phase C — predictive policy. When velocity reports sustained backlog
+ * growth we soften concurrency *before* depth crosses the threshold. The
+ * policy is intentionally less aggressive than depth-driven drain mode: we
+ * halve concurrency and double the idle interval (matching the "ratio ≤ 2"
+ * tier of the depth-driven policy) but we do NOT collapse to concurrency=1.
+ * That keeps throughput high enough to actually exercise the backlog while
+ * still slowing the arrival/processing imbalance.
+ */
+export function derivePredictiveBackpressure(
+  cfg: QueueConfig,
+): { active: boolean; concurrency: number; pollIntervalMs: number } {
+  return {
+    active: true,
+    concurrency: Math.max(Math.floor(cfg.baseConcurrency * 0.5), 1),
+    pollIntervalMs: Math.max(cfg.idlePollMs * 2, cfg.activePollMs * 4),
+  };
+}
+
 export function createBackpressureController(
   supabase: SupabaseLike,
   configs: ReadonlyMap<QueueName, QueueConfig>,
@@ -112,6 +150,9 @@ export function createBackpressureController(
   opts: BackpressureOptions = {},
 ): BackpressureController {
   const sampleIntervalMs = Math.max(opts.sampleIntervalMs ?? 5_000, 1_000);
+  const velocity = opts.velocity;
+  const predictiveGrowthPerMin = Math.max(opts.predictiveGrowthPerMin ?? 50, 1);
+  const predictiveMinSamples = Math.max(opts.predictiveMinSamples ?? 3, 1);
   const snapshots = new Map<QueueName, InternalSnapshot>();
 
   for (const [name, cfg] of configs) {
@@ -168,13 +209,33 @@ export function createBackpressureController(
   }
 
   function makeSnapshot(cfg: QueueConfig, depth: number, prev: InternalSnapshot): InternalSnapshot {
-    const { active, ratio, concurrency, pollIntervalMs } = deriveBackpressure(cfg, depth);
+    const depthPolicy = deriveBackpressure(cfg, depth);
+    let { active, ratio, concurrency, pollIntervalMs } = depthPolicy;
+    let predictive = false;
+
+    // Phase C — if depth has NOT yet engaged backpressure but the velocity
+    // tracker says the backlog is growing fast, throttle pre-emptively.
+    if (!active && velocity) {
+      const v = velocity.snapshot(cfg.name);
+      if (
+        v.samples >= predictiveMinSamples &&
+        v.growthDeltaPerMin >= predictiveGrowthPerMin
+      ) {
+        const p = derivePredictiveBackpressure(cfg);
+        active = true;
+        predictive = true;
+        concurrency = p.concurrency;
+        pollIntervalMs = p.pollIntervalMs;
+      }
+    }
+
     const snap: InternalSnapshot = {
       active,
       depth,
       ratio,
       concurrency,
       pollIntervalMs,
+      predictive,
       lastSampledAt: Date.now(),
       wasActive: prev.wasActive,
     };
@@ -187,6 +248,15 @@ export function createBackpressureController(
         new_concurrency: concurrency,
         new_poll_interval_ms: pollIntervalMs,
         threshold: cfg.backpressureThreshold,
+        predictive,
+        ...(predictive && velocity
+          ? {
+              growth_delta_per_min: Number(
+                velocity.snapshot(cfg.name).growthDeltaPerMin.toFixed(2),
+              ),
+              predictive_growth_threshold: predictiveGrowthPerMin,
+            }
+          : {}),
       });
     } else if (!active && prev.wasActive) {
       log('info', 'queue_backpressure_cleared', {

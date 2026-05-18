@@ -57,6 +57,43 @@ export interface FakeCategoryRow {
   slug: string;
 }
 
+export interface FakeNotificationEventRow {
+  id: string;
+  event_type: string;
+  target_audience: string;
+  target_user_id: string | null;
+  article_id: string | null;
+  category_id: string | null;
+  title: string;
+  body: string;
+  payload: Record<string, unknown>;
+  channels: string[];
+  dedup_key: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  recipient_count: number;
+}
+
+export interface FakeNotificationDeliveryRow {
+  id: string;
+  event_id: string;
+  notification_id: string | null;
+  user_id: string | null;
+  device_id: string | null;
+  push_token: string | null;
+  channel: 'inbox' | 'push' | 'realtime' | 'email';
+  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'skipped';
+  provider: string | null;
+  provider_message_id: string | null;
+  error_message: string | null;
+  attempts: number;
+}
+
+export interface FakeUserDeviceRow {
+  user_id: string;
+  device_id: string;
+  push_token: string;
+}
+
 export interface FakeRpcOverrides {
   refresh_ranked_feeds?: () => Promise<RpcResponse<unknown>>;
   refresh_ranked_feed_for_category?: (
@@ -75,12 +112,17 @@ export interface FakeSupabase extends SupabaseLike {
   _seedJob(row: Omit<FakeJobRow, 'id'> & { id?: string }): FakeJobRow;
   _seedJobs(count: number, partial: Partial<FakeJobRow>): FakeJobRow[];
   _seedCategory(row: FakeCategoryRow): void;
+  _seedUserDevices(devices: FakeUserDeviceRow[]): void;
+  _seedNotificationUsers(userIds: string[]): void;
   _setFlag(name: string, enabled: boolean): void;
   _setDepth(queue: string, depth: number): void;
   _setOverrides(overrides: FakeRpcOverrides): void;
   _jobs(): FakeJobRow[];
   _dlq(): FakeDLQRow[];
   _byStatus(status: FakeJobRow['status']): FakeJobRow[];
+  _notificationEvents(): FakeNotificationEventRow[];
+  _notificationDeliveries(): FakeNotificationDeliveryRow[];
+  _pendingPushDeliveries(): FakeNotificationDeliveryRow[];
 }
 
 export function createFakeSupabase(): FakeSupabase {
@@ -91,6 +133,11 @@ export function createFakeSupabase(): FakeSupabase {
   const flags = new Map<string, boolean>();
   const depths = new Map<string, number>();
   let overrides: FakeRpcOverrides = {};
+  // Phase C — notification dispatch tables.
+  const notificationEvents = new Map<string, FakeNotificationEventRow>();
+  const notificationDeliveries = new Map<string, FakeNotificationDeliveryRow>();
+  const userDevices: FakeUserDeviceRow[] = [];
+  const notificationUserIds = new Set<string>();
 
   function now(): number {
     return Date.now();
@@ -259,6 +306,159 @@ export function createFakeSupabase(): FakeSupabase {
     return { data: flags.get(String(args.p_name)) ?? false, error: null };
   }
 
+  // ----- Phase C: notification dispatch RPCs ------------------------------
+  async function enqueueNotificationEvent(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const dedup = (args.p_dedup_key ?? null) as string | null;
+    const eventType = String(args.p_event_type);
+    if (dedup) {
+      const existing = Array.from(notificationEvents.values()).find(
+        (e) =>
+          e.event_type === eventType &&
+          e.dedup_key === dedup &&
+          (e.status === 'pending' || e.status === 'processing'),
+      );
+      if (existing) return { data: existing.id, error: null };
+    }
+    const id = randomUUID();
+    const row: FakeNotificationEventRow = {
+      id,
+      event_type: eventType,
+      target_audience: String(args.p_target_audience ?? 'all'),
+      target_user_id: (args.p_target_user_id ?? null) as string | null,
+      article_id: (args.p_article_id ?? null) as string | null,
+      category_id: (args.p_category_id ?? null) as string | null,
+      title: String(args.p_title ?? ''),
+      body: String(args.p_body ?? ''),
+      payload: (args.p_payload ?? {}) as Record<string, unknown>,
+      channels: Array.isArray(args.p_channels)
+        ? (args.p_channels as string[])
+        : ['inbox', 'push'],
+      dedup_key: dedup,
+      status: 'pending',
+      recipient_count: 0,
+    };
+    notificationEvents.set(id, row);
+    return { data: id, error: null };
+  }
+
+  async function materializeNotificationEvent(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const id = String(args.p_event_id);
+    const cap = Math.max(1, Number(args.p_max_recipients ?? 5000));
+    const ev = notificationEvents.get(id);
+    if (!ev || ev.status !== 'pending') return { data: 0, error: null };
+    ev.status = 'processing';
+
+    let recipients: string[];
+    if (ev.target_audience === 'specific_user' && ev.target_user_id) {
+      recipients = [ev.target_user_id];
+    } else if (ev.target_audience === 'category_followers') {
+      // Fake: every seeded user is a follower of every category in tests.
+      recipients = Array.from(notificationUserIds);
+    } else {
+      recipients = Array.from(notificationUserIds);
+    }
+    recipients = recipients.slice(0, cap);
+
+    const inboxEnabled = ev.channels.includes('inbox');
+    const pushEnabled = ev.channels.includes('push');
+    for (const uid of recipients) {
+      if (inboxEnabled) {
+        const did = randomUUID();
+        notificationDeliveries.set(did, {
+          id: did,
+          event_id: ev.id,
+          notification_id: randomUUID(),
+          user_id: uid,
+          device_id: null,
+          push_token: null,
+          channel: 'inbox',
+          status: 'delivered',
+          provider: null,
+          provider_message_id: null,
+          error_message: null,
+          attempts: 1,
+        });
+      }
+      if (pushEnabled) {
+        const devices = userDevices.filter(
+          (d) => d.user_id === uid && d.push_token && d.push_token.length > 0,
+        );
+        for (const dev of devices) {
+          const did = randomUUID();
+          notificationDeliveries.set(did, {
+            id: did,
+            event_id: ev.id,
+            notification_id: null,
+            user_id: uid,
+            device_id: dev.device_id,
+            push_token: dev.push_token,
+            channel: 'push',
+            status: 'pending',
+            provider: null,
+            provider_message_id: null,
+            error_message: null,
+            attempts: 0,
+          });
+        }
+      }
+    }
+    ev.status = 'completed';
+    ev.recipient_count = recipients.length;
+    return { data: recipients.length, error: null };
+  }
+
+  async function claimPendingPushDeliveries(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const limit = Math.max(1, Number(args.p_limit ?? 100));
+    const claimed: Array<{
+      id: string;
+      user_id: string | null;
+      device_id: string | null;
+      push_token: string;
+      title: string;
+      body: string;
+      payload: Record<string, unknown> | null;
+    }> = [];
+    for (const d of notificationDeliveries.values()) {
+      if (d.channel !== 'push' || d.status !== 'pending') continue;
+      d.status = 'sent'; // claim; will be re-finalised by record_notification_delivery
+      const ev = notificationEvents.get(d.event_id);
+      claimed.push({
+        id: d.id,
+        user_id: d.user_id,
+        device_id: d.device_id,
+        push_token: d.push_token ?? '',
+        title: ev?.title ?? '',
+        body: ev?.body ?? '',
+        payload: ev?.payload ?? null,
+      });
+      if (claimed.length >= limit) break;
+    }
+    return { data: claimed, error: null };
+  }
+
+  async function recordNotificationDelivery(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const id = String(args.p_delivery_id);
+    const status = String(args.p_status) as FakeNotificationDeliveryRow['status'];
+    const d = notificationDeliveries.get(id);
+    if (!d) return { data: false, error: null };
+    d.status = status;
+    d.provider = (args.p_provider ?? d.provider) as string | null;
+    d.provider_message_id = (args.p_provider_message_id ?? d.provider_message_id) as
+      | string
+      | null;
+    d.error_message = (args.p_error ?? null) as string | null;
+    d.attempts += 1;
+    return { data: true, error: null };
+  }
+
   // ----- Dispatcher --------------------------------------------------------
   async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<RpcResponse<T>> {
     switch (fn) {
@@ -278,6 +478,14 @@ export function createFakeSupabase(): FakeSupabase {
         return (await isFeatureEnabled(args)) as RpcResponse<T>;
       case 'worker_heartbeat':
         return { data: null, error: null } as RpcResponse<T>;
+      case 'enqueue_notification_event':
+        return (await enqueueNotificationEvent(args)) as RpcResponse<T>;
+      case 'materialize_notification_event':
+        return (await materializeNotificationEvent(args)) as RpcResponse<T>;
+      case 'claim_pending_push_deliveries':
+        return (await claimPendingPushDeliveries(args)) as RpcResponse<T>;
+      case 'record_notification_delivery':
+        return (await recordNotificationDelivery(args)) as RpcResponse<T>;
       case 'refresh_ranked_feeds':
         return (overrides.refresh_ranked_feeds
           ? await overrides.refresh_ranked_feeds()
@@ -387,6 +595,15 @@ export function createFakeSupabase(): FakeSupabase {
       categories.set(row.id, row);
       categoriesBySlug.set(row.slug, row);
     },
+    _seedUserDevices(devices) {
+      for (const d of devices) {
+        userDevices.push(d);
+        notificationUserIds.add(d.user_id);
+      }
+    },
+    _seedNotificationUsers(userIds) {
+      for (const id of userIds) notificationUserIds.add(id);
+    },
     _setFlag(name, enabled) {
       flags.set(name, enabled);
     },
@@ -404,6 +621,17 @@ export function createFakeSupabase(): FakeSupabase {
     },
     _byStatus(status) {
       return Array.from(jobs.values()).filter((j) => j.status === status);
+    },
+    _notificationEvents() {
+      return Array.from(notificationEvents.values());
+    },
+    _notificationDeliveries() {
+      return Array.from(notificationDeliveries.values());
+    },
+    _pendingPushDeliveries() {
+      return Array.from(notificationDeliveries.values()).filter(
+        (d) => d.channel === 'push' && d.status === 'pending',
+      );
     },
   };
   return api;

@@ -46,6 +46,7 @@ import type { LogFn } from './logger';
 import type { BackpressureController } from './backpressure';
 import type { CycleAccumulator, MetricsSink } from './observability';
 import { emitCycleMetrics, startCycleMetrics } from './observability';
+import type { QueueVelocityTracker } from './queueVelocity';
 import type {
   LeasedJob,
   Processor,
@@ -80,6 +81,11 @@ export interface QueueRunnerDeps {
    */
   failBackoffBaseSeconds?: number;
   failBackoffMaxSeconds?: number;
+  /**
+   * Phase C — optional velocity tracker fed from each completed cycle.
+   * Drives the predictive backpressure path in `backpressure.ts`.
+   */
+  velocity?: QueueVelocityTracker;
 }
 
 export interface QueueRunner {
@@ -171,6 +177,7 @@ export function createQueueRunner(deps: QueueRunnerDeps): QueueRunner {
     sleep = defaultSleep,
     failBackoffBaseSeconds = 30,
     failBackoffMaxSeconds = 3600,
+    velocity,
   } = deps;
 
   let running = false;
@@ -406,6 +413,18 @@ export function createQueueRunner(deps: QueueRunnerDeps): QueueRunner {
     }
 
     await emitCycleMetrics(log, acc, metricsSink);
+
+    // Phase C — observe this cycle's totals so the velocity tracker can
+    // smooth ingestion vs processing rates. `enqueued` here approximates
+    // arrivals as the number of jobs the runner observed this cycle
+    // (leased count) — for processing it counts successes + skipped (both
+    // remove a job from the queue).
+    if (velocity) {
+      velocity.observe(cfg.name, {
+        enqueued: leased.length,
+        processed: succeeded + skipped,
+      });
+    }
 
     return {
       leased: leased.length,

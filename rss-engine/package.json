@@ -8,7 +8,9 @@
     "worker": "node worker.js",
     "worker:v2": "tsx workers/rss-worker.ts",
     "queue:runner": "tsx workers/queue-runner.ts",
+    "notification:runner": "tsx workers/notification/dispatch/notification-runner.ts",
     "test:queue": "tsx workers/tests/queueRunner.simulation.ts",
+    "test:notification": "tsx workers/tests/notification.simulation.ts",
     "lint": "node --check index.js && node --check worker.js && node --check src/fetchRSS.js && node --check src/fetchSources.js && node --check src/deduplicateArticles.js && node --check src/saveArticles.js",
     "typecheck": "tsc --noEmit"
   },

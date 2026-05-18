@@ -20,9 +20,70 @@
  */
 
 import type { LogFn } from './logger';
-import type { CycleMetrics, QueueName } from './types';
+import type { CycleMetrics, QueueName, SupabaseLike } from './types';
 
 export type MetricsSink = (metrics: CycleMetrics) => void | Promise<void>;
+
+/**
+ * Phase C — non-blocking analytics-queue sink.
+ *
+ * Closes the Phase B "observability sink is local-only" debt by giving the
+ * runner an optional path to forward each cycle's metrics into the
+ * `analytics` queue. The job is enqueued via the existing `enqueue_job` RPC
+ * — no schema additions, no new infra — and consumed downstream by whatever
+ * analytics processor / admin dashboard takes over the rollup.
+ *
+ * Rules baked in here:
+ *   - FIRE-AND-FORGET. The runner never awaits the enqueue (we return
+ *     immediately after kicking it off) and any RPC failure is downgraded
+ *     to a debug log. Metrics emission must never wedge the data path.
+ *   - DEDUP. Each metric job carries a coarse-time dedup key so a chatty
+ *     runner cannot flood the analytics queue with thousands of identical
+ *     rows when the queue is hot.
+ *   - FLAG-GATED at the caller. The runner only installs this sink when
+ *     `emit_metrics_to_queue` is requested explicitly; default deployments
+ *     remain log-only.
+ */
+export function createAnalyticsQueueMetricsSink(
+  supabase: SupabaseLike,
+  log: LogFn,
+  opts: { dedupBucketMs?: number } = {},
+): MetricsSink {
+  const bucketMs = Math.max(opts.dedupBucketMs ?? 60_000, 1_000);
+  return function emitMetricsToAnalyticsQueue(metrics: CycleMetrics): void {
+    // Don't await — caller already invokes us asynchronously, but we make
+    // the promise chain explicit so unhandled rejections don't escape.
+    const bucket = Math.floor(Date.now() / bucketMs);
+    const dedup = `cycle_metrics:${metrics.queue_name}:${bucket}`;
+    void (async () => {
+      try {
+        const { error } = await supabase.rpc('enqueue_job', {
+          p_queue_name: 'analytics',
+          p_job_type: 'cycle_metrics_rollup',
+          p_payload: {
+            source: 'queue_runner',
+            metrics,
+            emitted_at: new Date().toISOString(),
+          },
+          p_dedup_key: dedup,
+          p_priority: 1,
+          p_max_attempts: 3,
+        });
+        if (error) {
+          log('debug', 'metrics_sink_enqueue_failed', {
+            queue_name: metrics.queue_name,
+            error: error.message,
+          });
+        }
+      } catch (err) {
+        log('debug', 'metrics_sink_enqueue_threw', {
+          queue_name: metrics.queue_name,
+          error: (err as Error)?.message ?? String(err),
+        });
+      }
+    })();
+  };
+}
 
 export interface CycleAccumulator {
   readonly queue_name: QueueName;

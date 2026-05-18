@@ -7,6 +7,7 @@ const navItems = [
   { to: '/publisher-application', label: 'Publisher Application', icon: '📝' },
   { to: '/categories', label: 'Categories', icon: '🗂️' },
   { to: '/analytics', label: 'Analytics', icon: '📊' },
+  { to: '/infrastructure', label: 'Infrastructure', icon: '⚙️' },
 ]
 
 export default function Layout({ children }) {

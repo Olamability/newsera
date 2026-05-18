@@ -6,13 +6,19 @@
   "scripts": {
     "start": "node index.js",
     "worker": "node worker.js",
+    "worker:v2": "tsx workers/rss-worker.ts",
     "lint": "node --check index.js && node --check worker.js && node --check src/fetchRSS.js && node --check src/fetchSources.js && node --check src/deduplicateArticles.js && node --check src/saveArticles.js",
-    "typecheck": "echo \"No TypeScript files in rss-engine\""
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^17.4.2",
     "p-limit": "^3.1.0",
     "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
   }
 }

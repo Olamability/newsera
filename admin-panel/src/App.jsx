@@ -8,6 +8,7 @@ import Sources from './pages/Sources'
 import PublisherApplication from './pages/PublisherApplication'
 import Categories from './pages/Categories'
 import Analytics from './pages/Analytics'
+import Infrastructure from './pages/Infrastructure'
 
 function Unauthorized() {
   return (
@@ -76,6 +77,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <Analytics />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/infrastructure"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Infrastructure />
                 </Layout>
               </ProtectedRoute>
             }

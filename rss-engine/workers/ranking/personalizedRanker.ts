@@ -316,19 +316,19 @@ export function rankForUser(
       deferred.push(item);
       diversityRotations += 1;
     }
-    // Drain deferred queue if main pool exhausted.
-    while (deferred.length > 0) {
-      const item = deferred.shift()!;
-      if (canPlace(item)) return item;
-      // re-defer to end — eventually streak breaks.
-      deferred.push(item);
-      diversityRotations += 1;
-      if (deferred.length > 50 && deferred.every((d) => !canPlace(d))) {
-        // No item ever satisfies → emit the head anyway (graceful escape).
-        return deferred.shift()!;
+    // Drain deferred queue: walk it once. If we find a placeable item,
+    // remove and return. Otherwise, emit the head as a graceful escape so
+    // the picker terminates (the alternative is an infinite cycle when
+    // every deferred item is currently blocked).
+    if (deferred.length === 0) return null;
+    for (let i = 0; i < deferred.length; i += 1) {
+      if (canPlace(deferred[i])) {
+        const [picked] = deferred.splice(i, 1);
+        return picked;
       }
     }
-    return null;
+    diversityRotations += 1;
+    return deferred.shift() ?? null;
   }
 
   function takeFromExploration(): (typeof surviving)[number] | null {

@@ -325,19 +325,19 @@ async function testFailureRecovery(): Promise<void> {
   );
 
   // Bypass backoff by yanking next_attempt_at into the past.
-  function flush(): void {
+  function bypassBackoff(): void {
     for (const j of fake._jobs()) j.next_attempt_at = Date.now() - 1;
   }
 
   // Second attempt → still failing → re-queued (attempt 2).
-  flush();
+  bypassBackoff();
   await runner.runOnce('ranking');
   const afterSecond = fake._jobs().find((j) => j.id === job.id);
   assert(afterSecond?.status === 'queued', 'job re-queued after second failure');
   assert((afterSecond?.attempts ?? 0) === 2, 'attempts counter incremented to 2');
 
   // Third attempt → max_attempts reached → DLQ.
-  flush();
+  bypassBackoff();
   await runner.runOnce('ranking');
   const afterThird = fake._jobs().find((j) => j.id === job.id);
   assert(afterThird?.status === 'dead', 'job dead-lettered after max attempts');

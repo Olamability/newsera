@@ -327,12 +327,12 @@ export function createQueueRunner(deps: QueueRunnerDeps): QueueRunner {
         detail: result.detail,
       });
     } else {
-      const dispositions = await failJob(job.id, job.lease_token, result.error);
+      const disposition = await failJob(job.id, job.lease_token, result.error);
       acc.recordFailure(latencyMs);
       log('warn', 'job_failed', {
         ...baseLog,
         latency_ms: latencyMs,
-        disposition: dispositions, // 'queued' = retry, 'dead' = DLQ
+        disposition, // 'queued' = retry, 'dead' = DLQ
         error: result.error,
         detail: result.detail,
       });

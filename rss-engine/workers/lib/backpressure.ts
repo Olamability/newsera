@@ -132,9 +132,17 @@ export function createBackpressureController(
       // fall through to direct count
     }
 
-    // Fallback: cheap server-side count of queued jobs only. Leased/running
-    // are intentionally excluded — backpressure cares about backlog, not
-    // work in progress.
+    // Fallback path: the minimal SupabaseLike `QueryBuilder` surface does not
+    // expose `count: 'exact'` (would force pulling in @supabase/supabase-js
+    // types into the test harness), so this fallback only tells us whether at
+    // least one row is queued — i.e. it returns 0 or 1.
+    //
+    // OPERATIONAL IMPLICATION: when the `queue_depth_for` RPC is unavailable
+    // backpressure will engage on the very first queued job (because depth=1
+    // can still exceed a tuned-low threshold) but it will NOT correctly tier
+    // into drain mode no matter how large the backlog gets. The RPC is the
+    // production-correct path; this fallback only exists to prevent the
+    // runner from crashing if the RPC is missing during a partial deploy.
     try {
       const builder = supabase.from<{ id: string }>('job_queue');
       const { data, error } = await builder
@@ -149,10 +157,6 @@ export function createBackpressureController(
         });
         return 0;
       }
-      // `maybeSingle` only returns 0 or 1 — without an explicit head:true /
-      // count:'exact' option we cannot get a true count from the minimal
-      // QueryBuilder surface, so we treat the presence of any queued row as
-      // "depth=1" and rely on the RPC for accurate numbers in production.
       return data ? 1 : 0;
     } catch (err) {
       log('warn', 'backpressure_depth_query_threw', {

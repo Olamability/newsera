@@ -119,7 +119,7 @@ export function createCategoryNormalizer(
           fallbackId = null;
           return null;
         }
-        fallbackId = (data?.id as string | null) ?? null;
+        fallbackId = data?.id ?? null;
         if (!fallbackId) {
           log('error', 'normalize_category_fallback_missing', {
             slug: UNCATEGORIZED_SLUG,

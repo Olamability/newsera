@@ -34,7 +34,7 @@ WITH base AS (
     COALESCE(rfs.reliability_score, 0.8)::numeric AS source_reliability,
     -- freshness decay (half-life 12h)
     exp(
-      - (0.05776226504666215)  -- ln(2) / 12
+      - (ln(2.0) / 12.0)
       * GREATEST(EXTRACT(EPOCH FROM (now() - COALESCE(aef.published_at, now()))) / 3600.0, 0.0)
     )::numeric AS freshness_factor
   FROM articles_engagement_feed aef

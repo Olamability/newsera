@@ -371,7 +371,8 @@ BEGIN
       lease_token = NULL,
       leased_until = NULL,
       next_attempt_at = LEAST(next_attempt_at, now()),
-      last_error = COALESCE(last_error, '') || ' [lease_expired]'
+      -- Replace (don't append) so repeat expirations don't grow the string unboundedly.
+      last_error = '[lease_expired]'
   WHERE status IN ('leased', 'running')
     AND leased_until IS NOT NULL
     AND leased_until < now() - interval '30 seconds';

@@ -60,6 +60,8 @@ AS $$
 DECLARE
   v_count integer;
 BEGIN
+  -- Only delete replayed entries by default; unreplayed DLQ rows are an
+  -- operator backlog and should never be silently purged.
   DELETE FROM job_dead_letter
   WHERE failed_at < now() - make_interval(days => GREATEST(p_keep_days, 7))
     AND replayed_at IS NOT NULL;

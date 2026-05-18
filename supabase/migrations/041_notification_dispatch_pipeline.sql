@@ -484,6 +484,10 @@ GRANT EXECUTE ON FUNCTION record_notification_delivery(uuid, text, text, text, t
 
 -- ------------------------------------------------------------
 -- 8) Unread counter helpers
+-- NOTE: broadcast notifications (user_id IS NULL) are *also* counted for
+-- every user. With the new dispatch pipeline (041), broadcasts are
+-- materialized into per-user rows by materialize_notification_event, so
+-- user_id IS NULL rows should only exist for legacy/admin direct inserts.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION get_notification_unread_count(p_user_id uuid)
 RETURNS integer

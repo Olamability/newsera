@@ -79,7 +79,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_half_life_days numeric := 14.0;
-  v_lambda numeric := 0.6931471805599453 / 14.0;  -- ln(2) / 14
+  v_lambda numeric := ln(2.0) / 14.0;  -- half-life of 14 days
   v_since timestamptz := now() - make_interval(days => GREATEST(p_lookback_days, 1));
   v_signal_total bigint := 0;
 BEGIN

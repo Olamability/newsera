@@ -39,12 +39,15 @@ require('dotenv').config();
 const supabase = require('../config/supabase');
 
 import { createBackpressureController } from './lib/backpressure';
+import { warmCategoryBootstrapCache } from './lib/categoryBootstrapCache';
 import { createLogger } from './lib/logger';
 import { createCategoryNormalizer } from './lib/normalizeCategory';
+import { createAnalyticsQueueMetricsSink } from './lib/observability';
 import { createAnalyticsProcessor } from './lib/processors/analytics';
 import { createIngestionProcessor } from './lib/processors/ingestion';
 import { createNotificationProcessor } from './lib/processors/notification';
 import { createRankingProcessor } from './lib/processors/ranking';
+import { createQueueVelocityTracker } from './lib/queueVelocity';
 import { createQueueRunner, defaultQueueConfigs } from './lib/runner';
 import type { Processor, QueueName, SupabaseLike } from './lib/types';
 
@@ -67,6 +70,16 @@ const HEARTBEAT_INTERVAL_MS = parsePositiveInt(
 );
 const JOB_TIMEOUT_MS = parsePositiveInt(process.env.QUEUE_RUNNER_JOB_TIMEOUT_MS, 5 * 60_000);
 const SHUTDOWN_GRACE_MS = parsePositiveInt(process.env.QUEUE_RUNNER_SHUTDOWN_GRACE_MS, 30_000);
+const VELOCITY_WINDOW_MS = parsePositiveInt(
+  process.env.QUEUE_RUNNER_VELOCITY_WINDOW_MS,
+  5 * 60_000,
+);
+const PREDICTIVE_GROWTH_PER_MIN = parsePositiveInt(
+  process.env.QUEUE_RUNNER_PREDICTIVE_GROWTH_PER_MIN,
+  50,
+);
+const EMIT_METRICS_TO_QUEUE =
+  (process.env.QUEUE_RUNNER_EMIT_METRICS_TO_QUEUE || '').toLowerCase() === 'true';
 const FLAG_NAME = 'queue_based_ingestion';
 
 const log = createLogger({ service: 'queue-runner', worker_id: WORKER_ID });
@@ -127,7 +140,17 @@ async function main(): Promise<void> {
 
   const configs = defaultQueueConfigs();
   const normalizer = createCategoryNormalizer(supabaseClient, log);
-  const backpressure = createBackpressureController(supabaseClient, configs, log);
+
+  // Phase C — warm the category cache before the runner starts polling so
+  // the first burst after a rolling restart does not hammer `categories`.
+  await warmCategoryBootstrapCache(supabaseClient, normalizer, log, { topN: 50 });
+
+  const velocity = createQueueVelocityTracker({ windowMs: VELOCITY_WINDOW_MS });
+  const backpressure = createBackpressureController(supabaseClient, configs, log, {
+    velocity,
+    predictiveGrowthPerMin: PREDICTIVE_GROWTH_PER_MIN,
+    predictiveMinSamples: 3,
+  });
 
   const processors = new Map<QueueName, Processor>();
   processors.set(
@@ -158,6 +181,10 @@ async function main(): Promise<void> {
     backpressure,
     jobTimeoutMs: JOB_TIMEOUT_MS,
     heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+    velocity,
+    metricsSink: EMIT_METRICS_TO_QUEUE
+      ? createAnalyticsQueueMetricsSink(supabaseClient, log)
+      : undefined,
   });
 
   // Worker-level heartbeat (separate from per-job lease heartbeats) so the

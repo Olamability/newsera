@@ -295,27 +295,91 @@ async function reapStaleWorkers(): Promise<void> {
 }
 
 /**
- * Look up category_id for a leased feed's underlying source. rss_feed_sources
- * tracks `category` as free text; articles need `category_id` from `sources`.
- * Best-effort: if the lookup fails we still ingest with null category_id
- * (same behaviour as if the source row has no category configured).
+ * Category resolution is deterministic by design:
+ *   - `category_id` is sourced ONLY from `sources.category_id`.
+ *   - Any free-text `category` field that may appear in lease RPC results is
+ *     deliberately ignored — coupling ingestion to free text was the root
+ *     cause of misaligned personalization / ranking buckets in production.
+ *   - When `sources.category_id` is missing or unresolvable we fall back to
+ *     the well-known "uncategorized" category (looked up once by slug and
+ *     cached). If even that lookup fails we surface `null` rather than
+ *     crashing — ingestion never blocks on category resolution.
  */
-async function resolveCategoryId(sourceId: string | null): Promise<string | null> {
-  if (!sourceId) return null;
+const UNCATEGORIZED_SLUG = 'uncategorized' as const;
+let uncategorizedCategoryIdCache: string | null | undefined = undefined;
+
+async function getUncategorizedCategoryId(): Promise<string | null> {
+  if (uncategorizedCategoryIdCache !== undefined) {
+    return uncategorizedCategoryIdCache;
+  }
   try {
     const { data, error } = await supabase
-      .from('sources')
-      .select('category_id')
-      .eq('id', sourceId)
+      .from('categories')
+      .select('id')
+      .eq('slug', UNCATEGORIZED_SLUG)
       .maybeSingle();
     if (error) {
-      log('debug', 'resolve_category_failed', { source_id: sourceId, error: error.message });
+      log('warn', 'uncategorized_lookup_failed', { error: error.message });
+      uncategorizedCategoryIdCache = null;
       return null;
     }
-    return (data?.category_id as string | null) ?? null;
-  } catch {
+    uncategorizedCategoryIdCache = (data?.id as string | null) ?? null;
+    return uncategorizedCategoryIdCache;
+  } catch (err) {
+    log('warn', 'uncategorized_lookup_threw', {
+      error: (err as Error)?.message ?? String(err),
+    });
+    uncategorizedCategoryIdCache = null;
     return null;
   }
+}
+
+interface ResolvedCategory {
+  categoryId: string | null;
+  usedFallback: boolean;
+}
+
+async function resolveCategoryId(
+  sourceId: string | null,
+  baseLog: Record<string, unknown>,
+): Promise<ResolvedCategory> {
+  if (sourceId) {
+    try {
+      const { data, error } = await supabase
+        .from('sources')
+        .select('category_id')
+        .eq('id', sourceId)
+        .maybeSingle();
+      if (error) {
+        log('warn', 'resolve_category_failed', {
+          ...baseLog,
+          source_id: sourceId,
+          error: error.message,
+        });
+      } else {
+        const categoryId = (data?.category_id as string | null) ?? null;
+        if (categoryId) {
+          return { categoryId, usedFallback: false };
+        }
+      }
+    } catch (err) {
+      log('warn', 'resolve_category_threw', {
+        ...baseLog,
+        source_id: sourceId,
+        error: (err as Error)?.message ?? String(err),
+      });
+    }
+  }
+
+  // Fail-safe fallback — never crash ingestion on missing category.
+  const fallbackId = await getUncategorizedCategoryId();
+  log('warn', 'missing_category_fallback_used', {
+    ...baseLog,
+    source_id: sourceId,
+    fallback_category_slug: UNCATEGORIZED_SLUG,
+    fallback_category_id: fallbackId,
+  });
+  return { categoryId: fallbackId, usedFallback: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +387,10 @@ async function resolveCategoryId(sourceId: string | null): Promise<string | null
 // ---------------------------------------------------------------------------
 
 async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
+  // trace_id is generated ONCE per feed execution and is treated as immutable
+  // for the rest of this function. Every log line, every article inserted,
+  // and the downstream ranking job all carry this same value so an operator
+  // can trace a single ingestion batch end-to-end.
   const traceId = randomUUID();
   const startedAt = Date.now();
   inFlight.add(feed.feed_id);
@@ -331,6 +399,7 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
     trace_id: traceId,
     feed_id: feed.feed_id,
     feed_name: feed.name,
+    source_id: feed.source_id,
     lease_token: feed.lease_token,
   };
 
@@ -339,12 +408,16 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
   const metrics: FeedMetrics = { fetched: 0, inserted: 0, duplicates: 0, durationMs: 0 };
   let success = false;
   let errorMessage: string | null = null;
+  let resolvedCategoryId: string | null = null;
 
   try {
-    const categoryId = await resolveCategoryId(feed.source_id);
+    const { categoryId } = await resolveCategoryId(feed.source_id, baseLog);
+    resolvedCategoryId = categoryId;
 
     // Shape an object compatible with the existing fetchRSS / saveArticles
-    // primitives, which expect { id, name, rss_url, category_id }.
+    // primitives, which expect { id, name, rss_url, category_id }. Note we
+    // intentionally do NOT pass through any free-text `category` field from
+    // the lease RPC result — category_id is the single source of truth.
     const sourceLike = {
       id: feed.source_id,
       name: feed.name,
@@ -364,7 +437,13 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
       if (fresh.length === 0) {
         success = true;
       } else {
-        const saved = await saveArticles(fresh);
+        const saveContext = {
+          trace_id: traceId,
+          worker_id: CONFIG.workerId,
+          feed_id: feed.feed_id,
+          source_id: feed.source_id,
+        };
+        const saved = await saveArticles(fresh, saveContext);
         metrics.inserted = saved.inserted;
         metrics.duplicates += saved.skippedDuplicates;
 
@@ -403,12 +482,15 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
 
     inFlight.delete(feed.feed_id);
 
+    // Standardized per-feed completion log. Keep this schema stable — it is
+    // the contract dashboards and alerts depend on.
     log(success ? 'info' : 'warn', 'feed_lease_released', {
       ...baseLog,
-      success,
+      category_id: resolvedCategoryId,
+      status: success ? 'success' : 'failed',
       fetched: metrics.fetched,
-      inserted: metrics.inserted,
-      duplicates: metrics.duplicates,
+      articles_inserted: metrics.inserted,
+      duplicates_skipped: metrics.duplicates,
       duration_ms: metrics.durationMs,
       error: errorMessage,
     });

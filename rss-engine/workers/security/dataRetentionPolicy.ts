@@ -45,7 +45,7 @@ export function evaluateRetention(
     if (rule.piiLevel === 'high') severity = 'severe';
     else if (rule.piiLevel === 'low') severity = 'warn';
     if (inv.rowsExceedingAge > inv.totalRows * 0.5) {
-      severity = severity === 'severe' ? 'severe' : 'severe';
+      severity = 'severe';
     }
     out.push({
       table: rule.table,

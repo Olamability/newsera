@@ -226,7 +226,9 @@ export function verifyRecovery(input: RecoveryVerificationInput): RecoveryVerifi
   const hasFail = active.some((c) => c.status === 'fail');
   const hasWarn = active.some((c) => c.status === 'warn');
   const confidenceScore =
-    active.length === 0 ? 1 : active.reduce((s, c) => s + c.score, 0) / active.length * (hasFail ? 0.4 : 1);
+    active.length === 0
+      ? 1
+      : (active.reduce((s, c) => s + c.score, 0) / active.length) * (hasFail ? 0.4 : 1);
   const status: RecoveryComponentStatus = hasFail ? 'fail' : hasWarn ? 'warn' : 'pass';
   return { components, confidenceScore, status };
 }

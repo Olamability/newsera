@@ -141,7 +141,7 @@ export function ProductionHealthPanel() {
         </>
       )}
 
-      {!data && !error && <p className="text-sm text-gray-500 italic">No snapshot — RPC {`get_production_health_snapshot`} not yet wired.</p>}
+      {!data && !error && <p className="text-sm text-gray-500 italic">No snapshot — RPC <code className="font-mono">get_production_health_snapshot</code> not yet wired.</p>}
     </Panel>
   )
 }

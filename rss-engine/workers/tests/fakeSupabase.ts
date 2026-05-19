@@ -123,6 +123,69 @@ export interface FakeSupabase extends SupabaseLike {
   _notificationEvents(): FakeNotificationEventRow[];
   _notificationDeliveries(): FakeNotificationDeliveryRow[];
   _pendingPushDeliveries(): FakeNotificationDeliveryRow[];
+  // Phase D — personalization / ranking introspection.
+  _fanoutChunks(): Array<{
+    parent_event_id: string | null;
+    parent_dedup_key: string | null;
+    trace_id: string | null;
+    chunk_index: number;
+    chunk_total: number;
+    recipient_count: number;
+    job_id: string | null;
+    status: string;
+  }>;
+  _deliveryHealth(): Array<{
+    sink: string;
+    event: string;
+    count: number;
+    reason: string | null;
+  }>;
+  _negativeSignals(): Array<{
+    user_id: string;
+    signal_type: string;
+    article_id: string | null;
+    source_id: string | null;
+    category_id: string | null;
+    weight: number;
+  }>;
+  _rankingFeedback(): Array<{
+    user_id: string | null;
+    feed_variant: string;
+    session_dwell_ms: number;
+    bounce: boolean;
+    quality_score: number;
+    diversity_score: number;
+    exploration_ratio: number;
+  }>;
+  _personalizedFeedRows(userId?: string): Array<{
+    user_id: string;
+    article_id: string;
+    rank_position: number;
+    personalized_score: number;
+  }>;
+  _seedPersonalizationData(opts: {
+    /** Articles ranked in `ranked_feed_global` order. */
+    globalArticles: Array<{
+      article_id: string;
+      source_id: string | null;
+      category_id: string | null;
+      global_score: number;
+      published_at?: Date;
+    }>;
+    /** Per-user (category_id|source_id) affinity rows. */
+    affinities?: Array<{
+      user_id: string;
+      category_id?: string | null;
+      source_id?: string | null;
+      score: number;
+    }>;
+    /** Per-user article read history. */
+    reads?: Array<{ user_id: string; article_id: string }>;
+  }): void;
+  _affinityFor(userId: string): {
+    categories: Map<string, number>;
+    sources: Map<string, number>;
+  };
 }
 
 export function createFakeSupabase(): FakeSupabase {
@@ -138,6 +201,77 @@ export function createFakeSupabase(): FakeSupabase {
   const notificationDeliveries = new Map<string, FakeNotificationDeliveryRow>();
   const userDevices: FakeUserDeviceRow[] = [];
   const notificationUserIds = new Set<string>();
+
+  // Phase D — personalization / ranking storage.
+  interface FakeAffinityRow {
+    user_id: string;
+    category_id: string | null;
+    source_id: string | null;
+    score: number;
+    last_interaction_at: number | null;
+  }
+  interface FakeNegativeSignalRow {
+    user_id: string;
+    signal_type: string;
+    article_id: string | null;
+    source_id: string | null;
+    category_id: string | null;
+    weight: number;
+    created_at: number;
+  }
+  interface FakeGlobalRow {
+    article_id: string;
+    source_id: string | null;
+    category_id: string | null;
+    global_score: number;
+    published_at: number;
+  }
+  interface FakeReadRow {
+    user_id: string;
+    article_id: string;
+  }
+  interface FakePersonalizedRow {
+    user_id: string;
+    article_id: string;
+    rank_position: number;
+    personalized_score: number;
+    computed_at: number;
+  }
+  interface FakeFanoutChunkRow {
+    parent_event_id: string | null;
+    parent_dedup_key: string | null;
+    trace_id: string | null;
+    chunk_index: number;
+    chunk_total: number;
+    recipient_count: number;
+    job_id: string | null;
+    status: string;
+  }
+  interface FakeDeliveryHealthRow {
+    sink: string;
+    event: string;
+    count: number;
+    reason: string | null;
+    recorded_at: number;
+  }
+  interface FakeRankingFeedbackRow {
+    user_id: string | null;
+    feed_variant: string;
+    session_dwell_ms: number;
+    bounce: boolean;
+    quality_score: number;
+    diversity_score: number;
+    exploration_ratio: number;
+  }
+  const affinities: FakeAffinityRow[] = [];
+  const negativeSignals: FakeNegativeSignalRow[] = [];
+  const globalRanked: FakeGlobalRow[] = [];
+  const reads: FakeReadRow[] = [];
+  const personalizedFeed: FakePersonalizedRow[] = [];
+  const personalizationQueue = new Set<string>();
+  const fanoutChunks: FakeFanoutChunkRow[] = [];
+  const deliveryHealth: FakeDeliveryHealthRow[] = [];
+  const rankingFeedback: FakeRankingFeedbackRow[] = [];
 
   function now(): number {
     return Date.now();
@@ -459,6 +593,234 @@ export function createFakeSupabase(): FakeSupabase {
     return { data: true, error: null };
   }
 
+  // ----- Phase D: personalization + ranking RPCs --------------------------
+  async function recomputeUserAffinity(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    // The fake doesn't actually scan raw signal tables — tests seed the
+    // result via `_seedPersonalizationData`. This stub just clears the
+    // queue entry so the runner observes "completed".
+    const uid = String(args.p_user_id ?? '');
+    personalizationQueue.delete(uid);
+    return { data: null, error: null };
+  }
+
+  async function applyNegativeSignalsToAffinity(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const uid = String(args.p_user_id ?? '');
+    // Group by source_id and category_id and apply (1-w) product reduction.
+    const srcFactors = new Map<string, number>();
+    const catFactors = new Map<string, number>();
+    for (const n of negativeSignals) {
+      if (n.user_id !== uid) continue;
+      if (n.source_id) {
+        srcFactors.set(
+          n.source_id,
+          (srcFactors.get(n.source_id) ?? 1) * Math.max(1 - n.weight, 0.01),
+        );
+      }
+      if (n.category_id) {
+        catFactors.set(
+          n.category_id,
+          (catFactors.get(n.category_id) ?? 1) * Math.max(1 - n.weight, 0.01),
+        );
+      }
+    }
+    for (const row of affinities) {
+      if (row.user_id !== uid) continue;
+      if (row.source_id && srcFactors.has(row.source_id)) {
+        row.score = row.score * (srcFactors.get(row.source_id) ?? 1);
+      }
+      if (row.category_id && catFactors.has(row.category_id)) {
+        row.score = row.score * (catFactors.get(row.category_id) ?? 1);
+      }
+    }
+    return { data: null, error: null };
+  }
+
+  async function recordNegativeSignal(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const userId = String(args.p_user_id ?? '');
+    if (!userId) return { data: null, error: null };
+    const id = randomUUID();
+    negativeSignals.push({
+      user_id: userId,
+      signal_type: String(args.p_signal_type ?? ''),
+      article_id: (args.p_article_id ?? null) as string | null,
+      source_id: (args.p_source_id ?? null) as string | null,
+      category_id: (args.p_category_id ?? null) as string | null,
+      weight: Math.max(0, Math.min(1, Number(args.p_weight ?? 0.5))),
+      created_at: now(),
+    });
+    personalizationQueue.add(userId);
+    return { data: id, error: null };
+  }
+
+  async function refreshPersonalizedFeedV2(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const uid = String(args.p_user_id ?? '');
+    const limit = Math.max(10, Math.min(500, Number(args.p_limit ?? 200)));
+    if (!uid) return { data: 0, error: null };
+
+    // Build per-user affinity lookup.
+    const userAff = affinities.filter((a) => a.user_id === uid);
+    const catScore = new Map<string, number>();
+    const srcScore = new Map<string, number>();
+    for (const a of userAff) {
+      if (a.category_id) catScore.set(a.category_id, a.score);
+      if (a.source_id) srcScore.set(a.source_id, a.score);
+    }
+    // Suppression: reads + negative signals (hide_article / block_source / mute_category).
+    const readSet = new Set(
+      reads.filter((r) => r.user_id === uid).map((r) => r.article_id),
+    );
+    const hiddenArticles = new Set<string>();
+    const blockedSources = new Set<string>();
+    const mutedCategories = new Set<string>();
+    for (const n of negativeSignals) {
+      if (n.user_id !== uid) continue;
+      if (n.signal_type === 'hide_article' && n.article_id) hiddenArticles.add(n.article_id);
+      if (n.signal_type === 'block_source' && n.source_id) blockedSources.add(n.source_id);
+      if (n.signal_type === 'mute_category' && n.category_id) mutedCategories.add(n.category_id);
+    }
+
+    const t = now();
+    const scored = globalRanked
+      .filter(
+        (g) =>
+          !readSet.has(g.article_id) &&
+          !hiddenArticles.has(g.article_id) &&
+          !(g.source_id && blockedSources.has(g.source_id)) &&
+          !(g.category_id && mutedCategories.has(g.category_id)),
+      )
+      .map((g) => {
+        const cat = g.category_id ? catScore.get(g.category_id) ?? 0 : 0;
+        const src = g.source_id ? srcScore.get(g.source_id) ?? 0 : 0;
+        const affW = Math.min(5, 1 + 0.5 * cat + 0.5 * src);
+        const ageHours = Math.max((t - g.published_at) / 3_600_000, 0);
+        const fresh = 0.5 * Math.exp(-(Math.LN2 / 24) * ageHours);
+        const personalizedScore = g.global_score * affW + fresh;
+        return { row: g, personalizedScore };
+      })
+      .sort((a, b) => b.personalizedScore - a.personalizedScore)
+      .slice(0, limit);
+
+    // Replace this user's slice.
+    for (let i = personalizedFeed.length - 1; i >= 0; i -= 1) {
+      if (personalizedFeed[i].user_id === uid) personalizedFeed.splice(i, 1);
+    }
+    scored.forEach((s, idx) => {
+      personalizedFeed.push({
+        user_id: uid,
+        article_id: s.row.article_id,
+        rank_position: idx + 1,
+        personalized_score: Math.round(s.personalizedScore * 10_000) / 10_000,
+        computed_at: t,
+      });
+    });
+    return { data: scored.length, error: null };
+  }
+
+  async function enqueuePersonalizationRecompute(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const uid = String(args.p_user_id ?? '');
+    if (uid) personalizationQueue.add(uid);
+    return { data: null, error: null };
+  }
+
+  async function recordFanoutChunk(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const id = randomUUID();
+    fanoutChunks.push({
+      parent_event_id: (args.p_parent_event_id ?? null) as string | null,
+      parent_dedup_key: (args.p_parent_dedup_key ?? null) as string | null,
+      trace_id: (args.p_trace_id ?? null) as string | null,
+      chunk_index: Math.max(0, Number(args.p_chunk_index ?? 0)),
+      chunk_total: Math.max(1, Number(args.p_chunk_total ?? 1)),
+      recipient_count: Math.max(0, Number(args.p_recipient_count ?? 0)),
+      job_id: (args.p_job_id ?? null) as string | null,
+      status: 'queued',
+    });
+    return { data: id, error: null };
+  }
+
+  async function recordDeliveryHealthEvent(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const id = randomUUID();
+    deliveryHealth.push({
+      sink: String(args.p_sink ?? ''),
+      event: String(args.p_event ?? ''),
+      count: Math.max(1, Number(args.p_count ?? 1)),
+      reason: (args.p_reason ?? null) as string | null,
+      recorded_at: now(),
+    });
+    return { data: id, error: null };
+  }
+
+  async function deliveryHealthSnapshot(
+    _args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const acc = new Map<string, { emitted: number; accepted: number; dropped: number; failed: number }>();
+    for (const r of deliveryHealth) {
+      const cur = acc.get(r.sink) ?? { emitted: 0, accepted: 0, dropped: 0, failed: 0 };
+      if (r.event === 'emitted') cur.emitted += r.count;
+      else if (r.event === 'accepted') cur.accepted += r.count;
+      else if (r.event === 'dropped') cur.dropped += r.count;
+      else if (r.event === 'failed') cur.failed += r.count;
+      acc.set(r.sink, cur);
+    }
+    const data = Array.from(acc.entries()).map(([sink, v]) => ({ sink, ...v }));
+    return { data, error: null };
+  }
+
+  async function recordRankingFeedback(
+    args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const id = randomUUID();
+    rankingFeedback.push({
+      user_id: (args.p_user_id ?? null) as string | null,
+      feed_variant: String(args.p_feed_variant ?? 'personalized_v2'),
+      session_dwell_ms: Math.max(0, Number(args.p_session_dwell_ms ?? 0)),
+      bounce: Boolean(args.p_bounce ?? false),
+      quality_score: Math.max(0, Math.min(1, Number(args.p_quality_score ?? 0))),
+      diversity_score: Math.max(0, Math.min(1, Number(args.p_diversity_score ?? 0))),
+      exploration_ratio: Math.max(0, Math.min(1, Number(args.p_exploration_ratio ?? 0))),
+    });
+    return { data: id, error: null };
+  }
+
+  async function rankingFeedbackSummary(
+    _args: Record<string, unknown>,
+  ): Promise<RpcResponse<unknown>> {
+    const byVariant = new Map<string, { samples: number; dwell: number; bounce: number; q: number; d: number; e: number }>();
+    for (const r of rankingFeedback) {
+      const v = byVariant.get(r.feed_variant) ?? { samples: 0, dwell: 0, bounce: 0, q: 0, d: 0, e: 0 };
+      v.samples += 1;
+      v.dwell += r.session_dwell_ms;
+      if (r.bounce) v.bounce += 1;
+      v.q += r.quality_score;
+      v.d += r.diversity_score;
+      v.e += r.exploration_ratio;
+      byVariant.set(r.feed_variant, v);
+    }
+    const data = Array.from(byVariant.entries()).map(([feed_variant, v]) => ({
+      feed_variant,
+      samples: v.samples,
+      avg_dwell_ms: v.samples ? v.dwell / v.samples : 0,
+      bounce_rate: v.samples ? v.bounce / v.samples : 0,
+      avg_quality: v.samples ? v.q / v.samples : 0,
+      avg_diversity: v.samples ? v.d / v.samples : 0,
+      avg_exploration: v.samples ? v.e / v.samples : 0,
+    }));
+    return { data, error: null };
+  }
+
   // ----- Dispatcher --------------------------------------------------------
   async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<RpcResponse<T>> {
     switch (fn) {
@@ -502,6 +864,27 @@ export function createFakeSupabase(): FakeSupabase {
         return (overrides.reset_feed_for_reingest
           ? await overrides.reset_feed_for_reingest(args)
           : { data: null, error: null }) as RpcResponse<T>;
+      // Phase D
+      case 'recompute_user_affinity':
+        return (await recomputeUserAffinity(args)) as RpcResponse<T>;
+      case 'apply_negative_signals_to_affinity':
+        return (await applyNegativeSignalsToAffinity(args)) as RpcResponse<T>;
+      case 'record_negative_signal':
+        return (await recordNegativeSignal(args)) as RpcResponse<T>;
+      case 'refresh_personalized_feed_v2':
+        return (await refreshPersonalizedFeedV2(args)) as RpcResponse<T>;
+      case 'enqueue_personalization_recompute':
+        return (await enqueuePersonalizationRecompute(args)) as RpcResponse<T>;
+      case 'record_fanout_chunk':
+        return (await recordFanoutChunk(args)) as RpcResponse<T>;
+      case 'record_delivery_health_event':
+        return (await recordDeliveryHealthEvent(args)) as RpcResponse<T>;
+      case 'delivery_health_snapshot':
+        return (await deliveryHealthSnapshot(args)) as RpcResponse<T>;
+      case 'record_ranking_feedback':
+        return (await recordRankingFeedback(args)) as RpcResponse<T>;
+      case 'ranking_feedback_summary':
+        return (await rankingFeedbackSummary(args)) as RpcResponse<T>;
       default:
         return { data: null, error: { message: `fake: rpc '${fn}' not implemented` } };
     }
@@ -632,6 +1015,75 @@ export function createFakeSupabase(): FakeSupabase {
       return Array.from(notificationDeliveries.values()).filter(
         (d) => d.channel === 'push' && d.status === 'pending',
       );
+    },
+    _fanoutChunks() {
+      return [...fanoutChunks];
+    },
+    _deliveryHealth() {
+      return deliveryHealth.map((r) => ({
+        sink: r.sink,
+        event: r.event,
+        count: r.count,
+        reason: r.reason,
+      }));
+    },
+    _negativeSignals() {
+      return negativeSignals.map((n) => ({
+        user_id: n.user_id,
+        signal_type: n.signal_type,
+        article_id: n.article_id,
+        source_id: n.source_id,
+        category_id: n.category_id,
+        weight: n.weight,
+      }));
+    },
+    _rankingFeedback() {
+      return rankingFeedback.map((r) => ({ ...r }));
+    },
+    _personalizedFeedRows(userId?: string) {
+      const rows = userId
+        ? personalizedFeed.filter((r) => r.user_id === userId)
+        : [...personalizedFeed];
+      return rows.map((r) => ({
+        user_id: r.user_id,
+        article_id: r.article_id,
+        rank_position: r.rank_position,
+        personalized_score: r.personalized_score,
+      }));
+    },
+    _seedPersonalizationData(opts) {
+      const t = Date.now();
+      for (const g of opts.globalArticles) {
+        globalRanked.push({
+          article_id: g.article_id,
+          source_id: g.source_id ?? null,
+          category_id: g.category_id ?? null,
+          global_score: g.global_score,
+          published_at: g.published_at ? g.published_at.getTime() : t,
+        });
+      }
+      for (const a of opts.affinities ?? []) {
+        affinities.push({
+          user_id: a.user_id,
+          category_id: a.category_id ?? null,
+          source_id: a.source_id ?? null,
+          score: a.score,
+          last_interaction_at: t,
+        });
+      }
+      for (const r of opts.reads ?? []) {
+        reads.push({ user_id: r.user_id, article_id: r.article_id });
+      }
+    },
+    _affinityFor(userId: string) {
+      const cats = new Map<string, number>();
+      const srcs = new Map<string, number>();
+      for (const a of affinities) {
+        if (a.user_id !== userId) continue;
+        if (a.category_id) cats.set(a.category_id, a.score);
+        if (a.source_id) srcs.set(a.source_id, a.score);
+      }
+      return { categories: cats, sources: srcs };
     },
   };
   return api;

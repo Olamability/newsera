@@ -159,7 +159,13 @@ async function main(): Promise<void> {
   );
   processors.set(
     'ranking',
-    createRankingProcessor({ supabase: supabaseClient, log, normalizer }),
+    createRankingProcessor({
+      supabase: supabaseClient,
+      log,
+      normalizer,
+      isPersonalizationEnabled: () => isFeatureEnabled('personalization_v1'),
+      isRankingEnabled: () => isFeatureEnabled('ranking_v1'),
+    }),
   );
   processors.set(
     'notification',
@@ -170,7 +176,7 @@ async function main(): Promise<void> {
       isDispatchEnabled: () => isFeatureEnabled('backend_notification_dispatch'),
     }),
   );
-  processors.set('analytics', createAnalyticsProcessor({ log }));
+  processors.set('analytics', createAnalyticsProcessor({ log, supabase: supabaseClient }));
 
   const runner = createQueueRunner({
     workerId: WORKER_ID,

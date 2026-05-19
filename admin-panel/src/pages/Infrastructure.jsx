@@ -8,6 +8,18 @@ import FeatureFlagsPanel from '../components/infrastructure/FeatureFlagsPanel'
 import NotificationHealthPanel from '../components/infrastructure/NotificationHealthPanel'
 import PersonalizationHealthPanel from '../components/infrastructure/PersonalizationHealthPanel'
 import RankingHealthPanel from '../components/infrastructure/RankingHealthPanel'
+import {
+  ProductionHealthPanel,
+  DeploymentsPanel,
+  IncidentsPanel,
+  RolloutTimelinePanel,
+  FeedQualityPanel,
+  MonetizationPanel,
+  SeoHealthPanel,
+  MobileReleasePanel,
+  CompliancePanel,
+  RecoveryCenterPanel,
+} from '../components/infrastructure/PhaseGPanels'
 
 const TABS = [
   { id: 'overview',       label: 'Overview' },
@@ -18,6 +30,17 @@ const TABS = [
   { id: 'notifications',  label: 'Notifications' },
   { id: 'personalization', label: 'Personalization' },
   { id: 'ranking',        label: 'Ranking' },
+  // Phase G tabs:
+  { id: 'production_health', label: 'Production Health' },
+  { id: 'deployments',       label: 'Deployments' },
+  { id: 'incidents',         label: 'Incidents' },
+  { id: 'rollout_timeline',  label: 'Rollout Timeline' },
+  { id: 'feed_quality',      label: 'Feed Quality' },
+  { id: 'monetization',      label: 'Monetization' },
+  { id: 'seo_health',        label: 'SEO Health' },
+  { id: 'mobile_release',    label: 'Mobile Release' },
+  { id: 'compliance',        label: 'Compliance' },
+  { id: 'recovery_center',   label: 'Recovery Center' },
 ]
 
 function OverviewPanel() {
@@ -136,6 +159,16 @@ export default function Infrastructure() {
       {tab === 'notifications'  && <NotificationHealthPanel />}
       {tab === 'personalization' && <PersonalizationHealthPanel />}
       {tab === 'ranking'        && <RankingHealthPanel />}
+      {tab === 'production_health' && <ProductionHealthPanel />}
+      {tab === 'deployments'       && <DeploymentsPanel />}
+      {tab === 'incidents'         && <IncidentsPanel />}
+      {tab === 'rollout_timeline'  && <RolloutTimelinePanel />}
+      {tab === 'feed_quality'      && <FeedQualityPanel />}
+      {tab === 'monetization'      && <MonetizationPanel />}
+      {tab === 'seo_health'        && <SeoHealthPanel />}
+      {tab === 'mobile_release'    && <MobileReleasePanel />}
+      {tab === 'compliance'        && <CompliancePanel />}
+      {tab === 'recovery_center'   && <RecoveryCenterPanel />}
     </div>
   )
 }

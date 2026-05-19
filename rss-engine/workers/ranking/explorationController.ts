@@ -31,7 +31,8 @@
  *     session does not whiplash the ratio. The EMA is callerprovided so the
  *     module stays stateless — the worker persists the smoothed value in
  *     `user_recommendation_state` when it exists, or recomputes on the fly
- *     when it does not.
+ *     when it does not. The EMA input is caller-provided so the controller
+ *     has no global mutable state.
  */
 
 // ---------------------------------------------------------------------------

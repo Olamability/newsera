@@ -153,7 +153,7 @@ function tokenize(input: string, minLen: number): string[] {
 }
 
 function normalizeKey(token: string): string {
-  // Collapse repeated hyphens/apostrophes that survive tokenisation.
+  // Collapse repeated hyphens/apostrophes that survive tokenization.
   return token.replace(/-+/g, '-').replace(/'+/g, "'");
 }
 

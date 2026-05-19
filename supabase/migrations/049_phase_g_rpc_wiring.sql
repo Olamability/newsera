@@ -1203,8 +1203,11 @@ BEGIN
   IF jsonb_array_length(COALESCE(v_compliance->'launch_blockers','[]'::jsonb)) > 0 THEN
     v_blockers := array_append(v_blockers, 'Outstanding compliance launch blockers.');
   END IF;
-  IF (v_mobile->>'recommendation') = 'block' THEN
-    v_blockers := array_append(v_blockers, 'Mobile release recommendation is BLOCK.');
+  -- get_mobile_release_readiness returns 'ship' or 'hold'; treat any
+  -- non-'ship' value as a launch blocker so future recommendation
+  -- vocabulary additions (e.g. 'block') also fail-safe.
+  IF COALESCE(v_mobile->>'recommendation', 'hold') <> 'ship' THEN
+    v_blockers := array_append(v_blockers, 'Mobile release recommendation is not SHIP.');
   END IF;
   IF ((v_recovery->>'backup_freshness_score')::numeric < 0.5) THEN
     v_blockers := array_append(v_blockers, 'Backup freshness below 0.5.');

@@ -1,0 +1,90 @@
+-- ============================================================
+-- MIGRATION 053: Fix feature_flags schema drift — missing `value`
+--                JSONB column
+--
+-- Purely additive, surgical fix for the production-activation
+-- blocker where the admin /infrastructure dashboard's Rollout
+-- Timeline panel (and any other Phase G RPC reading rollout
+-- metadata from `feature_flags`) errors out with:
+--
+--     get_rollout_timeline_failed
+--     ERROR: column "value" does not exist
+--
+-- Symptom impact
+-- --------------
+--   * admin-panel `RolloutTimelinePanel` renders a hard error
+--     instead of stage history
+--   * `get_admin_dashboard_overview()` silently degrades the
+--     rollout / freeze / traffic-guard signals to defaults
+--     (wrapped in BEGIN/EXCEPTION blocks) — operators see
+--     "live / normal" even when paused
+--   * `emergency_rollback()` cannot persist its `paused=true`
+--     payload into the governor flag
+--
+-- Root cause
+-- ----------
+-- Migration 045 created `feature_flags` with columns
+--
+--   (name, enabled, rollout_percent, description,
+--    created_at, updated_at)
+--
+-- Migration 049 was authored against a richer assumed schema and
+-- reads/writes `value->>'status'`, `value->>'canary_stage'`,
+-- `value->>'paused'`, `value->>'frozen'`, `value->>'mode'`, etc.
+-- That `value` JSONB column was never actually created, so every
+-- Phase G RPC that touches rollout metadata either errors out
+-- (e.g. `get_rollout_timeline`) or silently swallows the
+-- exception (e.g. `get_admin_dashboard_overview`).
+--
+-- Fix
+-- ---
+-- Add the missing column with a safe default. All readers in
+-- migration 049 already use COALESCE / `?` operators, so existing
+-- rows (`value = '{}'`) degrade gracefully to the documented
+-- fallback values:
+--   * status         → derived from `enabled`
+--   * canary_stage   → '—'
+--   * paused/frozen  → false
+--   * traffic mode   → 'normal'
+--
+-- What is NOT changed
+-- -------------------
+--   * No data migration, no destructive DDL.
+--   * No RLS policy changes — feature_flags remains admin-write
+--     via `admin_update_feature_flag()` and the existing service-
+--     role mutation surface.
+--   * No new indexes, no triggers, no signature changes.
+--   * `is_feature_enabled()` still reads only `enabled`.
+--   * `admin_update_feature_flag()` still mutates `enabled` and
+--     `rollout_percent` — the `value` column is reserved for the
+--     Phase G governor/canary metadata and is only written by
+--     `emergency_rollback()` and equivalent SECURITY DEFINER RPCs.
+--
+-- Rollback
+-- --------
+--   ALTER TABLE feature_flags DROP COLUMN IF EXISTS value;
+-- (Safe because no constraints, indexes, or FKs reference it.)
+-- ============================================================
+
+SET ROLE postgres;
+
+-- ------------------------------------------------------------
+-- 1) Add the missing JSONB column expected by migration 049.
+-- ------------------------------------------------------------
+ALTER TABLE IF EXISTS feature_flags
+  ADD COLUMN IF NOT EXISTS value jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- ------------------------------------------------------------
+-- 2) Defensive validation: every Phase G read site is guarded by
+--    `_phaseg_relation_exists('public.feature_flags')` and uses
+--    `value->>'...'` accessors, which are null-safe on empty
+--    JSONB. After this migration:
+--
+--      SELECT * FROM get_rollout_timeline();
+--
+--    must execute without raising. We don't run it here because
+--    it is SECURITY DEFINER and admin-gated; ops will verify it
+--    via the admin panel post-deploy.
+-- ------------------------------------------------------------
+
+RESET ROLE;

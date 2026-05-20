@@ -75,6 +75,12 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Script drift validation
+        run: npm run validate:scripts
+
+      - name: Simulation suite (Phases B–G)
+        run: npm run test:all
+
   # ─────────────────────────────────────────────────────────────────
   # Mobile app: TypeScript type check
   # ─────────────────────────────────────────────────────────────────

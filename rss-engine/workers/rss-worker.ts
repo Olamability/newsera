@@ -236,6 +236,49 @@ async function markHeartbeatStopped(): Promise<void> {
   }
 }
 
+/**
+ * Read-only eligibility probe (migration 054). Returns the number
+ * of feeds that *should* have been leased on the next poll. Used
+ * exclusively for observability: when `lease_due_feeds` returns
+ * zero rows we still want to know whether the database had eligible
+ * feeds that were somehow excluded by the leasing path, vs. a
+ * genuine "no work" state.
+ *
+ * Best-effort: any RPC / permission failure degrades to `null` so
+ * the claim loop is never blocked by an observability call.
+ */
+interface DueFeedCounts {
+  eligible_feeds: number | null;
+  active_feeds: number | null;
+  leased_feeds: number | null;
+}
+
+async function countDueFeeds(): Promise<DueFeedCounts> {
+  try {
+    const { data, error } = await supabase.rpc('count_due_feeds');
+    if (error) {
+      log('warn', 'count_due_feeds_failed', { error: error.message });
+      return { eligible_feeds: null, active_feeds: null, leased_feeds: null };
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    const toNum = (v: unknown): number | null => {
+      if (v === null || v === undefined) return null;
+      const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+      return Number.isFinite(n) ? n : null;
+    };
+    return {
+      eligible_feeds: toNum(row?.eligible_feeds),
+      active_feeds: toNum(row?.active_feeds),
+      leased_feeds: toNum(row?.leased_feeds),
+    };
+  } catch (err) {
+    log('warn', 'count_due_feeds_threw', {
+      error: (err as Error)?.message ?? String(err),
+    });
+    return { eligible_feeds: null, active_feeds: null, leased_feeds: null };
+  }
+}
+
 async function leaseDueFeeds(): Promise<LeasedFeed[]> {
   const { data, error } = await supabase.rpc('lease_due_feeds', {
     p_worker_id: CONFIG.workerId,
@@ -252,12 +295,30 @@ async function leaseDueFeeds(): Promise<LeasedFeed[]> {
     // loop from a silently failing RPC. Required by PART A of the
     // production stabilization spec ("Prevent silent catch-and-
     // idle behavior").
+    //
+    // We also emit the eligibility counts so an operator can tell
+    // at a glance whether the database genuinely has no due feeds
+    // or whether the leasing path is silently dropping work
+    // (e.g. all eligible feeds are currently leased, or the
+    // eligibility predicate is too strict).
+    const counts = await countDueFeeds();
     log('info', 'lease_due_feeds_idle', {
       next_poll_in_ms: CONFIG.idlePollIntervalMs,
+      eligible_feeds: counts.eligible_feeds,
+      active_feeds: counts.active_feeds,
+      leased_feeds: counts.leased_feeds,
+      sql_result_count: 0,
+      ingestion_jobs_inserted: 0,
     });
   } else {
     log('info', 'lease_due_feeds_success', {
       count: leased.length,
+      // PART D observability: explicit alias for the per-cycle
+      // ingestion-jobs upsert count — same value as `count`, kept
+      // distinct so dashboards/alerts can pivot on a stable name
+      // regardless of future shape changes to this log line.
+      sql_result_count: leased.length,
+      ingestion_jobs_inserted: leased.length,
       feed_ids: leased.map((f) => f.feed_id),
     });
   }

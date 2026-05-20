@@ -4,7 +4,7 @@
  *
  * Runs every simulation harness in deterministic order. Spawns the
  * current Node executable (`process.execPath`) and points it at the
- * portable `tsx/dist/cli.mjs` ES module entry — never a `.cmd`/`.ps1`
+ * portable `tsx/cli` ES module entry — never a `.cmd`/`.ps1`
  * shim — so the script works identically on:
  *
  *   • Linux / macOS
@@ -67,6 +67,8 @@ function resolveTsxCli() {
   // resolution rules (works in pnpm's nested store, npm hoisted layouts,
   // and plain `node_modules` alike).
   const candidates = [
+    // Modern tsx exports this stable subpath.
+    'tsx/cli',
     'tsx/dist/cli.mjs',
     // Older tsx releases shipped the CLI at `dist/cli.js`; keep as a
     // best-effort fallback so a minor version bump doesn't break us.

@@ -15,6 +15,8 @@
     "test:phaseE": "tsx workers/tests/phaseE.simulation.ts",
     "test:phaseF": "tsx workers/tests/phaseF.simulation.ts",
     "test:phaseG": "tsx workers/tests/phaseG.simulation.ts",
+    "test:all": "node scripts/run-all-tests.js",
+    "validate:scripts": "tsx workers/tools/validateScripts.ts",
     "lint": "node --check index.js && node --check worker.js && node --check src/fetchRSS.js && node --check src/fetchSources.js && node --check src/deduplicateArticles.js && node --check src/saveArticles.js",
     "typecheck": "tsc --noEmit"
   },

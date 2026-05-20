@@ -5,7 +5,18 @@
   "scripts": {
     "start": "corepack pnpm --dir ../../rss-engine run start",
     "worker": "corepack pnpm --dir ../../rss-engine run worker",
+    "worker:v2": "corepack pnpm --dir ../../rss-engine run worker:v2",
+    "queue:runner": "corepack pnpm --dir ../../rss-engine run queue:runner",
+    "notification:runner": "corepack pnpm --dir ../../rss-engine run notification:runner",
     "lint": "corepack pnpm --dir ../../rss-engine run lint",
-    "typecheck": "corepack pnpm --dir ../../rss-engine run typecheck"
+    "typecheck": "corepack pnpm --dir ../../rss-engine run typecheck",
+    "test:queue": "corepack pnpm --dir ../../rss-engine run test:queue",
+    "test:notification": "corepack pnpm --dir ../../rss-engine run test:notification",
+    "test:personalization": "corepack pnpm --dir ../../rss-engine run test:personalization",
+    "test:phaseE": "corepack pnpm --dir ../../rss-engine run test:phaseE",
+    "test:phaseF": "corepack pnpm --dir ../../rss-engine run test:phaseF",
+    "test:phaseG": "corepack pnpm --dir ../../rss-engine run test:phaseG",
+    "test:all": "corepack pnpm --dir ../../rss-engine run test:all",
+    "validate:scripts": "corepack pnpm --dir ../../rss-engine run validate:scripts"
   }
 }

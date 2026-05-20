@@ -4,15 +4,26 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
+    "postinstall": "node scripts/install-externals.js",
     "dev": "corepack pnpm --filter @newsera/admin-panel dev",
     "build": "corepack pnpm --filter @newsera/admin-panel build",
     "rss:start": "corepack pnpm --filter @newsera/rss-engine start",
     "rss:worker": "corepack pnpm --filter @newsera/rss-engine worker",
     "rss:worker:v2": "corepack pnpm --filter @newsera/rss-engine worker:v2",
     "queue:runner": "corepack pnpm --filter @newsera/rss-engine queue:runner",
+    "test": "corepack pnpm --filter @newsera/rss-engine test:queue",
     "test:queue": "corepack pnpm --filter @newsera/rss-engine test:queue",
+    "test:notification": "corepack pnpm --filter @newsera/rss-engine test:notification",
+    "test:personalization": "corepack pnpm --filter @newsera/rss-engine test:personalization",
+    "test:phaseE": "corepack pnpm --filter @newsera/rss-engine test:phaseE",
+    "test:phaseF": "corepack pnpm --filter @newsera/rss-engine test:phaseF",
+    "test:phaseG": "corepack pnpm --filter @newsera/rss-engine test:phaseG",
+    "test:all": "corepack pnpm --filter @newsera/rss-engine test:all",
+    "validate:scripts": "corepack pnpm --filter @newsera/rss-engine validate:scripts",
     "lint": "corepack pnpm -r --if-present run lint",
-    "typecheck": "corepack pnpm -r --if-present run typecheck"
+    "typecheck": "corepack pnpm -r --if-present run typecheck",
+    "verify": "node scripts/verify.js",
+    "verify:launch": "node scripts/verify-launch.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

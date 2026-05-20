@@ -151,7 +151,7 @@ async function isFeatureEnabled(name: string): Promise<boolean> {
   }
 }
 
-async function sendHeartbeat(metadata: Record<string, unknown> = {}): Promise<void> {
+async function sendHeartbeat(metadata: Record<string, unknown> = {}): Promise<boolean> {
   try {
     const { error } = await supabase.rpc('worker_heartbeat', {
       p_worker_id: CONFIG.workerId,
@@ -166,9 +166,53 @@ async function sendHeartbeat(metadata: Record<string, unknown> = {}): Promise<vo
     });
     if (error) {
       log('warn', 'heartbeat_failed', { error: error.message });
+      return false;
     }
+    return true;
   } catch (err) {
     log('warn', 'heartbeat_threw', { error: (err as Error)?.message ?? String(err) });
+    return false;
+  }
+}
+
+/**
+ * Verify that the heartbeat upsert actually landed in
+ * `worker_heartbeats` after startup. Without this, a silent RPC
+ * failure (e.g. permission drift on `worker_heartbeat`, RLS
+ * misconfiguration, or a stale schema) shows up only as "no rows
+ * in worker_heartbeats" with no corresponding error in the worker
+ * logs — exactly the symptom reported in production.
+ */
+async function verifyHeartbeatRegistered(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('worker_heartbeats')
+      .select('worker_id, worker_type, status, last_heartbeat_at')
+      .eq('worker_id', CONFIG.workerId)
+      .eq('worker_type', CONFIG.workerType)
+      .maybeSingle();
+    if (error) {
+      log('error', 'heartbeat_register_failed', { error: error.message });
+      return false;
+    }
+    if (!data) {
+      log('error', 'heartbeat_register_failed', {
+        reason: 'no_row_after_upsert',
+        hint: 'worker_heartbeat RPC returned without error but no row landed — check RLS / grants',
+      });
+      return false;
+    }
+    log('info', 'heartbeat_registered', {
+      worker_type: data.worker_type,
+      status: data.status,
+      last_heartbeat_at: data.last_heartbeat_at,
+    });
+    return true;
+  } catch (err) {
+    log('error', 'heartbeat_register_threw', {
+      error: (err as Error)?.message ?? String(err),
+    });
+    return false;
   }
 }
 
@@ -202,7 +246,54 @@ async function leaseDueFeeds(): Promise<LeasedFeed[]> {
     log('error', 'lease_due_feeds_failed', { error: error.message });
     return [];
   }
-  return (data as LeasedFeed[]) || [];
+  const leased = (data as LeasedFeed[]) || [];
+  if (leased.length === 0) {
+    // Structured "no work" signal — distinguishes a healthy idle
+    // loop from a silently failing RPC. Required by PART A of the
+    // production stabilization spec ("Prevent silent catch-and-
+    // idle behavior").
+    log('info', 'lease_due_feeds_idle', {
+      next_poll_in_ms: CONFIG.idlePollIntervalMs,
+    });
+  } else {
+    log('info', 'lease_due_feeds_success', {
+      count: leased.length,
+      feed_ids: leased.map((f) => f.feed_id),
+    });
+  }
+  return leased;
+}
+
+/**
+ * Emit a queue-depth snapshot so the activation/admin panels and
+ * operators can correlate worker activity against the orchestration
+ * tables. Counts are best-effort: any RPC/permission error degrades
+ * silently to a single warn log line so it never blocks ingestion.
+ */
+async function logQueueDepth(): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('ingestion_jobs')
+      .select('last_status');
+    if (error) {
+      log('warn', 'queue_depth_query_failed', { error: error.message });
+      return;
+    }
+    const rows = (data as Array<{ last_status: string | null }>) || [];
+    const byStatus: Record<string, number> = {};
+    for (const r of rows) {
+      const key = r.last_status ?? 'null';
+      byStatus[key] = (byStatus[key] ?? 0) + 1;
+    }
+    log('info', 'queue_depth', {
+      ingestion_jobs_total: rows.length,
+      by_status: byStatus,
+    });
+  } catch (err) {
+    log('warn', 'queue_depth_threw', {
+      error: (err as Error)?.message ?? String(err),
+    });
+  }
 }
 
 async function recordFeedOutcome(
@@ -534,8 +625,6 @@ async function claimLoop(): Promise<void> {
       continue;
     }
 
-    log('info', 'feeds_leased', { count: feeds.length });
-
     // Process the leased batch with bounded concurrency; await the whole batch
     // before claiming again so we never exceed perFeedConcurrency * batchSize
     // open ingestions and never leak leases on shutdown.
@@ -578,6 +667,19 @@ function startStaleReap(): void {
   staleReapTimer.unref();
 }
 
+/**
+ * Queue-depth metrics scheduler. Shares the stale-reap cadence so we
+ * don't add a third independent timer — once per `staleReapIntervalMs`
+ * is sufficient for dashboard/alert correlation.
+ */
+let queueDepthTimer: NodeJS.Timeout | null = null;
+function startQueueDepthMetrics(): void {
+  queueDepthTimer = setInterval(() => {
+    void logQueueDepth();
+  }, CONFIG.staleReapIntervalMs);
+  queueDepthTimer.unref();
+}
+
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -585,6 +687,7 @@ async function shutdown(signal: string): Promise<void> {
 
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (staleReapTimer) clearInterval(staleReapTimer);
+  if (queueDepthTimer) clearInterval(queueDepthTimer);
 
   // Wait for in-flight feeds to finish (bounded by shutdownGraceMs). Each
   // in-flight feed releases its own lease in its finally block, so we just
@@ -653,8 +756,19 @@ async function main(): Promise<void> {
   }
 
   await sendHeartbeat({ event: 'startup' });
+  // Verify the heartbeat row actually landed before entering the claim
+  // loop — this turns "starts but no rows in worker_heartbeats" from a
+  // silent failure into a loud, structured `heartbeat_register_failed`
+  // log line. We do NOT abort startup on failure: an operator may want
+  // the worker to keep trying, and subsequent `sendHeartbeat()` ticks
+  // will surface the same issue again.
+  await verifyHeartbeatRegistered();
   startHeartbeat();
   startStaleReap();
+  startQueueDepthMetrics();
+  // Emit one queue-depth snapshot at startup so the very first log
+  // stream contains a baseline reading for dashboards.
+  await logQueueDepth();
 
   try {
     await claimLoop();

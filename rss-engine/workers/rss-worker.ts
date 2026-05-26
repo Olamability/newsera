@@ -279,6 +279,61 @@ async function countDueFeeds(): Promise<DueFeedCounts> {
   }
 }
 
+/**
+ * Empty-table bootstrap (migration 056). On startup, if
+ * `rss_feed_sources` contains zero rows the worker would idle
+ * forever — there is nothing for `lease_due_feeds` to claim and
+ * no operator-driven feedback loop. We call the admin-safe
+ * `seed_default_rss_feeds()` RPC exactly once at startup to plant
+ * the default catalogue. The RPC is idempotent and gated by
+ * `_is_admin_caller()`; the worker authenticates with
+ * `service_role`, which satisfies that check.
+ *
+ * Best-effort: any RPC / permission failure is logged and the
+ * worker continues so the operator path (manual SQL editor RPC
+ * call) is never blocked by a worker-side bootstrap error.
+ */
+async function bootstrapDefaultFeedsIfEmpty(): Promise<void> {
+  try {
+    const { data: statsData, error: statsError } = await supabase.rpc('get_rss_feed_stats');
+    if (statsError) {
+      log('warn', 'feed_bootstrap_stats_failed', { error: statsError.message });
+      return;
+    }
+    const statsRow = Array.isArray(statsData) ? statsData[0] : statsData;
+    const totalFeeds =
+      statsRow && statsRow.total_feeds !== undefined && statsRow.total_feeds !== null
+        ? Number(statsRow.total_feeds)
+        : null;
+    if (totalFeeds === null || !Number.isFinite(totalFeeds)) {
+      log('warn', 'feed_bootstrap_stats_unparseable', { stats: statsRow });
+      return;
+    }
+    if (totalFeeds > 0) {
+      log('info', 'feed_bootstrap_skipped', {
+        reason: 'rss_feed_sources_already_populated',
+        total_feeds: totalFeeds,
+        active_feeds: statsRow?.active_feeds ?? null,
+        eligible_feeds: statsRow?.eligible_feeds ?? null,
+      });
+      return;
+    }
+    log('warn', 'feed_bootstrap_empty_table_detected', {
+      hint: 'rss_feed_sources is empty — invoking seed_default_rss_feeds()',
+    });
+    const { data: seedData, error: seedError } = await supabase.rpc('seed_default_rss_feeds');
+    if (seedError) {
+      log('error', 'feed_bootstrap_seed_failed', { error: seedError.message });
+      return;
+    }
+    log('info', 'feed_bootstrap_seed_success', { result: seedData });
+  } catch (err) {
+    log('warn', 'feed_bootstrap_threw', {
+      error: (err as Error)?.message ?? String(err),
+    });
+  }
+}
+
 async function leaseDueFeeds(): Promise<LeasedFeed[]> {
   const { data, error } = await supabase.rpc('lease_due_feeds', {
     p_worker_id: CONFIG.workerId,
@@ -826,6 +881,10 @@ async function main(): Promise<void> {
   await verifyHeartbeatRegistered();
   startHeartbeat();
   startStaleReap();
+  // Auto-bootstrap the default feed catalogue if rss_feed_sources
+  // is empty (migration 056). Without this a fresh deployment with
+  // a healthy worker would silently idle forever on `lease_due_feeds_idle`.
+  await bootstrapDefaultFeedsIfEmpty();
   startQueueDepthMetrics();
   // Emit one queue-depth snapshot at startup so the very first log
   // stream contains a baseline reading for dashboards.

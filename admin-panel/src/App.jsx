@@ -9,6 +9,14 @@ import PublisherApplication from './pages/PublisherApplication'
 import Categories from './pages/Categories'
 import Analytics from './pages/Analytics'
 import Infrastructure from './pages/Infrastructure'
+import ModerationOverview from './pages/moderation/Overview'
+import ReportsQueue from './pages/moderation/Reports'
+import CaseView from './pages/moderation/CaseView'
+import Verifications from './pages/moderation/Verifications'
+import FraudMonitor from './pages/moderation/FraudMonitor'
+import AuditLog from './pages/moderation/AuditLog'
+import ModerationAnalytics from './pages/moderation/Analytics'
+import UsersModeration from './pages/moderation/Users'
 
 function Unauthorized() {
   return (
@@ -87,6 +95,86 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <Infrastructure />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ModerationOverview />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/reports"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ReportsQueue />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/cases/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CaseView />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/users"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <UsersModeration />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/verifications"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Verifications />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/fraud"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <FraudMonitor />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/analytics"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ModerationAnalytics />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/moderation/audit"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AuditLog />
                 </Layout>
               </ProtectedRoute>
             }

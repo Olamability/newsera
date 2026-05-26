@@ -15,7 +15,7 @@ export { computeSeverity, slaDueAt };
 export async function intakeReport(input, { requestId } = {}) {
   const { reporterId, targetType, targetId, reasonCode, description } = input;
   if (!targetType || !targetId || !reasonCode) {
-    const err = new Error('reporterId, targetType, targetId, reasonCode are required');
+    const err = new Error('targetType, targetId, reasonCode are required');
     err.statusCode = 400;
     throw err;
   }
@@ -340,16 +340,24 @@ async function decideVerification(client, ctx, decision) {
     throw err;
   }
   const isBusiness = before.type === 'business';
-  const reviewerCol = isBusiness && before.reviewer_id && before.reviewer_id !== ctx.actorId
-    ? 'second_reviewer_id'
-    : 'reviewer_id';
-  const upd = await client.query(
-    `update public.verifications
-        set status=$2, ${reviewerCol}=$3,
-            decision_reason=$4, decided_at=now()
-      where id=$1 returning *`,
-    [ctx.target.id, decision, ctx.actorId, ctx.payload.reasonText ?? ctx.payload.reasonCode],
-  );
+  const useSecondReviewer =
+    isBusiness && before.reviewer_id && before.reviewer_id !== ctx.actorId;
+  // Explicit branches — never interpolate a column name from data.
+  const upd = useSecondReviewer
+    ? await client.query(
+        `update public.verifications
+            set status=$2, second_reviewer_id=$3,
+                decision_reason=$4, decided_at=now()
+          where id=$1 returning *`,
+        [ctx.target.id, decision, ctx.actorId, ctx.payload.reasonText ?? ctx.payload.reasonCode],
+      )
+    : await client.query(
+        `update public.verifications
+            set status=$2, reviewer_id=$3,
+                decision_reason=$4, decided_at=now()
+          where id=$1 returning *`,
+        [ctx.target.id, decision, ctx.actorId, ctx.payload.reasonText ?? ctx.payload.reasonCode],
+      );
 
   // Update profile flags on approval (best effort)
   if (decision === 'approved') {
@@ -379,14 +387,16 @@ async function escalateCase(client, ctx) {
 async function decideAppeal(client, ctx) {
   const before = (await client.query(`select * from public.moderation_cases where id=$1`, [ctx.target.id])).rows[0];
   if (!before) throw notFound('case', ctx.target.id);
-  // Separation of duties: the same admin who took the original action can't decide its appeal
-  const lastAction = (await client.query(
-    `select actor_id from public.moderation_actions
-      where case_id=$1 and actor_kind='human'
-      order by occurred_at asc limit 1`,
-    [ctx.target.id],
-  )).rows[0];
-  if (lastAction?.actor_id && lastAction.actor_id === ctx.actorId) {
+  // Separation of duties: no admin who took ANY prior human action on this
+  // case may decide its appeal. This is stricter than just the originator and
+  // closes the loophole where multiple admins collaborated on the action.
+  const prior = await client.query(
+    `select 1 from public.moderation_actions
+      where case_id = $1 and actor_kind = 'human' and actor_id = $2
+      limit 1`,
+    [ctx.target.id, ctx.actorId],
+  );
+  if (prior.rowCount > 0) {
     const err = new Error('Separation of duties: a different admin must decide this appeal');
     err.statusCode = 403;
     throw err;

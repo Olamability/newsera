@@ -49,7 +49,6 @@ export async function processEvent(event, context = {}) {
   if (signals.length === 0) return { signals: [], scores: [], autoActions: [] };
 
   const client = await getPool().connect();
-  const autoActions = [];
   const scoreUpdates = new Map();
   try {
     await client.query('begin');
@@ -71,30 +70,25 @@ export async function processEvent(event, context = {}) {
       );
 
       const key = `${sig.subjectType}:${sig.subjectId}`;
-      const cur = scoreUpdates.get(key) ?? { subjectType: sig.subjectType, subjectId: sig.subjectId, score: 0 };
+      const cur = scoreUpdates.get(key) ?? {
+        subjectType: sig.subjectType,
+        subjectId: sig.subjectId,
+        score: 0,
+        contributingRules: [],
+        hasEnforce: false,
+      };
       // Simple aggregation: sum-capped-at-100 of contributing scores.
       cur.score = Math.min(100, cur.score + Number(sig.score));
+      cur.contributingRules.push({
+        ruleId: sig.ruleId, ruleVersion: sig.ruleVersion,
+        signalCode: sig.signalCode, score: sig.score,
+      });
+      if (sig.mode === 'enforce') cur.hasEnforce = true;
       scoreUpdates.set(key, cur);
-
-      if (sig.mode === 'enforce') {
-        const action = automatedAction(sig.subjectType, sig.score);
-        if (action.action) {
-          autoActions.push({
-            requestId: randomUUID(),
-            actionId: action.action,
-            target: { id: sig.subjectId, type: sig.subjectType },
-            payload: {
-              ...action.payload,
-              reasonCode: `fraud:${sig.signalCode}`,
-              reasonText: `Automated action from rule ${sig.ruleId} v${sig.ruleVersion}`,
-              metadata: { ruleId: sig.ruleId, ruleVersion: sig.ruleVersion, score: sig.score },
-            },
-          });
-        }
-      }
     }
 
     const scores = [];
+    const autoActions = [];
     for (const upd of scoreUpdates.values()) {
       const band = bandFor(upd.score);
       const hash = inputsHash(event, context);
@@ -110,6 +104,26 @@ export async function processEvent(event, context = {}) {
         [upd.subjectType, String(upd.subjectId), upd.score, band, hash],
       );
       scores.push({ ...upd, band });
+
+      // Auto-action is based on the AGGREGATED subject score, not any single
+      // signal — so we never act before the full risk picture is computed.
+      // Requires at least one contributing rule to be in 'enforce' mode.
+      if (upd.hasEnforce) {
+        const action = automatedAction(upd.subjectType, upd.score);
+        if (action.action) {
+          autoActions.push({
+            requestId: randomUUID(),
+            actionId: action.action,
+            target: { id: upd.subjectId, type: upd.subjectType },
+            payload: {
+              ...action.payload,
+              reasonCode: `fraud:${band}`,
+              reasonText: `Automated action from aggregated risk score ${upd.score} (${band})`,
+              metadata: { contributingRules: upd.contributingRules, score: upd.score, band },
+            },
+          });
+        }
+      }
     }
 
     await client.query('commit');

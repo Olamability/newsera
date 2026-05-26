@@ -1,0 +1,18 @@
+{
+  "name": "@newsera/moderation-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Moderation API service: reports, cases, actions, suspensions, verifications. All mutations write the business change + admin_activity_log row in a single Postgres transaction.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  }
+}

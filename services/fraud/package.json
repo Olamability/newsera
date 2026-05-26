@@ -1,0 +1,16 @@
+{
+  "name": "@newsera/fraud-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fraud signal engine: consumes events, evaluates declarative rules, writes fraud_signals and risk_scores. Shadow-mode by default; enforcement is opt-in per rule.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
+    "pg": "^8.12.0"
+  }
+}

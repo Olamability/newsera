@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.43.4",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
     "pg": "^8.12.0"
   }
 }

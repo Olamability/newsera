@@ -29,8 +29,19 @@ export async function loadRules() {
   }
 }
 
+/** Stable JSON serialization with sorted object keys, so the same logical
+ *  input always hashes to the same string regardless of insertion order. */
+function canonicalStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalStringify).join(',')}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map(k => `${JSON.stringify(k)}:${canonicalStringify(value[k])}`).join(',')}}`;
+}
+
 function inputsHash(event, context) {
-  return createHash('sha256').update(JSON.stringify({ event, context })).digest('hex');
+  return createHash('sha256').update(canonicalStringify({ event, context })).digest('hex');
 }
 
 /**

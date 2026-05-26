@@ -5,6 +5,14 @@ import { Badge, EmptyState, ErrorBanner, Spinner, relativeTime } from '../../com
 import ActionConfirmModal from '../../components/moderation/ActionConfirmModal'
 import { STATUS_COLOR } from '../../services/moderation/constants'
 
+function formatEvidenceRef(e) {
+  if (typeof e === 'string') return e
+  if (e && typeof e === 'object') {
+    return e.path || e.key || e.filename || e.sha256 || '[evidence object — open via signed URL]'
+  }
+  return '[evidence reference]'
+}
+
 const TABS = ['requested', 'submitted', 'in_review', 'approved', 'rejected']
 
 export default function Verifications() {
@@ -113,17 +121,9 @@ export default function Verifications() {
                   <p className="text-sm text-gray-500">No evidence attached.</p>
                 ) : revealed.has(v.id) ? (
                   <ul className="text-xs font-mono text-gray-700 space-y-1">
-                    {v.evidence_refs.map((e, i) => {
-                      // Whitelist what we display: known string fields only.
-                      // React escapes string children, but we still avoid
-                      // dumping arbitrary evidence objects (which may contain
-                      // sensitive PII) into the UI.
-                      const display = typeof e === 'string'
-                        ? e
-                        : (e && (e.path || e.key || e.filename || e.sha256))
-                          || '[evidence object — open via signed URL]'
-                      return <li key={i}>{display}</li>
-                    })}
+                    {v.evidence_refs.map((e, i) => (
+                      <li key={i}>{formatEvidenceRef(e)}</li>
+                    ))}
                   </ul>
                 ) : (
                   <div className="flex items-center gap-3">

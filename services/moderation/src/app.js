@@ -1,8 +1,8 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import rateLimit from 'express-rate-limit';
 import { getPool } from './db.js';
 import { intakeReport, applyAction } from './handlers.js';
-import { rateLimit } from './rate-limit.js';
 
 /**
  * Build the moderation API. Auth is expected to be enforced by an upstream
@@ -23,9 +23,15 @@ export function buildApp({ logger = console } = {}) {
   app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
   // Rate-limit every DB-touching endpoint. Per-actor when present, falling
-  // back to remote IP. Tighter bucket on mutation endpoints below.
-  const readLimiter  = rateLimit({ windowMs: 60_000, max: 300 });
-  const writeLimiter = rateLimit({ windowMs: 60_000, max: 60  });
+  // back to remote IP. Tighter bucket on mutation endpoints below. We apply
+  // it as a global middleware so every current and future DB-touching route
+  // is covered by default.
+  const keyFn = (req) => req.header('x-actor-id') || req.ip || 'anon';
+  const readLimiter  = rateLimit({ windowMs: 60_000, limit: 300, keyGenerator: keyFn,
+                                   standardHeaders: 'draft-7', legacyHeaders: false });
+  const writeLimiter = rateLimit({ windowMs: 60_000, limit:  60, keyGenerator: keyFn,
+                                   standardHeaders: 'draft-7', legacyHeaders: false });
+  app.use(readLimiter);
 
   // ---------- Reports ----------
   app.post('/v1/reports', writeLimiter, async (req, res, next) => {
@@ -35,7 +41,7 @@ export function buildApp({ logger = console } = {}) {
     } catch (e) { next(e); }
   });
 
-  app.get('/v1/queue', readLimiter, async (req, res, next) => {
+  app.get('/v1/queue', async (req, res, next) => {
     try {
       const limit = Math.min(Number(req.query.limit ?? 50), 200);
       const { rows } = await getPool().query(
@@ -46,7 +52,7 @@ export function buildApp({ logger = console } = {}) {
     } catch (e) { next(e); }
   });
 
-  app.get('/v1/cases/:id', readLimiter, async (req, res, next) => {
+  app.get('/v1/cases/:id', async (req, res, next) => {
     try {
       const { id } = req.params;
       const pool = getPool();
@@ -90,7 +96,7 @@ export function buildApp({ logger = console } = {}) {
   });
 
   // ---------- Audit ----------
-  app.get('/v1/audit/log', readLimiter, async (req, res, next) => {
+  app.get('/v1/audit/log', async (req, res, next) => {
     try {
       const limit = Math.min(Number(req.query.limit ?? 100), 500);
       const { rows } = await getPool().query(
@@ -104,7 +110,7 @@ export function buildApp({ logger = console } = {}) {
     } catch (e) { next(e); }
   });
 
-  app.get('/v1/audit/verify', readLimiter, async (_req, res, next) => {
+  app.get('/v1/audit/verify', async (_req, res, next) => {
     try {
       const { rows } = await getPool().query(`select broken_at from public.verify_admin_activity_chain()`);
       res.json({ ok: rows.length === 0, broken_at: rows[0]?.broken_at ?? null });

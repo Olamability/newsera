@@ -359,15 +359,21 @@ async function decideVerification(client, ctx, decision) {
         [ctx.target.id, decision, ctx.actorId, ctx.payload.reasonText ?? ctx.payload.reasonCode],
       );
 
-  // Update profile flags on approval (best effort)
+  // Update profile flags on approval (best effort, using explicit branches
+  // so we never interpolate a column name from data).
   if (decision === 'approved') {
     const exists = await client.query(`select to_regclass('public.user_profiles') as t`);
     if (exists.rows[0].t) {
-      const col = before.type === 'business' ? 'verified_business'
-                : before.type === 'id'       ? 'verified_id'
-                : null;
-      if (col) {
-        await client.query(`update public.user_profiles set ${col}=true where id=$1`, [before.user_id]);
+      if (before.type === 'business') {
+        await client.query(
+          `update public.user_profiles set verified_business=true where id=$1`,
+          [before.user_id],
+        );
+      } else if (before.type === 'id') {
+        await client.query(
+          `update public.user_profiles set verified_id=true where id=$1`,
+          [before.user_id],
+        );
       }
     }
   }

@@ -6,12 +6,17 @@ function toCsv(rows) {
   if (rows.length === 0) return ''
   const cols = ['id', 'occurred_at', 'request_id', 'actor_id', 'actor_role', 'action',
                 'target_type', 'target_id', 'reason_code', 'reason_text', 'prev_hash', 'row_hash']
+  // RFC 4180: fields containing quote / comma / CR / LF must be quoted; embedded
+  // quotes are doubled. We also strip NUL bytes (which Excel mishandles).
   const esc = (v) => {
     if (v == null) return ''
-    const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    const raw = typeof v === 'object' ? JSON.stringify(v) : String(v)
+    const s = raw.replace(/\u0000/g, '')
+    if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+    return s
   }
-  return [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n')
+  // CRLF line endings per RFC 4180
+  return [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\r\n')
 }
 
 export default function AuditLog() {

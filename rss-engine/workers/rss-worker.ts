@@ -68,6 +68,27 @@ const CONFIG = {
   shutdownGraceMs: parsePositiveInt(process.env.RSS_SHUTDOWN_GRACE_MS, 30_000),
   featureFlag: 'queue_based_ingestion' as const,
   flagPollIntervalMs: parsePositiveInt(process.env.RSS_FLAG_POLL_INTERVAL_MS, 30_000),
+  // ----- Adaptive scheduling bounds (client-side; DB columns are still the
+  // source of truth — these are only used when we adjust fetch_interval_seconds
+  // in response to feed productivity). All values clamp at safe defaults so a
+  // mis-configured env never starves or hammers a feed.
+  adaptiveMinIntervalSeconds: parsePositiveInt(
+    process.env.RSS_ADAPTIVE_MIN_INTERVAL_SECONDS,
+    300, // 5 min floor — well above the DB CHECK lower bound (60s) so even
+         // a maximally-decreased interval stays safely off the constraint
+  ),
+  adaptiveMaxIntervalSeconds: parsePositiveInt(
+    process.env.RSS_ADAPTIVE_MAX_INTERVAL_SECONDS,
+    10_800, // 3 h ceiling — within DB CHECK upper bound (86400)
+  ),
+  adaptiveDecreaseSeconds: parsePositiveInt(
+    process.env.RSS_ADAPTIVE_DECREASE_SECONDS,
+    60, // shrink interval by 1 min when feed produced new articles
+  ),
+  adaptiveIncreaseSeconds: parsePositiveInt(
+    process.env.RSS_ADAPTIVE_INCREASE_SECONDS,
+    120, // grow interval by 2 min when feed produced no new articles
+  ),
 };
 
 // ---------------------------------------------------------------------------
@@ -233,6 +254,183 @@ async function markHeartbeatStopped(): Promise<void> {
     }
   } catch (err) {
     log('warn', 'heartbeat_stop_threw', { error: (err as Error)?.message ?? String(err) });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schema-drift defense: column probe for rss_feed_sources
+// ---------------------------------------------------------------------------
+
+/**
+ * Adaptive scheduling and reliability scoring rely on optional columns on
+ * `rss_feed_sources` (`fetch_interval_seconds`, `backoff_seconds`,
+ * `reliability_score`). Migration 040 introduced them, but the worker MUST
+ * tolerate an environment where one of those migrations has not yet been
+ * applied — that is the explicit "no schema assumptions" production-safety
+ * requirement.
+ *
+ * We probe once at startup using `information_schema.columns`. If the probe
+ * itself fails (permission drift, missing grants, etc.) we conservatively
+ * assume nothing is available, which forces every adaptive code path to
+ * no-op and degrade to the legacy behavior driven by
+ * `record_feed_ingestion_outcome`.
+ */
+const ADAPTIVE_OPTIONAL_COLUMNS = [
+  'fetch_interval_seconds',
+  'backoff_seconds',
+  'reliability_score',
+] as const;
+type AdaptiveColumn = (typeof ADAPTIVE_OPTIONAL_COLUMNS)[number];
+
+let feedSourceColumns: Set<string> | null = null;
+
+async function probeFeedSourceColumns(): Promise<Set<string>> {
+  // 1) Preferred path: query information_schema directly. Service-role has
+  //    read access to information_schema in standard Supabase deployments.
+  //    The `as never` cast is required because the Supabase generated types
+  //    don't enumerate system-catalog tables; we're querying a stable
+  //    PostgreSQL system view, not a user table, so bypassing the typed
+  //    table registry here is safe and intentional.
+  try {
+    const { data, error } = await supabase
+      .from('information_schema.columns' as never)
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'rss_feed_sources');
+    if (!error && Array.isArray(data)) {
+      const cols = new Set<string>(
+        (data as Array<{ column_name: string }>).map((r) => r.column_name),
+      );
+      log('info', 'feed_source_columns_probed', {
+        method: 'information_schema',
+        column_count: cols.size,
+        adaptive_columns_present: ADAPTIVE_OPTIONAL_COLUMNS.filter((c) => cols.has(c)),
+      });
+      return cols;
+    }
+    // Fall through to the empty-row probe below.
+    if (error) {
+      log('warn', 'feed_source_columns_probe_failed', {
+        method: 'information_schema',
+        error: error.message,
+      });
+    }
+  } catch (err) {
+    log('warn', 'feed_source_columns_probe_threw', {
+      method: 'information_schema',
+      error: (err as Error)?.message ?? String(err),
+    });
+  }
+
+  // 2) Fallback: ask Postgres for a zero-row sample with the columns we care
+  //    about. PostgREST returns a `column does not exist` error per-column,
+  //    so we probe each adaptive column individually. This works in
+  //    environments where `information_schema` access is restricted.
+  const present = new Set<string>();
+  for (const col of ADAPTIVE_OPTIONAL_COLUMNS) {
+    try {
+      const { error } = await supabase
+        .from('rss_feed_sources')
+        .select(col)
+        .limit(0);
+      if (!error) {
+        present.add(col);
+      }
+    } catch {
+      // Treat throws as "not present"; we already log probe failures above.
+    }
+  }
+  log('info', 'feed_source_columns_probed', {
+    method: 'select_limit_zero_fallback',
+    adaptive_columns_present: Array.from(present),
+  });
+  return present;
+}
+
+function hasFeedColumn(name: AdaptiveColumn): boolean {
+  // Default to "present" only if the probe completed successfully and saw it.
+  // If the probe has not yet run (e.g. tests, or startup ordering edge case)
+  // we err on the side of "absent" so adaptive writes silently no-op.
+  return feedSourceColumns !== null && feedSourceColumns.has(name);
+}
+
+/**
+ * Adaptive `fetch_interval_seconds` update. Called after a successful fetch:
+ *   - If the feed produced new articles, slightly DECREASE the interval so we
+ *     come back sooner (more freshness).
+ *   - If the feed produced no new articles, gradually INCREASE the interval
+ *     (up to a safe ceiling) so we stop wasting polls on quiet feeds.
+ *
+ * Failure backoff is intentionally NOT done here — it is handled by
+ * `record_feed_ingestion_outcome` server-side (exponential, capped at 6h) and
+ * we must not stack two competing backoff policies.
+ *
+ * This is a pure observability/efficiency win: the DB function then computes
+ * `next_fetch_at = now() + fetch_interval_seconds + backoff_seconds`, so any
+ * adjustment we make here is automatically respected on the next cycle.
+ *
+ * Skips silently when the optional column is missing or any write fails — the
+ * adaptive path must never block ingestion.
+ */
+async function adjustAdaptiveFetchInterval(
+  feedId: string,
+  hadNewArticles: boolean,
+  baseLog: Record<string, unknown>,
+): Promise<void> {
+  if (!hasFeedColumn('fetch_interval_seconds')) {
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('rss_feed_sources')
+      .select('fetch_interval_seconds')
+      .eq('id', feedId)
+      .maybeSingle();
+    if (error || !data) {
+      // Row may have been deleted out from under us — that is fine.
+      return;
+    }
+    const current = Number(
+      (data as { fetch_interval_seconds: number | null }).fetch_interval_seconds,
+    );
+    if (!Number.isFinite(current) || current <= 0) {
+      return;
+    }
+    const delta = hadNewArticles
+      ? -CONFIG.adaptiveDecreaseSeconds
+      : CONFIG.adaptiveIncreaseSeconds;
+    const next = Math.min(
+      CONFIG.adaptiveMaxIntervalSeconds,
+      Math.max(CONFIG.adaptiveMinIntervalSeconds, current + delta),
+    );
+    if (next === current) {
+      return;
+    }
+    const { error: updateError } = await supabase
+      .from('rss_feed_sources')
+      .update({ fetch_interval_seconds: next })
+      .eq('id', feedId);
+    if (updateError) {
+      log('warn', 'adaptive_interval_update_failed', {
+        ...baseLog,
+        previous_interval_seconds: current,
+        next_interval_seconds: next,
+        had_new_articles: hadNewArticles,
+        error: updateError.message,
+      });
+      return;
+    }
+    log('info', 'adaptive_interval_adjusted', {
+      ...baseLog,
+      previous_interval_seconds: current,
+      next_interval_seconds: next,
+      had_new_articles: hadNewArticles,
+    });
+  } catch (err) {
+    log('warn', 'adaptive_interval_threw', {
+      ...baseLog,
+      error: (err as Error)?.message ?? String(err),
+    });
   }
 }
 
@@ -593,7 +791,13 @@ async function resolveCategoryId(
 // Per-feed ingestion pipeline
 // ---------------------------------------------------------------------------
 
-async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
+interface FeedOutcome {
+  success: boolean;
+  hadNewArticles: boolean;
+  durationMs: number;
+}
+
+async function processLeasedFeed(feed: LeasedFeed): Promise<FeedOutcome> {
   // trace_id is generated ONCE per feed execution and is treated as immutable
   // for the rest of this function. Every log line, every article inserted,
   // and the downstream ranking job all carry this same value so an operator
@@ -675,6 +879,17 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
 
     // Always release the lease and record the outcome — even on error — so the
     // lease never lingers and server-side backoff updates correctly.
+    //
+    // Order matters: we adjust `fetch_interval_seconds` BEFORE
+    // `record_feed_ingestion_outcome` so the RPC's
+    //   next_fetch_at = now() + fetch_interval_seconds + backoff_seconds
+    // picks up the new interval in the same write transaction window. On
+    // failure we skip adaptive adjustment entirely — the server-side
+    // exponential backoff is the single source of truth for failure pacing.
+    if (success) {
+      await adjustAdaptiveFetchInterval(feed.feed_id, metrics.inserted > 0, baseLog);
+    }
+
     await recordFeedOutcome(
       feed.feed_id,
       success,
@@ -721,6 +936,12 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
       ...(success ? {} : { error_message: errorMessage }),
     });
   }
+
+  return {
+    success,
+    hadNewArticles: success && metrics.inserted > 0,
+    durationMs: metrics.durationMs,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -753,9 +974,20 @@ async function claimLoop(): Promise<void> {
       continue;
     }
 
+    const cycleStartedAt = Date.now();
     const feeds = await leaseDueFeeds();
 
     if (feeds.length === 0) {
+      // Cycle yielded no leases — still emit a (mostly-zero) metrics line so
+      // dashboards can chart "idle" cycles distinctly from "no log" cycles.
+      log('info', 'cycle_metrics', {
+        feeds_checked: 0,
+        feeds_skipped: 0,
+        feeds_fetched: 0,
+        feeds_failed: 0,
+        avg_fetch_latency_ms: 0,
+        cycle_duration_ms: Date.now() - cycleStartedAt,
+      });
       await sleep(CONFIG.idlePollIntervalMs);
       continue;
     }
@@ -763,7 +995,7 @@ async function claimLoop(): Promise<void> {
     // Process the leased batch with bounded concurrency; await the whole batch
     // before claiming again so we never exceed perFeedConcurrency * batchSize
     // open ingestions and never leak leases on shutdown.
-    await Promise.all(
+    const outcomes = await Promise.all(
       feeds.map((feed) =>
         limit(() =>
           processLeasedFeed(feed).catch((err) => {
@@ -771,10 +1003,51 @@ async function claimLoop(): Promise<void> {
               feed_id: feed.feed_id,
               error: (err as Error)?.message ?? String(err),
             });
+            return null;
           }),
         ),
       ),
     );
+
+    // -------------------------------------------------------------------
+    // Per-cycle efficiency metrics (PART 3 of the smart-polling spec).
+    // Pure observability: no behavior change to ingestion. Counters:
+    //   feeds_checked       — feeds actually leased this cycle
+    //   feeds_skipped       — successful runs that produced no new articles
+    //                         (the "wasted poll" signal the spec targets)
+    //   feeds_fetched       — successful runs that produced new articles
+    //   feeds_failed        — runs that errored / threw / returned null
+    //   avg_fetch_latency_ms — mean per-feed durationMs across the batch
+    // -------------------------------------------------------------------
+    let feedsFetched = 0;
+    let feedsSkipped = 0;
+    let feedsFailed = 0;
+    let latencySum = 0;
+    let latencySamples = 0;
+    for (const outcome of outcomes) {
+      if (!outcome) {
+        feedsFailed += 1;
+        continue;
+      }
+      latencySum += outcome.durationMs;
+      latencySamples += 1;
+      if (!outcome.success) {
+        feedsFailed += 1;
+      } else if (outcome.hadNewArticles) {
+        feedsFetched += 1;
+      } else {
+        feedsSkipped += 1;
+      }
+    }
+    log('info', 'cycle_metrics', {
+      feeds_checked: feeds.length,
+      feeds_skipped: feedsSkipped,
+      feeds_fetched: feedsFetched,
+      feeds_failed: feedsFailed,
+      avg_fetch_latency_ms:
+        latencySamples > 0 ? Math.round(latencySum / latencySamples) : 0,
+      cycle_duration_ms: Date.now() - cycleStartedAt,
+    });
 
     if (!shuttingDown) {
       await sleep(CONFIG.claimIntervalMs);
@@ -898,6 +1171,12 @@ async function main(): Promise<void> {
   // the worker to keep trying, and subsequent `sendHeartbeat()` ticks
   // will surface the same issue again.
   await verifyHeartbeatRegistered();
+  // Schema-drift defense: probe `rss_feed_sources` column set ONCE before
+  // entering the claim loop so adaptive scheduling can safely no-op on
+  // environments where migration 040 (or follow-ups) has not landed yet.
+  // Probe failures are logged but never abort startup — the worker degrades
+  // to legacy behavior driven purely by `record_feed_ingestion_outcome`.
+  feedSourceColumns = await probeFeedSourceColumns();
   startHeartbeat();
   startStaleReap();
   // Auto-bootstrap the default feed catalogue if rss_feed_sources

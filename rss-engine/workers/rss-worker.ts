@@ -52,11 +52,27 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+// Worker identity must be stable across restarts of the same instance so the
+// admin dashboard does not see "phantom" workers (each restart minted a fresh
+// worker_id, leaving the previous heartbeat row to be reaped as `crashed`).
+//
+// Resolution order:
+//   1. `RSS_WORKER_ID`  — explicit override, used in container orchestration
+//                          where the platform supplies a stable identity.
+//   2. `HOSTNAME`/host  — deterministic per-instance fallback. On Kubernetes
+//                          and most container runtimes the hostname is the
+//                          pod / container name, which is exactly the
+//                          stability boundary we want.
+function resolveWorkerId(): string {
+  const explicit = process.env.RSS_WORKER_ID?.trim();
+  if (explicit) return explicit;
+  const host = (process.env.HOSTNAME || hostname() || 'localhost').trim();
+  return `rss-${host || 'localhost'}`;
+}
+
 const CONFIG = {
   workerType: 'rss_ingestion' as const,
-  workerId:
-    process.env.RSS_WORKER_ID ||
-    `rss-${hostname()}-${process.pid}-${randomUUID().slice(0, 8)}`,
+  workerId: resolveWorkerId(),
   heartbeatIntervalMs: parsePositiveInt(process.env.RSS_HEARTBEAT_INTERVAL_MS, 30_000),
   claimIntervalMs: parsePositiveInt(process.env.RSS_CLAIM_INTERVAL_MS, 5_000),
   idlePollIntervalMs: parsePositiveInt(process.env.RSS_IDLE_POLL_INTERVAL_MS, 30_000),

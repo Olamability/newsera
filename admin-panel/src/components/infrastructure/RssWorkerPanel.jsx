@@ -64,7 +64,7 @@ export default function RssWorkerPanel() {
         {error && <Banner tone="bad" title="Error">{error}</Banner>}
         {totalAlive === 0 && (
           <Banner tone="bad" title="No live worker heartbeats">
-            No worker has heartbeat-ed in the last 3 minutes. RSS ingestion is effectively stopped — do not enable the <code>queue_based_ingestion</code> flag until workers are healthy.
+            No worker has heartbeat-ed in the last 5 minutes. RSS ingestion is effectively stopped — do not enable the <code>queue_based_ingestion</code> flag until workers are healthy.
           </Banner>
         )}
         {totalCrashed > 0 && (
@@ -74,7 +74,7 @@ export default function RssWorkerPanel() {
         )}
         {totalStale > 0 && (
           <Banner tone="warn" title={`${totalStale} alive worker(s) with stale heartbeat`}>
-            Workers reporting 'alive' but no heartbeat in 3m. Likely network/cron lag or a paused process.
+            Workers reporting 'alive' but no heartbeat in 5m. Likely network/cron lag or a paused process.
           </Banner>
         )}
         {staleLeases > 0 && (

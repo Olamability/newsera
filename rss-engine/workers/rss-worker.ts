@@ -355,23 +355,22 @@ function hasFeedColumn(name: AdaptiveColumn): boolean {
 }
 
 /**
- * Adaptive `fetch_interval_seconds` update. Called after a successful fetch:
- *   - If the feed produced new articles, slightly DECREASE the interval so we
- *     come back sooner (more freshness).
- *   - If the feed produced no new articles, gradually INCREASE the interval
- *     (up to a safe ceiling) so we stop wasting polls on quiet feeds.
+ * DEPRECATED — DO NOT CALL.
  *
- * Failure backoff is intentionally NOT done here — it is handled by
- * `record_feed_ingestion_outcome` server-side (exponential, capped at 6h) and
- * we must not stack two competing backoff policies.
+ * Historical worker-side adaptive interval tuning. Retained intentionally
+ * (logic preserved, usage disabled) per the "single source of truth"
+ * refactor: the database is now the sole owner of scheduling decisions via
+ * `apply_feed_ingestion_signal()` (migration 058) and
+ * `record_feed_ingestion_outcome()` (migration 040). The worker now only
+ * emits ingestion signals through {@link recordFeedIngestionSignal}, and
+ * never mutates `fetch_interval_seconds` directly.
  *
- * This is a pure observability/efficiency win: the DB function then computes
- * `next_fetch_at = now() + fetch_interval_seconds + backoff_seconds`, so any
- * adjustment we make here is automatically respected on the next cycle.
- *
- * Skips silently when the optional column is missing or any write fails — the
- * adaptive path must never block ingestion.
+ * Kept here (not deleted) so that:
+ *   - reverting the refactor is a one-line change if scheduling regresses;
+ *   - the original adaptive constants in CONFIG remain documented;
+ *   - reviewers can compare old vs new behavior at a glance.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function adjustAdaptiveFetchInterval(
   feedId: string,
   hadNewArticles: boolean,
@@ -634,6 +633,59 @@ async function recordFeedOutcome(
   }
 }
 
+/**
+ * Worker-emitted adaptive scheduling signal. The DB-side
+ * `apply_feed_ingestion_signal` RPC (migration 058) is the single source of
+ * truth for adjusting `fetch_interval_seconds`; the worker only reports the
+ * outcome and never mutates scheduling columns directly.
+ *
+ * Failsafe contract (per the refactor spec):
+ *   - RPC failures are logged at warn level only — they MUST NOT block or
+ *     fail the ingestion path.
+ *   - If the RPC is missing (e.g. migration not yet applied) or any column
+ *     it relies on is absent, the DB function itself silently no-ops, and
+ *     we treat any error here as benign.
+ *   - The worker continues to call `record_feed_ingestion_outcome` and
+ *     `release_ingestion_job` regardless, so legacy observability is
+ *     preserved.
+ */
+type FeedIngestionSignal =
+  | 'success_with_new_articles'
+  | 'success_no_new_articles'
+  | 'failed_fetch';
+
+async function recordFeedIngestionSignal(
+  feedId: string,
+  signal: FeedIngestionSignal,
+  fetchedCount: number,
+  latencyMs: number,
+  baseLog: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('apply_feed_ingestion_signal', {
+      p_feed_id: feedId,
+      p_worker_id: CONFIG.workerId,
+      p_signal: signal,
+      p_fetched_count: Math.max(0, Math.floor(fetchedCount || 0)),
+      p_latency_ms: Math.max(0, Math.floor(latencyMs || 0)),
+      p_timestamp: new Date().toISOString(),
+    });
+    if (error) {
+      log('warn', 'ingestion_signal_failed', {
+        ...baseLog,
+        signal,
+        error: error.message,
+      });
+    }
+  } catch (err) {
+    log('warn', 'ingestion_signal_threw', {
+      ...baseLog,
+      signal,
+      error: (err as Error)?.message ?? String(err),
+    });
+  }
+}
+
 async function releaseLease(
   feedId: string,
   leaseToken: string,
@@ -880,15 +932,30 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<FeedOutcome> {
     // Always release the lease and record the outcome — even on error — so the
     // lease never lingers and server-side backoff updates correctly.
     //
-    // Order matters: we adjust `fetch_interval_seconds` BEFORE
-    // `record_feed_ingestion_outcome` so the RPC's
-    //   next_fetch_at = now() + fetch_interval_seconds + backoff_seconds
-    // picks up the new interval in the same write transaction window. On
-    // failure we skip adaptive adjustment entirely — the server-side
-    // exponential backoff is the single source of truth for failure pacing.
+    // Adaptive scheduling is now DB-driven (single source of truth):
+    // the worker only emits a signal and `apply_feed_ingestion_signal`
+    // (migration 058) decides whether/how to nudge
+    // `fetch_interval_seconds`. `record_feed_ingestion_outcome` continues
+    // to own the next_fetch_at = now() + fetch_interval_seconds +
+    // backoff_seconds computation, so emitting the signal BEFORE the
+    // outcome RPC means any cadence change picks up in the same cycle.
+    // Failsafe: signal RPC errors are logged at warn level and never
+    // block ingestion.
+    let signal: FeedIngestionSignal;
     if (success) {
-      await adjustAdaptiveFetchInterval(feed.feed_id, metrics.inserted > 0, baseLog);
+      signal = metrics.inserted > 0
+        ? 'success_with_new_articles'
+        : 'success_no_new_articles';
+    } else {
+      signal = 'failed_fetch';
     }
+    await recordFeedIngestionSignal(
+      feed.feed_id,
+      signal,
+      metrics.inserted,
+      metrics.durationMs,
+      baseLog,
+    );
 
     await recordFeedOutcome(
       feed.feed_id,

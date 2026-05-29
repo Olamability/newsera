@@ -100,8 +100,13 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  -- Bounds mirror the DB CHECK on fetch_interval_seconds (60..86400) but stay
-  -- conservatively inside it so we never bump into the constraint.
+  -- Conservative bounds chosen well inside the DB CHECK on
+  -- `fetch_interval_seconds` (60..86400) so adaptive nudges never bump into
+  -- the constraint. The asymmetric steps (slow decrease, slightly faster
+  -- increase) bias the system toward quieter polling under steady-state
+  -- load — productive feeds ramp up gradually, quiet feeds back off
+  -- promptly. These constants are intentionally local to the RPC so the
+  -- policy is owned in one place.
   v_min_floor      constant integer := 300;    -- 5 min
   v_max_ceiling    constant integer := 10800;  -- 3 h
   v_decrease_step  constant integer := 60;     -- 1 min
@@ -169,10 +174,20 @@ BEGIN
   -- record_feed_ingestion_outcome owns failure pacing.
   v_next_interval := v_current_interval;
   IF p_signal = 'success_with_new_articles' THEN
-    v_next_interval := GREATEST(v_min_floor, v_current_interval - v_decrease_step);
+    -- Decrease toward v_min_floor, but never push UP a feed that is already
+    -- below the floor (that would invert the signal's intent).
+    v_next_interval := LEAST(
+      v_current_interval,
+      GREATEST(v_min_floor, v_current_interval - v_decrease_step)
+    );
     v_notes := 'decreased interval (productive feed)';
   ELSIF p_signal = 'success_no_new_articles' THEN
-    v_next_interval := LEAST(v_max_ceiling, v_current_interval + v_increase_step);
+    -- Increase toward v_max_ceiling, but never pull DOWN a feed that is
+    -- already above the ceiling (preserve admin/manual overrides).
+    v_next_interval := GREATEST(
+      v_current_interval,
+      LEAST(v_max_ceiling, v_current_interval + v_increase_step)
+    );
     v_notes := 'increased interval (quiet feed)';
   ELSE
     -- failed_fetch: deferred to record_feed_ingestion_outcome

@@ -666,8 +666,8 @@ async function recordFeedIngestionSignal(
       p_feed_id: feedId,
       p_worker_id: CONFIG.workerId,
       p_signal: signal,
-      p_fetched_count: Math.max(0, Math.floor(fetchedCount || 0)),
-      p_latency_ms: Math.max(0, Math.floor(latencyMs || 0)),
+      p_fetched_count: Math.max(0, Math.floor(fetchedCount ?? 0)),
+      p_latency_ms: Math.max(0, Math.floor(latencyMs ?? 0)),
       p_timestamp: new Date().toISOString(),
     });
     if (error) {

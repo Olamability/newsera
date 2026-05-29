@@ -60,13 +60,14 @@ async function saveArticles(articles, context = {}) {
 
     // Annotate each article with its ingestion key (used for logging + the
     // pre-insert dedup lookup). Drop unrecoverable rows that have neither a
-    // URL nor an external identifier.
+    // URL nor an external identifier, and any row missing source_id (which
+    // would otherwise render as "Unknown source" in the feed).
     const annotated = batch
       .map((article) => ({
         article,
         ingestion_key: computeIngestionKey(article),
       }))
-      .filter((entry) => entry.article && entry.article.url && entry.ingestion_key);
+      .filter((entry) => entry.article && entry.article.url && entry.article.source_id && entry.ingestion_key);
 
     if (annotated.length === 0) {
       continue;

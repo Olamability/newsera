@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { NewsArticle } from '../types';
+import { resolveArticleSourceName } from '../services/shareService';
 
 interface Props {
   article: NewsArticle;
@@ -26,7 +27,7 @@ const FEED_IMAGE_BLURHASH = 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4';
 const CARD_RIPPLE = { color: 'rgba(0,0,0,0.06)', borderless: false } as const;
 
 function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
-  const sourceName = article.source_name ?? article.sources?.name ?? 'Unknown Source';
+  const sourceName = resolveArticleSourceName(article);
   const likeCount = article.like_count ?? 0;
   const commentCount = article.comment_count ?? 0;
   const [imageFailed, setImageFailed] = useState(false);

@@ -9,6 +9,8 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NewsArticle } from '../types';
+import { resolveArticleSourceName } from '../services/shareService';
+import { formatRelativeTime } from '../services/relativeTime';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SMALL_SCREEN_THRESHOLD = 360;
@@ -37,24 +39,14 @@ interface Props {
 }
 
 function formatTimestamp(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  // Single source of truth for relative time labels across the feed; keeps
+  // headline cards and the "Updated …" indicator visually consistent.
+  return formatRelativeTime(dateStr) ?? '';
 }
 
 const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
   const [imageFailed, setImageFailed] = useState(false);
-  const sourceName =
-    article.source_name ?? article.sources?.name ?? 'Unknown Source';
+  const sourceName = resolveArticleSourceName(article);
   const timestamp = formatTimestamp(article.published_at);
   const imageSource = useMemo(() => (
     article.image_url ? { uri: article.image_url } : null

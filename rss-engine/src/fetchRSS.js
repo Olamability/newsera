@@ -444,6 +444,14 @@ async function normalizeArticle(item, source) {
     return null;
   }
 
+  // Defensive: never emit an article without a source_id. The DB column is
+  // nullable today but the mobile/admin clients all assume a populated
+  // sources(name) join — articles without source_id surface as
+  // "Unknown source" in the feed which is a production bug.
+  if (!source || !source.id) {
+    return null;
+  }
+
   return {
     source_id: source.id,
     category_id: source.category_id,

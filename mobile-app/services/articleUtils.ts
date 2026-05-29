@@ -7,6 +7,7 @@
  */
 
 import { NewsArticle } from '../types';
+import { UNKNOWN_SOURCE_LABEL } from './shareService';
 
 export interface ArticleRow {
   image_url?: string | null;
@@ -105,11 +106,19 @@ export function sanitizeArticleContent(text: string | null | undefined): string 
     .trim();
 }
 
+const UNKNOWN_SOURCE_FALLBACK = UNKNOWN_SOURCE_LABEL;
+
+function normalizeSourceName(name: string | null | undefined): string {
+  if (typeof name !== 'string') return UNKNOWN_SOURCE_FALLBACK;
+  const trimmed = name.trim();
+  return trimmed ? trimmed : UNKNOWN_SOURCE_FALLBACK;
+}
+
 export function mapArticle(row: ArticleRow): NewsArticle {
   return {
     ...(row as unknown as NewsArticle),
     image_url: resolveImageUrl(row),
-    source_name: row.sources?.name ?? 'Unknown source',
+    source_name: normalizeSourceName(row.sources?.name),
     category_name: row.categories?.name ?? null,
   };
 }

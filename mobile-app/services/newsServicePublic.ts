@@ -1,6 +1,7 @@
 import { supabasePublic } from './supabase';
 import { NewsArticle, Category } from '../types';
 import { ArticleRow, mapArticle } from './articleUtils';
+import { UNKNOWN_SOURCE_LABEL } from './shareService';
 
 const PAGE_SIZE = 20;
 const TRENDING_LIMIT = 20;
@@ -73,6 +74,9 @@ const writeFeedCache = <T>(key: string, value: T, ttlMs: number = FEED_CACHE_TTL
 };
 
 function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
+  const trimmedSourceName =
+    typeof row.source_name === 'string' ? row.source_name.trim() : '';
+  const sourceLabel = trimmedSourceName || UNKNOWN_SOURCE_LABEL;
   return {
     id: row.id,
     title: row.title,
@@ -86,7 +90,7 @@ function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
     sources: row.source_id
       ? {
           id: row.source_id,
-          name: row.source_name ?? 'Unknown source',
+          name: sourceLabel,
           website_url: row.source_website_url,
           logo_url: row.source_logo_url,
         }
@@ -98,7 +102,7 @@ function mapEngagementFeedRow(row: EngagementFeedRow): NewsArticle {
           slug: row.category_slug ?? undefined,
         }
       : null,
-    source_name: row.source_name ?? 'Unknown source',
+    source_name: sourceLabel,
     category_name: row.category_name,
     like_count: row.likes_count ?? 0,
     comment_count: (row.comments_count ?? 0) + (row.replies_count ?? 0),

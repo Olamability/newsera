@@ -27,7 +27,6 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
   const navigation = useNavigation<Nav>();
   const [headlines, setHeadlines] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const lastUpdatedAtRef = useRef<number | null>(null);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefreshRequestRef = useRef(0);
@@ -44,9 +43,7 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
     try {
       const data = await fetchHeadlinesPublic();
       setHeadlines(data);
-      const now = Date.now();
-      setLastUpdatedAt(now);
-      lastUpdatedAtRef.current = now;
+      lastUpdatedAtRef.current = Date.now();
     } catch (err) {
       console.warn('[HeadlinesSection] Failed to load headlines:', err);
     } finally {
@@ -144,14 +141,6 @@ const HeadlinesSection: React.FC<Props> = ({ refreshSignal = 0 }) => {
 
       {/* Carousel */}
       <HeadlineCarousel articles={headlines} loading={loading} />
-      {lastUpdatedAt ? (
-        <Text
-          style={styles.refreshMeta}
-          accessibilityLabel={`Headlines last updated at ${new Date(lastUpdatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
-        >
-          Updated {new Date(lastUpdatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-        </Text>
-      ) : null}
     </View>
   );
 };
@@ -185,11 +174,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#e63946',
-  },
-  refreshMeta: {
-    marginTop: 8,
-    marginHorizontal: 16,
-    fontSize: 11,
-    color: '#8a8a8a',
   },
 });

@@ -1,0 +1,49 @@
+# ============================================================================
+# rss-worker:v2 — production compose file
+# ----------------------------------------------------------------------------
+# Single-service stack that runs the lease-based RSS ingestion worker.
+# Designed for 24/7 background operation on a VPS or any Docker host.
+#
+# Quick start:
+#   1. cp .env.example .env  (and fill in SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
+#   2. docker compose up -d --build
+#   3. docker compose logs -f rss-worker
+# ============================================================================
+
+services:
+  rss-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: newsera/rss-worker:v2
+    container_name: newsera-rss-worker
+    restart: unless-stopped
+    # Reads SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and the RSS_* tuning
+    # variables from a .env file at the repo root. NEVER commit .env.
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # Stable worker_id so the heartbeat row survives container restarts.
+      RSS_WORKER_ID: ${RSS_WORKER_ID:-rss-worker-docker-1}
+    # Hard caps prevent a runaway parser from OOM-killing the host. Tune
+    # for your VPS — defaults are conservative.
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "1.0"
+    # The Docker HEALTHCHECK is defined inside the Dockerfile; this block
+    # tunes it without rebuilding the image.
+    healthcheck:
+      test: ["CMD", "node", "scripts/healthcheck.js"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        # Bound the log volume — JSON logs from the worker are dense.
+        max-size: "10m"
+        max-file: "5"
+    # Worker is self-contained: no inbound network, no volumes, no DB
+    # sidecar (Supabase is the system of record).

@@ -1,0 +1,24 @@
+# Keep the Docker build context small — only the rss-engine source is needed.
+**/node_modules
+**/.git
+**/.github
+**/dist
+**/build
+**/coverage
+**/.cache
+**/*.log
+**/logs
+
+# Application code that does NOT belong in the worker image.
+mobile-app
+admin-panel
+apps
+docs
+packages
+scripts
+supabase
+
+# Secrets and local-only files.
+.env
+.env.*
+!.env.example

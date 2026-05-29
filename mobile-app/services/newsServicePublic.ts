@@ -512,6 +512,39 @@ export async function fetchPersonalizedArticlesPublic(
   }
 }
 
+/**
+ * Fetch only articles strictly newer than `sinceIso`. Used by the live
+ * auto-refresh polling layer to avoid full feed reloads — only the delta
+ * is fetched and prepended client-side.
+ *
+ * Returns at most `limit` articles ordered newest-first. Result is NOT
+ * cached: callers always want a fresh delta when polling.
+ */
+export async function fetchArticlesNewerThan(
+  sinceIso: string,
+  options: { categoryId?: string | null; limit?: number } = {},
+): Promise<NewsArticle[]> {
+  const { categoryId = null, limit = 30 } = options;
+
+  let query = supabasePublic
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .gt('published_at', sinceIso)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+
+  if (categoryId) {
+    query = query.eq('category_id', categoryId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    logPublicErrorOnce('fetchArticlesNewerThan', error);
+    throw error;
+  }
+  return ((data as ArticleRow[]) ?? []).map(mapArticle);
+}
+
 export {
   fetchArticlesPublic as fetchArticles,
   fetchCategoriesPublic as fetchCategories,

@@ -34,6 +34,9 @@ import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent } from '../services/shareService';
 import { isAuthError } from '../services/publicDataErrors';
 import { subscribeToHomeRefresh } from '../services/homeRefreshBus';
+import LiveUpdatedIndicator from '../components/LiveUpdatedIndicator';
+import NewArticlesBanner from '../components/NewArticlesBanner';
+import { useLiveArticleUpdates } from '../hooks/useLiveArticleUpdates';
 
 const SKELETON_COUNT = 6;
 const SKELETON_DATA = Array.from({ length: SKELETON_COUNT }, (_, i) => i);
@@ -266,6 +269,65 @@ export default function HomeScreen() {
     return articles.filter((a) => a.title.toLowerCase().includes(q));
   }, [articles, searchQuery]);
 
+  // Newest article timestamp drives both the "Updated …" indicator and the
+  // live-updates cursor. We read it from the displayed list so it stays in
+  // sync with what the user actually sees (e.g. respects search filtering).
+  const latestArticleTimestamp = useMemo<string | null>(() => {
+    for (const article of displayedArticles) {
+      if (article.published_at) return article.published_at;
+    }
+    return null;
+  }, [displayedArticles]);
+
+  // The live layer is only meaningful for chronological feeds. "For You"
+  // and "Trending" are ranked server-side and would be disrupted by
+  // arbitrary prepends.
+  const liveLayerEnabled =
+    !searchQuery.trim() &&
+    selectedCategory !== CATEGORY_FOR_YOU &&
+    selectedCategory !== CATEGORY_TRENDING;
+
+  const liveCategoryFilter =
+    selectedCategory === CATEGORY_ALL ||
+    selectedCategory === CATEGORY_FOR_YOU ||
+    selectedCategory === CATEGORY_TRENDING
+      ? null
+      : selectedCategory;
+
+  const {
+    pendingCount,
+    consumePending,
+    clearPending,
+  } = useLiveArticleUpdates({
+    latestTimestamp: latestArticleTimestamp,
+    categoryId: liveCategoryFilter,
+    enabled: liveLayerEnabled,
+  });
+
+  const mergeLiveArticles = useCallback(() => {
+    const incoming = consumePending();
+    if (incoming.length === 0) return;
+    setArticles((prev) => {
+      const seen = new Set(prev.map((a) => a.id));
+      const fresh = incoming.filter((a) => a && a.id && !seen.has(a.id));
+      if (fresh.length === 0) return prev;
+      // Prepend — do NOT scroll. FlatList preserves the visible range,
+      // so the user keeps reading whatever they were reading.
+      return [...fresh, ...prev];
+    });
+  }, [consumePending]);
+
+  const handleNewArticlesBannerPress = useCallback(() => {
+    mergeLiveArticles();
+  }, [mergeLiveArticles]);
+
+  // When the user triggers a manual refresh we drop the buffered pending
+  // articles — the upcoming full fetch will supersede them.
+  useEffect(() => {
+    if (refreshing) clearPending();
+  }, [refreshing, clearPending]);
+
+
   const handleSwipeLeft = useCallback(async (article: NewsArticle) => {
     if (!user) {
       Alert.alert(
@@ -322,8 +384,15 @@ export default function HomeScreen() {
     [insets.bottom],
   );
   const listHeader = useMemo(
-    () => (searchQuery.trim() ? null : <HeadlinesSection refreshSignal={headlineRefreshSignal} />),
-    [searchQuery, headlineRefreshSignal],
+    () => (
+      <>
+        {!searchQuery.trim() ? <HeadlinesSection refreshSignal={headlineRefreshSignal} /> : null}
+        {liveLayerEnabled ? (
+          <LiveUpdatedIndicator latestTimestamp={latestArticleTimestamp} />
+        ) : null}
+      </>
+    ),
+    [searchQuery, headlineRefreshSignal, liveLayerEnabled, latestArticleTimestamp],
   );
 
   if (loading) {
@@ -403,6 +472,7 @@ export default function HomeScreen() {
         updateCellsBatchingPeriod={BATCHING_PERIOD_MS}
         removeClippedSubviews
       />
+      <NewArticlesBanner count={pendingCount} onPress={handleNewArticlesBannerPress} />
     </SafeAreaView>
   );
 }

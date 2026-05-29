@@ -611,6 +611,11 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
   };
 
   log('info', 'feed_lease_claimed', baseLog);
+  log('info', 'ingestion_job_started', {
+    ...baseLog,
+    worker_id: CONFIG.workerId,
+    started_at: new Date(startedAt).toISOString(),
+  });
 
   const metrics: FeedMetrics = { fetched: 0, inserted: 0, duplicates: 0, durationMs: 0 };
   let success = false;
@@ -700,6 +705,20 @@ async function processLeasedFeed(feed: LeasedFeed): Promise<void> {
       duplicates_skipped: metrics.duplicates,
       duration_ms: metrics.durationMs,
       error: errorMessage,
+    });
+
+    // Companion ingestion_job_* events. These are the canonical names used
+    // by the production dashboards / log routers; `feed_lease_released`
+    // is kept for backward compatibility with existing alert rules.
+    log(success ? 'info' : 'error', success ? 'ingestion_job_success' : 'ingestion_job_failed', {
+      ...baseLog,
+      worker_id: CONFIG.workerId,
+      category_id: resolvedCategoryId,
+      articles_inserted: metrics.inserted,
+      duplicates_skipped: metrics.duplicates,
+      duration_ms: metrics.durationMs,
+      completed_at: new Date().toISOString(),
+      ...(success ? {} : { error_message: errorMessage }),
     });
   }
 }

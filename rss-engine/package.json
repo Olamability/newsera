@@ -7,6 +7,7 @@
     "start": "node index.js",
     "worker": "node worker.js",
     "worker:v2": "tsx workers/rss-worker.ts",
+    "health": "node scripts/healthcheck.js",
     "queue:runner": "tsx workers/queue-runner.ts",
     "notification:runner": "tsx workers/notification/dispatch/notification-runner.ts",
     "test:queue": "tsx workers/tests/queueRunner.simulation.ts",

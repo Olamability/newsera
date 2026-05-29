@@ -46,6 +46,7 @@ Pick one — running both at the same time will create competing workers
 | `RSS_SHUTDOWN_GRACE_MS` | `30000` | Drain window on SIGTERM. |
 | `HEALTHCHECK_MAX_ARTICLE_STALENESS_SEC` | `3600` | Healthcheck warns above this. |
 | `HEALTHCHECK_REQUIRE_ACTIVE_WORKER` | `true` | Healthcheck fails if no live worker. |
+| `HEALTHCHECK_TIMEOUT_MS` | `10000` | Hard timeout for a single healthcheck run. |
 
 Never commit `.env`. Use `.env.example` as the template.
 

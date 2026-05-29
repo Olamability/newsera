@@ -181,12 +181,13 @@ export function useLiveArticleUpdates({
       const since = latestTimestampRef.current;
       if (since && publishedAt && publishedAt <= since) return;
 
-      // We have a minimal row from the realtime payload. Fetch the
-      // hydrated version (with joined source/category) via the polling
+      // Hydrate the row (with joined source/category) via the polling
       // path so the buffered article shape matches the rest of the feed.
-      // This is cheap because `fetchArticlesNewerThan` returns at most
-      // a handful of rows in the live case.
-      const sinceForFetch = since ?? publishedAt ?? new Date(0).toISOString();
+      // We need a sensible cursor: prefer the current head, then the
+      // payload timestamp; if neither is available, skip the hydrate —
+      // the next polling tick will pick the row up safely.
+      const sinceForFetch = since ?? publishedAt;
+      if (!sinceForFetch) return;
       void fetchArticlesNewerThan(sinceForFetch, {
         categoryId: activeCategory,
         limit: 10,

@@ -8,7 +8,11 @@ interface Props {
 
 /**
  * Floating "N new articles" banner shown when polling or realtime detects
- * new content. Tapping it prepends/refreshes and scrolls the feed to top.
+ * new content. Tapping it merges the buffered new articles into the feed.
+ *
+ * Note: we intentionally do NOT scroll the user to the top — they keep
+ * their reading position, matching the production-readiness requirement
+ * "do NOT force-scroll users to top".
  *
  * The component returns null when `count <= 0`, so callers can render it
  * unconditionally and let it manage its own visibility.

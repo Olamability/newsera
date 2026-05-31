@@ -1,5 +1,10 @@
 // Small shared primitives used across infrastructure panels.
 
+import {
+  formatDateTime as sharedFormatDateTime,
+  formatRelative as sharedFormatRelative,
+} from '../../lib/dateUtils'
+
 export function Panel({ title, subtitle, action, children }) {
   return (
     <section className="bg-white border border-gray-200 rounded-2xl p-6 mb-6">
@@ -115,17 +120,9 @@ export function Table({ columns, rows, empty = 'No data', rowKey }) {
 }
 
 export function formatDateTime(s) {
-  if (!s) return '—'
-  try { return new Date(s).toLocaleString() } catch { return String(s) }
+  return sharedFormatDateTime(s)
 }
 
 export function formatRelative(s) {
-  if (!s) return '—'
-  const t = new Date(s).getTime()
-  if (Number.isNaN(t)) return String(s)
-  const diff = Math.round((Date.now() - t) / 1000)
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.round(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`
-  return `${Math.round(diff / 86400)}d ago`
+  return sharedFormatRelative(s)
 }

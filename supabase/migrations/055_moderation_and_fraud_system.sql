@@ -349,9 +349,14 @@ create table if not exists public.user_suspensions (
 
 create index if not exists user_suspensions_user_idx
   on public.user_suspensions (user_id, starts_at desc);
+-- Partial index for active suspensions. The predicate intentionally omits
+-- `ends_at > now()` because `now()` is STABLE (not IMMUTABLE) and Postgres
+-- forbids non-IMMUTABLE functions in index predicates. Queries filtering on
+-- "currently active" can still use this index and apply the `ends_at > now()`
+-- check during the scan.
 create index if not exists user_suspensions_active_idx
-  on public.user_suspensions (user_id)
-  where lifted_at is null and (ends_at is null or ends_at > now());
+  on public.user_suspensions (user_id, ends_at)
+  where lifted_at is null;
 
 create table if not exists public.verifications (
   id              uuid primary key default gen_random_uuid(),

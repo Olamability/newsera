@@ -59,179 +59,150 @@
 -- exactly like the existing 056 implementation) and never disables
 -- RLS, never drops or relaxes any policy, and never widens the
 -- existing service-role-only write grant on `rss_feed_sources`.
+--
+-- Runner-portability note
+-- -----------------------
+-- An earlier revision of this migration relied on two physical
+-- staging tables (`public._seed_publishers_060` and
+-- `public._seed_publisher_ids_060`) to pass the publisher catalogue
+-- between top-level statements.  That arrangement broke on SQL
+-- runners that split the file into independent per-statement
+-- requests (both the Supabase Dashboard SQL editor and the MCP
+-- `sql` endpoint behave this way, and PgBouncer in transaction
+-- pooling mode amplifies the problem by reassigning each request
+-- to a different backend), producing
+--
+--     ERROR: 42P01: relation "public._seed_publishers_060" does not exist
+--
+-- when a later statement landed before the CREATE TABLE became
+-- visible — or, on a retry, after the `DROP TABLE` cleanup at the
+-- bottom had already run.  This revision removes the staging tables
+-- entirely: the publisher catalogue is now defined once as a local
+-- JSONB literal inside a single self-contained `DO` block, and
+-- every read of it happens within the same block on the same
+-- backend, so there is no cross-statement state for any runner to
+-- lose.
 -- ============================================================
 
 SET ROLE postgres;
 
 -- ------------------------------------------------------------
--- 1) Canonical publisher catalogue
+-- 1) Upsert canonical `sources` rows, link `rss_feed_sources`,
+--    and backfill orphan `articles.source_id` — all in a single
+--    self-contained DO block.
 -- ------------------------------------------------------------
--- (name, website_url, logo_url, host_patterns)
+-- The publisher catalogue is declared as a JSONB array of records
+-- inside this block.  Each record carries:
+--   * name          – canonical publisher name written to `sources.name`
+--   * website_url   – canonical site URL written to `sources.website_url`
+--   * host_patterns – authoritative URL host substrings, matched
+--                     case-insensitively with `LIKE '%pattern%'` against
+--                     `rss_feed_sources.url` and `articles.url`.
+--                     Robust to scheme (http/https), subdomain
+--                     (www, edition, feeds, ...), and path differences.
 --
--- `host_patterns` lists every URL host substring we consider
--- authoritative for the publisher.  Used both to attach seeded
--- `rss_feed_sources` rows AND to backfill orphan
--- `articles.source_id` rows.  Each pattern is matched with a
--- case-insensitive `LIKE '%pattern%'` against the article URL,
--- which is robust to scheme (http/https), subdomain (www, edition,
--- feeds, ...), and path differences.
---
--- We use a regular table in the `public` schema under a
--- migration-versioned private name (`_seed_publishers_060`) rather
--- than a `TEMP … ON COMMIT DROP` table.  TEMP tables only survive
--- inside the session/transaction that created them, which breaks
--- when this migration is executed by a runner that commits between
--- statements or re-pools to a different backend mid-script — e.g.
--- the Supabase Dashboard SQL editor, the MCP `sql` endpoint, or
--- PgBouncer in transaction pooling mode.  Re-running the migration
--- against an existing table is made safe by `IF NOT EXISTS` plus a
--- `TRUNCATE` before each load, and the explicit `DROP TABLE IF
--- EXISTS` at the bottom of this file removes the staging tables
--- once the migration has finished its work.
+-- Steps performed per publisher, in order:
+--   (a) Upsert one `sources` row, matching by (name, website_url)
+--       first, then falling back to name-only so a row whose URL
+--       drifted (e.g. http vs https) is adopted instead of duplicated.
+--       Seeded publishers are real live wires, so we write
+--       `status='active'` rather than the table default 'pending'.
+--   (b) Link every seeded `rss_feed_sources` row whose URL matches
+--       one of the publisher's host patterns and whose `source_id`
+--       is still NULL — operator-curated links are left alone.
+--   (c) Backfill `articles.source_id` for every article whose
+--       `source_id` is NULL or points at a now-missing sources row
+--       and whose URL matches one of the publisher's host patterns.
+--       Bounded to one UPDATE per publisher; the UNIQUE backing
+--       index on `articles.url` keeps the ILIKE reasonable.
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public._seed_publishers_060 (
-  name          text NOT NULL,
-  website_url   text NOT NULL,
-  logo_url      text,
-  host_patterns text[] NOT NULL
-);
-
-TRUNCATE public._seed_publishers_060;
-
-INSERT INTO public._seed_publishers_060 (name, website_url, logo_url, host_patterns) VALUES
-  ('BBC News',     'https://www.bbc.com',          NULL, ARRAY['bbc.com',         'bbc.co.uk',     'bbci.co.uk']),
-  ('Reuters',      'https://www.reuters.com',      NULL, ARRAY['reuters.com']),
-  ('Al Jazeera',   'https://www.aljazeera.com',    NULL, ARRAY['aljazeera.com']),
-  ('CNN',          'https://www.cnn.com',          NULL, ARRAY['cnn.com',         'cnn.it']),
-  ('TechCrunch',   'https://techcrunch.com',       NULL, ARRAY['techcrunch.com']),
-  ('Ars Technica', 'https://arstechnica.com',      NULL, ARRAY['arstechnica.com']),
-  ('Goal',         'https://www.goal.com',         NULL, ARRAY['goal.com']),
-  ('ESPN',         'https://www.espn.com',         NULL, ARRAY['espn.com',        'espn.co.uk']);
-
--- ------------------------------------------------------------
--- 2) Upsert one `sources` row per publisher, capturing the id
--- ------------------------------------------------------------
--- `sources` carries no UNIQUE constraint on (name) or (website_url)
--- — see migration 001 — so we cannot use ON CONFLICT.  Instead we
--- match an existing row by (name, website_url) and only insert when
--- none is found.  This is idempotent across re-runs.
---
--- The `status='active'` write is intentional: the seeded publishers
--- are real, live wires, and leaving them at the table default
--- 'pending' would keep them out of any admin filters that require
--- `status='active'`.
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public._seed_publisher_ids_060 (
-  name        text PRIMARY KEY,
-  source_id   uuid NOT NULL
-);
-
-TRUNCATE public._seed_publisher_ids_060;
-
 DO $$
 DECLARE
-  r           record;
-  v_source_id uuid;
+  -- Inlined catalogue.  Adding a publisher = adding one JSON object
+  -- here; no other edits required in this block.
+  publishers CONSTANT jsonb := jsonb_build_array(
+    jsonb_build_object('name','BBC News',     'website_url','https://www.bbc.com',        'host_patterns', jsonb_build_array('bbc.com','bbc.co.uk','bbci.co.uk')),
+    jsonb_build_object('name','Reuters',      'website_url','https://www.reuters.com',    'host_patterns', jsonb_build_array('reuters.com')),
+    jsonb_build_object('name','Al Jazeera',   'website_url','https://www.aljazeera.com',  'host_patterns', jsonb_build_array('aljazeera.com')),
+    jsonb_build_object('name','CNN',          'website_url','https://www.cnn.com',        'host_patterns', jsonb_build_array('cnn.com','cnn.it')),
+    jsonb_build_object('name','TechCrunch',   'website_url','https://techcrunch.com',     'host_patterns', jsonb_build_array('techcrunch.com')),
+    jsonb_build_object('name','Ars Technica', 'website_url','https://arstechnica.com',    'host_patterns', jsonb_build_array('arstechnica.com')),
+    jsonb_build_object('name','Goal',         'website_url','https://www.goal.com',       'host_patterns', jsonb_build_array('goal.com')),
+    jsonb_build_object('name','ESPN',         'website_url','https://www.espn.com',       'host_patterns', jsonb_build_array('espn.com','espn.co.uk'))
+  );
+  pub          jsonb;
+  v_name       text;
+  v_website    text;
+  v_source_id  uuid;
+  v_pattern    text;
+  v_filters    text[];
+  v_clause     text;
+  v_updated    bigint;
+  v_total      bigint := 0;
 BEGIN
-  FOR r IN SELECT * FROM public._seed_publishers_060 LOOP
+  FOR pub IN SELECT jsonb_array_elements(publishers) LOOP
+    v_name    := pub->>'name';
+    v_website := pub->>'website_url';
+
+    -- (a) Get-or-create the canonical sources row.
+    v_source_id := NULL;
+
     SELECT s.id INTO v_source_id
       FROM public.sources s
-     WHERE s.name = r.name
-       AND COALESCE(s.website_url, '') = COALESCE(r.website_url, '')
+     WHERE s.name = v_name
+       AND COALESCE(s.website_url, '') = COALESCE(v_website, '')
      LIMIT 1;
 
     IF v_source_id IS NULL THEN
-      -- Fall back to a name-only match so we adopt any pre-existing
-      -- row whose website_url drifted (e.g. http vs https) instead
-      -- of creating a duplicate.
       SELECT s.id INTO v_source_id
         FROM public.sources s
-       WHERE s.name = r.name
+       WHERE s.name = v_name
        ORDER BY s.created_at ASC
        LIMIT 1;
     END IF;
 
     IF v_source_id IS NULL THEN
-      INSERT INTO public.sources (name, website_url, logo_url, status)
-      VALUES (r.name, r.website_url, r.logo_url, 'active')
+      INSERT INTO public.sources (name, website_url, status)
+      VALUES (v_name, v_website, 'active')
       RETURNING id INTO v_source_id;
     ELSE
-      -- Refresh the canonical fields on the existing row without
-      -- demoting status.  Only writes when the new value differs to
-      -- avoid spurious updated-timestamp churn (sources has no
-      -- updated_at column today, but a future addition would still
-      -- be unaffected).
       UPDATE public.sources
-         SET website_url = COALESCE(NULLIF(website_url, ''), r.website_url),
-             logo_url    = COALESCE(logo_url, r.logo_url),
+         SET website_url = COALESCE(NULLIF(website_url, ''), v_website),
              status      = CASE WHEN status = 'inactive' THEN status ELSE 'active' END
        WHERE id = v_source_id
          AND (
-              COALESCE(website_url, '') IS DISTINCT FROM COALESCE(NULLIF(website_url, ''), r.website_url)
-           OR logo_url IS DISTINCT FROM COALESCE(logo_url, r.logo_url)
-           OR (status = 'pending')
+              COALESCE(website_url, '') IS DISTINCT FROM COALESCE(NULLIF(website_url, ''), v_website)
+           OR status = 'pending'
          );
     END IF;
 
-    INSERT INTO public._seed_publisher_ids_060 (name, source_id)
-    VALUES (r.name, v_source_id);
-  END LOOP;
-END $$;
-
--- ------------------------------------------------------------
--- 3) Link seeded `rss_feed_sources` rows to their publisher
--- ------------------------------------------------------------
--- Match by any of the publisher's host patterns appearing in the
--- feed URL.  We only overwrite a NULL `source_id` so we never
--- clobber a row that an operator has manually linked elsewhere.
--- ------------------------------------------------------------
-UPDATE public.rss_feed_sources rfs
-   SET source_id = pi.source_id
-  FROM public._seed_publishers_060 p
-  JOIN public._seed_publisher_ids_060 pi ON pi.name = p.name
- WHERE rfs.source_id IS NULL
-   AND EXISTS (
-     SELECT 1
-       FROM unnest(p.host_patterns) AS pat(host)
-      WHERE rfs.url ILIKE '%' || pat.host || '%'
-   );
-
--- ------------------------------------------------------------
--- 4) Backfill orphan `articles.source_id`
--- ------------------------------------------------------------
--- For every article whose source_id is NULL (or points at a row
--- that no longer exists in `sources`), match the article URL host
--- against the publisher catalogue and adopt the canonical id.
--- This repairs the rendering for content already ingested before
--- the link in step (3) was in place.
---
--- Bounded to a single UPDATE per publisher to keep the migration
--- predictable on large tables; the URL index established by
--- migration 030 (`idx_articles_url`? – url is UNIQUE, so the
--- backing index suffices) keeps the ILIKE on `articles.url`
--- reasonable in practice.  Worst case this is a one-off bulk
--- update at activation time.
--- ------------------------------------------------------------
-DO $$
-DECLARE
-  r record;
-  v_pattern text;
-  v_clause  text;
-  v_filters text[];
-  v_updated bigint := 0;
-  v_total   bigint := 0;
-BEGIN
-  FOR r IN
-    SELECT p.host_patterns, pi.source_id, p.name
-      FROM public._seed_publishers_060 p
-      JOIN public._seed_publisher_ids_060 pi ON pi.name = p.name
-  LOOP
+    -- Build the ILIKE OR-chain once per publisher; reused below.
     v_filters := ARRAY[]::text[];
-    FOREACH v_pattern IN ARRAY r.host_patterns LOOP
-      v_filters := v_filters || format('a.url ILIKE %L', '%' || v_pattern || '%');
+    FOR v_pattern IN
+      SELECT jsonb_array_elements_text(pub->'host_patterns')
+    LOOP
+      v_filters := v_filters || format('%%%s%%', v_pattern);
     END LOOP;
 
-    v_clause := array_to_string(v_filters, ' OR ');
+    -- (b) Link seeded rss_feed_sources rows whose URL matches any
+    --     host pattern and whose source_id is still NULL.
+    v_clause := array_to_string(
+      ARRAY(SELECT format('rfs.url ILIKE %L', p) FROM unnest(v_filters) AS p),
+      ' OR '
+    );
+
+    EXECUTE format($f$
+      UPDATE public.rss_feed_sources rfs
+         SET source_id = %L::uuid
+       WHERE rfs.source_id IS NULL
+         AND (%s)
+    $f$, v_source_id, v_clause);
+
+    -- (c) Backfill orphan articles.source_id.
+    v_clause := array_to_string(
+      ARRAY(SELECT format('a.url ILIKE %L', p) FROM unnest(v_filters) AS p),
+      ' OR '
+    );
 
     EXECUTE format($f$
       WITH upd AS (
@@ -245,23 +216,79 @@ BEGIN
         RETURNING 1
       )
       SELECT COUNT(*) FROM upd
-    $f$, r.source_id, v_clause)
+    $f$, v_source_id, v_clause)
     INTO v_updated;
 
     v_total := v_total + COALESCE(v_updated, 0);
-    RAISE NOTICE 'articles.source_id backfilled for %: % rows', r.name, v_updated;
+    RAISE NOTICE 'articles.source_id backfilled for %: % rows', v_name, v_updated;
   END LOOP;
 
   RAISE NOTICE 'articles.source_id backfill complete: % rows total', v_total;
 END $$;
 
 -- ------------------------------------------------------------
--- 5) Rewrite `seed_default_rss_feeds()` to keep source_id linked
+-- 2) Helper: _ensure_seed_publisher_source(name, website_url)
+-- ------------------------------------------------------------
+-- Get-or-create idiom used by seed_default_rss_feeds() below.
+-- Returns the `sources.id` for a canonical publisher row,
+-- creating it (with status='active') if no match exists.  Private
+-- to the seeding code path; not granted to API roles.
+--
+-- Declared before `seed_default_rss_feeds()` so the RPC body can
+-- resolve the symbol on first parse without ordering issues.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION _ensure_seed_publisher_source(
+  p_name        text,
+  p_website_url text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  SELECT s.id INTO v_id
+    FROM public.sources s
+   WHERE s.name = p_name
+     AND COALESCE(s.website_url, '') = COALESCE(p_website_url, '')
+   LIMIT 1;
+
+  IF v_id IS NOT NULL THEN
+    RETURN v_id;
+  END IF;
+
+  SELECT s.id INTO v_id
+    FROM public.sources s
+   WHERE s.name = p_name
+   ORDER BY s.created_at ASC
+   LIMIT 1;
+
+  IF v_id IS NOT NULL THEN
+    RETURN v_id;
+  END IF;
+
+  INSERT INTO public.sources (name, website_url, status)
+  VALUES (p_name, p_website_url, 'active')
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+ALTER FUNCTION _ensure_seed_publisher_source(text, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION _ensure_seed_publisher_source(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION _ensure_seed_publisher_source(text, text) TO service_role;
+
+-- ------------------------------------------------------------
+-- 3) Rewrite `seed_default_rss_feeds()` to keep source_id linked
 -- ------------------------------------------------------------
 -- Migration 056 introduced this RPC; we preserve its signature,
 -- return shape, ownership, grants, and ON CONFLICT semantics, but
--- extend the upsert to populate `source_id` from a CTE that
--- ensures one `sources` row per publisher.  Idempotent.
+-- extend the upsert to populate `source_id` from a per-publisher
+-- get-or-create helper so an operator-triggered re-seed on a fresh
+-- environment is self-sufficient.  Idempotent.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION seed_default_rss_feeds()
 RETURNS jsonb
@@ -288,8 +315,6 @@ BEGIN
   END IF;
 
   -- Ensure a canonical `sources` row exists for each publisher.
-  -- Mirrors step (2) of this migration so an operator-triggered
-  -- re-seed on a fresh environment is self-sufficient.
   v_bbc_id         := _ensure_seed_publisher_source('BBC News',     'https://www.bbc.com');
   v_reuters_id     := _ensure_seed_publisher_source('Reuters',      'https://www.reuters.com');
   v_aljazeera_id   := _ensure_seed_publisher_source('Al Jazeera',   'https://www.aljazeera.com');
@@ -368,59 +393,10 @@ COMMENT ON FUNCTION seed_default_rss_feeds() IS
   'publisher name instead of "Unknown source".';
 
 -- ------------------------------------------------------------
--- 6) Helper: _ensure_seed_publisher_source(name, website_url)
+-- Cleanup: drop staging tables from any earlier revision of this
+-- migration that may still be lingering in the database.  Safe and
+-- idempotent — these tables are no longer created by this script.
 -- ------------------------------------------------------------
--- Get-or-create idiom used by seed_default_rss_feeds() above.
--- Returns the `sources.id` for a canonical publisher row,
--- creating it (with status='active') if no match exists.  Private
--- to the seeding code path; not granted to API roles.
--- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION _ensure_seed_publisher_source(
-  p_name        text,
-  p_website_url text
-)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_catalog
-AS $$
-DECLARE
-  v_id uuid;
-BEGIN
-  SELECT s.id INTO v_id
-    FROM public.sources s
-   WHERE s.name = p_name
-     AND COALESCE(s.website_url, '') = COALESCE(p_website_url, '')
-   LIMIT 1;
-
-  IF v_id IS NOT NULL THEN
-    RETURN v_id;
-  END IF;
-
-  SELECT s.id INTO v_id
-    FROM public.sources s
-   WHERE s.name = p_name
-   ORDER BY s.created_at ASC
-   LIMIT 1;
-
-  IF v_id IS NOT NULL THEN
-    RETURN v_id;
-  END IF;
-
-  INSERT INTO public.sources (name, website_url, status)
-  VALUES (p_name, p_website_url, 'active')
-  RETURNING id INTO v_id;
-
-  RETURN v_id;
-END;
-$$;
-
-ALTER FUNCTION _ensure_seed_publisher_source(text, text) OWNER TO postgres;
-REVOKE ALL ON FUNCTION _ensure_seed_publisher_source(text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION _ensure_seed_publisher_source(text, text) TO service_role;
-
--- Cleanup: drop the per-migration staging tables.  Safe to re-run
--- and safe whether the script executed in one transaction or many.
 DROP TABLE IF EXISTS public._seed_publisher_ids_060;
 DROP TABLE IF EXISTS public._seed_publishers_060;
 

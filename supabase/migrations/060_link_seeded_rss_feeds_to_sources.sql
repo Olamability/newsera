@@ -76,18 +76,29 @@ SET ROLE postgres;
 -- which is robust to scheme (http/https), subdomain (www, edition,
 -- feeds, ...), and path differences.
 --
--- We use a TEMP table (auto-dropped at transaction commit by
--- Supabase migration runner; explicit DROP at the bottom is a
--- belt-and-braces no-op).
+-- We use a regular table in the `public` schema under a
+-- migration-versioned private name (`_seed_publishers_060`) rather
+-- than a `TEMP … ON COMMIT DROP` table.  TEMP tables only survive
+-- inside the session/transaction that created them, which breaks
+-- when this migration is executed by a runner that commits between
+-- statements or re-pools to a different backend mid-script — e.g.
+-- the Supabase Dashboard SQL editor, the MCP `sql` endpoint, or
+-- PgBouncer in transaction pooling mode.  Re-running the migration
+-- against an existing table is made safe by `IF NOT EXISTS` plus a
+-- `TRUNCATE` before each load, and the explicit `DROP TABLE IF
+-- EXISTS` at the bottom of this file removes the staging tables
+-- once the migration has finished its work.
 -- ------------------------------------------------------------
-CREATE TEMP TABLE _seed_publishers (
+CREATE TABLE IF NOT EXISTS public._seed_publishers_060 (
   name          text NOT NULL,
   website_url   text NOT NULL,
   logo_url      text,
   host_patterns text[] NOT NULL
-) ON COMMIT DROP;
+);
 
-INSERT INTO _seed_publishers (name, website_url, logo_url, host_patterns) VALUES
+TRUNCATE public._seed_publishers_060;
+
+INSERT INTO public._seed_publishers_060 (name, website_url, logo_url, host_patterns) VALUES
   ('BBC News',     'https://www.bbc.com',          NULL, ARRAY['bbc.com',         'bbc.co.uk',     'bbci.co.uk']),
   ('Reuters',      'https://www.reuters.com',      NULL, ARRAY['reuters.com']),
   ('Al Jazeera',   'https://www.aljazeera.com',    NULL, ARRAY['aljazeera.com']),
@@ -110,17 +121,19 @@ INSERT INTO _seed_publishers (name, website_url, logo_url, host_patterns) VALUES
 -- 'pending' would keep them out of any admin filters that require
 -- `status='active'`.
 -- ------------------------------------------------------------
-CREATE TEMP TABLE _seed_publisher_ids (
+CREATE TABLE IF NOT EXISTS public._seed_publisher_ids_060 (
   name        text PRIMARY KEY,
   source_id   uuid NOT NULL
-) ON COMMIT DROP;
+);
+
+TRUNCATE public._seed_publisher_ids_060;
 
 DO $$
 DECLARE
   r           record;
   v_source_id uuid;
 BEGIN
-  FOR r IN SELECT * FROM _seed_publishers LOOP
+  FOR r IN SELECT * FROM public._seed_publishers_060 LOOP
     SELECT s.id INTO v_source_id
       FROM public.sources s
      WHERE s.name = r.name
@@ -160,7 +173,7 @@ BEGIN
          );
     END IF;
 
-    INSERT INTO _seed_publisher_ids (name, source_id)
+    INSERT INTO public._seed_publisher_ids_060 (name, source_id)
     VALUES (r.name, v_source_id);
   END LOOP;
 END $$;
@@ -174,8 +187,8 @@ END $$;
 -- ------------------------------------------------------------
 UPDATE public.rss_feed_sources rfs
    SET source_id = pi.source_id
-  FROM _seed_publishers p
-  JOIN _seed_publisher_ids pi ON pi.name = p.name
+  FROM public._seed_publishers_060 p
+  JOIN public._seed_publisher_ids_060 pi ON pi.name = p.name
  WHERE rfs.source_id IS NULL
    AND EXISTS (
      SELECT 1
@@ -210,8 +223,8 @@ DECLARE
 BEGIN
   FOR r IN
     SELECT p.host_patterns, pi.source_id, p.name
-      FROM _seed_publishers p
-      JOIN _seed_publisher_ids pi ON pi.name = p.name
+      FROM public._seed_publishers_060 p
+      JOIN public._seed_publisher_ids_060 pi ON pi.name = p.name
   LOOP
     v_filters := ARRAY[]::text[];
     FOREACH v_pattern IN ARRAY r.host_patterns LOOP
@@ -406,10 +419,10 @@ ALTER FUNCTION _ensure_seed_publisher_source(text, text) OWNER TO postgres;
 REVOKE ALL ON FUNCTION _ensure_seed_publisher_source(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION _ensure_seed_publisher_source(text, text) TO service_role;
 
--- Belt-and-braces: temp tables drop at COMMIT, but be explicit in
--- case the migration runner wraps each migration differently.
-DROP TABLE IF EXISTS _seed_publisher_ids;
-DROP TABLE IF EXISTS _seed_publishers;
+-- Cleanup: drop the per-migration staging tables.  Safe to re-run
+-- and safe whether the script executed in one transaction or many.
+DROP TABLE IF EXISTS public._seed_publisher_ids_060;
+DROP TABLE IF EXISTS public._seed_publishers_060;
 
 -- ============================================================
 -- END OF MIGRATION 060

@@ -22,14 +22,6 @@ export function AuthProvider({ children }) {
   const role = user?.app_metadata?.role
   const isAdmin = role === 'admin'
 
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    console.log('[ADMIN AUTH]', {
-      email: user?.email,
-      role,
-    })
-  }, [user?.email, role])
-
   const signIn = (email, password) =>
     supabase.auth.signInWithPassword({ email, password })
 

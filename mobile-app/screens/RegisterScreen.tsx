@@ -108,6 +108,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+          autoComplete="email"
           value={email}
           onChangeText={setEmail}
           editable={!loading}
@@ -118,6 +119,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
           placeholder="Password"
           placeholderTextColor="#aaa"
           secureTextEntry
+          autoComplete="new-password"
           value={password}
           onChangeText={setPassword}
           editable={!loading}
@@ -128,6 +130,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
           placeholder="Confirm Password"
           placeholderTextColor="#aaa"
           secureTextEntry
+          autoComplete="new-password"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           editable={!loading}

@@ -106,6 +106,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+          autoComplete="email"
           value={email}
           onChangeText={setEmail}
           editable={!loading}
@@ -117,6 +118,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
             placeholder="Password"
             placeholderTextColor="#aaa"
             secureTextEntry={!showPassword}
+            autoComplete="current-password"
             value={password}
             onChangeText={setPassword}
             editable={!loading}

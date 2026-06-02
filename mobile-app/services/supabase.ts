@@ -28,6 +28,7 @@ const secureStorage = Platform.OS === 'web' ? AsyncStorage : {
 
 export const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    debug: false,
     autoRefreshToken: false,
     persistSession: false,
     detectSessionInUrl: false,
@@ -36,6 +37,7 @@ export const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
 
 export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    debug: false,
     storage: secureStorage,
     autoRefreshToken: true,
     persistSession: true,

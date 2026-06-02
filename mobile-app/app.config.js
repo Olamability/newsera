@@ -103,6 +103,8 @@ module.exports = {
           defaultChannel: 'default',
         },
       ],
+      'expo-secure-store',
+      'expo-font',   // <-- Added for custom font support
     ],
 
     extra: {

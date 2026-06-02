@@ -18,18 +18,23 @@ function newRequestId() {
   return `r-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-async function apiFetch(path, { method = 'GET', body, actorId } = {}) {
+async function apiFetch(path, { method = 'GET', body } = {}) {
   if (!API_BASE) {
     throw new Error(
       'Moderation API not configured. Set VITE_MODERATION_API_URL to enable admin actions.',
     )
   }
+
+  // Retrieve the current session token securely
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
       'content-type': 'application/json',
       'x-request-id': newRequestId(),
-      ...(actorId ? { 'x-actor-id': actorId } : {}),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -140,7 +145,6 @@ export function applyAction({ actorId, actionId, target, payload }) {
   return apiFetch(`/v1/actions/${encodeURIComponent(actionId)}`, {
     method: 'POST',
     body: { target, payload },
-    actorId,
   })
 }
 

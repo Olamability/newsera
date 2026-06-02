@@ -57,8 +57,8 @@ function EditModal({ source, categories, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Edit Source</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
@@ -98,7 +98,7 @@ function EditModal({ source, categories, onClose, onSaved }) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button type="submit" disabled={saving}
               className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm">
               {saving ? 'Saving…' : 'Save Changes'}
@@ -151,62 +151,51 @@ export default function Sources() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Sources</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Sources</h1>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+        <p className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
       )}
 
       {loading ? (
-        <p className="text-gray-500">Loading sources…</p>
+        <p className="text-sm sm:text-base text-gray-500">Loading sources…</p>
       ) : (
-        <div className="overflow-x-auto bg-white rounded-2xl shadow-sm border border-gray-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
-              <tr>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">Website</th>
-                <th className="px-4 py-3 text-left">RSS URL</th>
-                <th className="px-4 py-3 text-left">Category</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sources.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-400">No sources found.</td>
-                </tr>
-              )}
-              {sources.map(source => (
-                <tr key={source.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{source.name}</td>
-                  <td className="px-4 py-3">
-                    {source.website_url
-                      ? <a href={source.website_url} target="_blank" rel="noreferrer"
-                          className="text-indigo-600 hover:underline truncate max-w-[160px] block">
-                          {source.website_url}
-                        </a>
-                      : <span className="text-gray-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    {source.rss_url
-                      ? <a href={source.rss_url} target="_blank" rel="noreferrer"
-                          className="text-indigo-600 hover:underline truncate max-w-[160px] block">
-                          {source.rss_url}
-                        </a>
-                      : <span className="text-gray-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{source.categories?.name ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[source.status]}`}>
-                      {source.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 flex-wrap">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+          {/* Mobile Card View */}
+          <div className="block lg:hidden">
+            {sources.length === 0 ? (
+              <div className="px-4 py-6 text-center text-gray-400 text-sm">No sources found.</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {sources.map(source => (
+                  <div key={source.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-800 truncate">{source.name}</h3>
+                        <p className="text-xs text-gray-500 mt-1">{source.categories?.name ?? '—'}</p>
+                      </div>
+                      <span className={`ml-2 flex-shrink-0 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[source.status]}`}>
+                        {source.status}
+                      </span>
+                    </div>
+                    
+                    {source.website_url && (
+                      <a href={source.website_url} target="_blank" rel="noreferrer"
+                        className="text-xs text-indigo-600 hover:underline truncate block">
+                        {source.website_url}
+                      </a>
+                    )}
+                    
+                    {source.rss_url && (
+                      <a href={source.rss_url} target="_blank" rel="noreferrer"
+                        className="text-xs text-indigo-600 hover:underline truncate block">
+                        {source.rss_url}
+                      </a>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-2">
                       {source.status !== 'active' && (
                         <button onClick={() => updateStatus(source.id, 'active')}
                           className="text-xs bg-green-100 hover:bg-green-200 text-green-800 font-medium px-2 py-1 rounded-lg transition-colors">
@@ -228,11 +217,85 @@ export default function Sources() {
                         Delete
                       </button>
                     </div>
-                  </td>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Name</th>
+                  <th className="px-4 py-3 text-left">Website</th>
+                  <th className="px-4 py-3 text-left">RSS URL</th>
+                  <th className="px-4 py-3 text-left">Category</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sources.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-400">No sources found.</td>
+                  </tr>
+                )}
+                {sources.map(source => (
+                  <tr key={source.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{source.name}</td>
+                    <td className="px-4 py-3">
+                      {source.website_url
+                        ? <a href={source.website_url} target="_blank" rel="noreferrer"
+                            className="text-indigo-600 hover:underline truncate max-w-[160px] block">
+                            {source.website_url}
+                          </a>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {source.rss_url
+                        ? <a href={source.rss_url} target="_blank" rel="noreferrer"
+                            className="text-indigo-600 hover:underline truncate max-w-[160px] block">
+                            {source.rss_url}
+                          </a>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{source.categories?.name ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[source.status]}`}>
+                        {source.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {source.status !== 'active' && (
+                          <button onClick={() => updateStatus(source.id, 'active')}
+                            className="text-xs bg-green-100 hover:bg-green-200 text-green-800 font-medium px-2 py-1 rounded-lg transition-colors">
+                            Approve
+                          </button>
+                        )}
+                        {source.status !== 'inactive' && (
+                          <button onClick={() => updateStatus(source.id, 'inactive')}
+                            className="text-xs bg-red-100 hover:bg-red-200 text-red-800 font-medium px-2 py-1 rounded-lg transition-colors">
+                            Reject
+                          </button>
+                        )}
+                        <button onClick={() => setEditTarget(source)}
+                          className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium px-2 py-1 rounded-lg transition-colors">
+                          Edit
+                        </button>
+                        <button onClick={() => deleteSource(source.id)}
+                          className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-2 py-1 rounded-lg transition-colors">
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

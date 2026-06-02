@@ -2,27 +2,27 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 function SectionTitle({ children }) {
-  return <h2 className="text-lg font-semibold text-gray-700 mb-3">{children}</h2>
+  return <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3">{children}</h2>
 }
 
 function TableWrapper({ children }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 mb-8">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">{children}</table>
+      <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">{children}</table>
     </div>
   )
 }
 
 function Th({ children }) {
   return (
-    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
+    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
       {children}
     </th>
   )
 }
 
 function Td({ children }) {
-  return <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{children}</td>
+  return <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-700 whitespace-nowrap">{children}</td>
 }
 
 export default function Analytics() {
@@ -106,26 +106,26 @@ export default function Analytics() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Analytics</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Analytics</h1>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+        <p className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
       )}
 
       {/* Total clicks today */}
-      <div className="mb-8">
-        <div className="inline-block bg-indigo-50 border border-indigo-200 rounded-2xl px-8 py-6">
-          <p className="text-sm font-medium text-indigo-600 opacity-80">Total Clicks Today</p>
-          <p className="text-4xl font-bold text-indigo-700 mt-1">{todayClicks ?? '—'}</p>
+      <div className="mb-6 sm:mb-8">
+        <div className="inline-block bg-indigo-50 border border-indigo-200 rounded-2xl px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto">
+          <p className="text-xs sm:text-sm font-medium text-indigo-600 opacity-80">Total Clicks Today</p>
+          <p className="text-3xl sm:text-4xl font-bold text-indigo-700 mt-1">{todayClicks ?? '—'}</p>
         </div>
       </div>
 
       {/* Top Sources */}
       <SectionTitle>Top Sources (by clicks)</SectionTitle>
       {topSources.length === 0 ? (
-        <p className="text-sm text-gray-400 mb-8">No click data yet.</p>
+        <p className="text-xs sm:text-sm text-gray-400 mb-8">No click data yet.</p>
       ) : (
         <TableWrapper>
           <thead>
@@ -150,7 +150,7 @@ export default function Analytics() {
       {/* Top Articles */}
       <SectionTitle>Top Articles (by clicks)</SectionTitle>
       {topArticles.length === 0 ? (
-        <p className="text-sm text-gray-400 mb-8">No click data yet.</p>
+        <p className="text-xs sm:text-sm text-gray-400 mb-8">No click data yet.</p>
       ) : (
         <TableWrapper>
           <thead>

@@ -79,12 +79,12 @@ export default function PublisherApplication() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">Publisher Application</h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Publisher Application</h1>
+      <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
         Submit a new publisher source. It will be set to <strong>pending</strong> until reviewed.
       </p>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 max-w-lg">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 max-w-lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Publisher Name <span className="text-red-500">*</span></label>
@@ -153,13 +153,13 @@ export default function PublisherApplication() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <p className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
 
           {success && (
-            <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <p className="text-xs sm:text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
               ✅ Application submitted for review.
             </p>
           )}

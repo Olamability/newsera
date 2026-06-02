@@ -8,9 +8,9 @@ function StatCard({ label, value, color }) {
     green: 'bg-green-50 border-green-200 text-green-700',
   }
   return (
-    <div className={`border rounded-2xl p-6 ${colorMap[color]}`}>
-      <p className="text-sm font-medium opacity-80">{label}</p>
-      <p className="text-4xl font-bold mt-1">{value ?? '—'}</p>
+    <div className={`border rounded-2xl p-4 sm:p-6 ${colorMap[color]}`}>
+      <p className="text-xs sm:text-sm font-medium opacity-80">{label}</p>
+      <p className="text-3xl sm:text-4xl font-bold mt-1">{value ?? '—'}</p>
     </div>
   )
 }
@@ -44,15 +44,15 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Dashboard</h1>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+        <p className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <StatCard label="Total Sources" value={stats.total} color="blue" />
         <StatCard label="Pending Sources" value={stats.pending} color="yellow" />
         <StatCard label="Active Sources" value={stats.active} color="green" />

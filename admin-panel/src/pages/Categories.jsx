@@ -43,8 +43,8 @@ function CategoryModal({ category, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
           {isEdit ? 'Edit Category' : 'New Category'}
         </h2>
@@ -72,7 +72,7 @@ function CategoryModal({ category, onClose, onSaved }) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button type="submit" disabled={saving}
               className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm">
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create'}
@@ -113,64 +113,101 @@ export default function Categories() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Categories</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Categories</h1>
         <button
           onClick={() => setModalTarget(null)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
         >
           + New Category
         </button>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+        <p className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
       )}
 
       {loading ? (
-        <p className="text-gray-500">Loading categories…</p>
+        <p className="text-sm sm:text-base text-gray-500">Loading categories…</p>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
-              <tr>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">Slug</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {categories.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-gray-400">No categories yet.</td>
-                </tr>
-              )}
-              {categories.map(cat => (
-                <tr key={cat.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{cat.name}</td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{cat.slug}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+          {/* Mobile Card View */}
+          <div className="block sm:hidden">
+            {categories.length === 0 ? (
+              <div className="px-4 py-6 text-center text-gray-400 text-sm">No categories yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {categories.map(cat => (
+                  <div key={cat.id} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-800">{cat.name}</h3>
+                        <p className="text-xs text-gray-500 font-mono mt-1">{cat.slug}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => setModalTarget(cat)}
-                        className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium px-2 py-1 rounded-lg transition-colors"
+                        className="flex-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium px-2 py-1 rounded-lg transition-colors"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => deleteCategory(cat.id)}
-                        className="text-xs bg-red-100 hover:bg-red-200 text-red-800 font-medium px-2 py-1 rounded-lg transition-colors"
+                        className="flex-1 text-xs bg-red-100 hover:bg-red-200 text-red-800 font-medium px-2 py-1 rounded-lg transition-colors"
                       >
                         Delete
                       </button>
                     </div>
-                  </td>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-hidden">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Name</th>
+                  <th className="px-4 py-3 text-left">Slug</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {categories.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-gray-400">No categories yet.</td>
+                  </tr>
+                )}
+                {categories.map(cat => (
+                  <tr key={cat.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{cat.name}</td>
+                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">{cat.slug}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setModalTarget(cat)}
+                          className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium px-2 py-1 rounded-lg transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(cat.id)}
+                          className="text-xs bg-red-100 hover:bg-red-200 text-red-800 font-medium px-2 py-1 rounded-lg transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

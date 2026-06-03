@@ -104,14 +104,14 @@ module.exports = {
         },
       ],
       'expo-secure-store',
-      'expo-font',   // <-- Added for custom font support
+      'expo-font',
     ],
 
     extra: {
       // Surface the active environment to the JS bundle for runtime checks
       appEnv,
       eas: {
-        projectId: process.env.EAS_PROJECT_ID ?? '',
+        projectId: 'f0bcba5d-0b42-41c4-92dc-0569a26b659f',
       },
     },
   },

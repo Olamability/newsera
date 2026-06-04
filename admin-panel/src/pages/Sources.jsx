@@ -137,8 +137,18 @@ export default function Sources() {
   useEffect(() => { loadData() }, [])
 
   async function updateStatus(id, status) {
-    const { error } = await supabase.from('sources').update({ status }).eq('id', id)
-    if (error) { setError(error.message); return }
+    if (status === 'active') {
+      // Use the atomic RPC that activates the source AND creates/activates
+      // the rss_feed_sources row so the ingestion worker picks it up immediately.
+      const { error } = await supabase.rpc('admin_activate_rss_feed', {
+        p_source_id: id,
+        p_reason: 'admin_panel_approve',
+      })
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('sources').update({ status }).eq('id', id)
+      if (error) { setError(error.message); return }
+    }
     setSources(prev => prev.map(s => s.id === id ? { ...s, status } : s))
   }
 

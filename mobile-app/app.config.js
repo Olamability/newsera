@@ -39,7 +39,7 @@ module.exports = {
     slug: 'newsera',
     version: '1.0.0',
     orientation: 'portrait',
-    newArchEnabled: false,
+
 
     cli: {
       appVersionSource: 'remote',

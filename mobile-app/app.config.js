@@ -39,7 +39,7 @@ module.exports = {
     slug: 'newsera',
     version: '1.0.0',
     orientation: 'portrait',
-    newArchEnabled: true,
+    newArchEnabled: false,
 
     icon: './assets/icon.png',
 
@@ -103,8 +103,20 @@ module.exports = {
           defaultChannel: 'default',
         },
       ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enableProguardInReleaseBuilds: true,
+            minifyEnabled: true,
+            shrinkResources: true,
+            jvmArgs: ['-Xmx3G']
+          }
+        }
+      ],
       'expo-secure-store',
       'expo-font',
+      'expo-system-ui',
     ],
 
     extra: {

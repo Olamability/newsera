@@ -1,0 +1,124 @@
+=================================================================
+   NEWSERA MOBILE - QUICK FIX GUIDE (Crash + Large Size)
+=================================================================
+
+PROBLEM:
+  ❌ App crashes on launch: "NewsEra (staging) has stopped"
+  ❌ APK size too large: 77 MB
+
+ROOT CAUSE:
+  1. New React Native architecture causing crashes
+  2. Unoptimized images (696 KB each!)
+
+=================================================================
+
+✅ CODE FIXES (ALREADY APPLIED)
+=================================================================
+
+1. Disabled new architecture        [app.config.js]
+2. Added error boundary            [App.tsx]
+3. Enabled minification            [metro.config.js]
+
+=================================================================
+
+⚠️  IMAGE OPTIMIZATION (YOU MUST DO THIS!)
+=================================================================
+
+CURRENT SIZES (TOO LARGE):
+  icon.png     → 696 KB  ❌
+  favicon.png  → 696 KB  ❌
+  splash.png   → 643 KB  ❌
+
+TARGET SIZES:
+  icon.png     → 20-50 KB   (1024x1024 px)
+  favicon.png  → 5-10 KB    (48x48 px)
+  splash.png   → 100-200 KB (1284x2778 px)
+
+=================================================================
+
+🔧 HOW TO OPTIMIZE (3 EASY STEPS)
+=================================================================
+
+STEP 1: Go to https://squoosh.app/
+
+STEP 2: For each image:
+  - Upload the file
+  - Resize to target dimensions
+  - Adjust quality to reach target size
+  - Download compressed version
+
+STEP 3: Replace files in: mobile-app/assets/
+
+=================================================================
+
+🚀 REBUILD & DEPLOY
+=================================================================
+
+cd mobile-app
+eas build --profile preview --platform android
+
+Expected APK size: 45-50 MB (down from 77 MB)
+
+=================================================================
+
+📋 VERIFICATION CHECKLIST
+=================================================================
+
+After rebuild:
+  [ ] APK size < 50 MB
+  [ ] App installs successfully  
+  [ ] App launches without crash
+  [ ] Splash screen shows correctly
+  [ ] Can navigate and view articles
+
+=================================================================
+
+📚 DETAILED DOCS (if you need more info)
+=================================================================
+
+  📄 SUMMARY_fixes_applied.md          ← Start here
+  📄 mobile-app/OPTIMIZE_ASSETS_NOW.md ← Image guide
+  📄 BUGFIX_app_crash_and_size.md      ← Technical details
+  
+  🔍 mobile-app/check-assets.bat       ← Check image sizes
+
+=================================================================
+
+⏱️  TIME ESTIMATE
+=================================================================
+
+  Code fixes:        ✅ Done (5 min)
+  Optimize images:   ⚠️  Todo (10 min)  ← YOU ARE HERE
+  EAS build:         ⏱️  Wait (20 min)
+  
+  TOTAL: ~30 minutes
+
+=================================================================
+
+💡 PRO TIP
+=================================================================
+
+Use TinyPNG for even easier optimization:
+  → https://tinypng.com/
+  → Upload all 3 images at once
+  → Download compressed versions
+  → Replace in mobile-app/assets/
+
+=================================================================
+
+🆘 STILL CRASHING?
+=================================================================
+
+Get crash logs:
+  adb logcat -s ReactNativeJS:* AndroidRuntime:* *:E
+
+Check environment variables:
+  eas secret:list
+
+Verify .env file has:
+  EXPO_PUBLIC_SUPABASE_URL
+  EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+=================================================================
+              ⚡ OPTIMIZE IMAGES → REBUILD → TEST ⚡
+=================================================================

@@ -72,6 +72,7 @@ module.exports = {
         foregroundImage: './assets/icon.png',
         backgroundColor: '#ffffff',
       },
+      package: 'com.newsera.mobile',
       versionCode: ANDROID_VERSION_CODE,
       permissions: [
         // Push notifications

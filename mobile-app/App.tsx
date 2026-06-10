@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Easing, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,8 +134,8 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size, focused }) => {
+      screenOptions={({ route }: { route: BottomTabScreenProps<MainTabParamList>['route'] }) => ({
+        tabBarIcon: ({ color, size, focused }: { color: string; size: number; focused: boolean }) => {
           let iconName: React.ComponentProps<typeof Ionicons>['name'];
           if (route.name === 'Home') {
             iconName = focused ? 'refresh' : 'home';

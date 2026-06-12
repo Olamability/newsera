@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.vscode-typescript-next",
+    "GitHub.copilot",
+    "eamodio.gitlens",
+    "ms-azuretools.vscode-docker",
+    "orta.vscode-jest",
+    "firsttris.vscode-jest-runner",
+    "bradlc.vscode-tailwindcss",
+    "React-Native-Tools"
+  ]
+}

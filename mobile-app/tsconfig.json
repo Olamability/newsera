@@ -1,10 +1,6 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
-    "types": [
-      "react",
-      "react-native"
-    ]
+    "strict": true
   }
 }

@@ -57,12 +57,22 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
     setLoading(true);
     try {
       await signUp(email.trim(), password);
-      // Auto-login after successful registration
+      
+      // Check if user is immediately authenticated (email confirmation disabled)
+      if (user) {
+        setAwaitingAuthSync(true);
+        return;
+      }
+      
+      // Try auto-login after successful registration
       try {
         await signIn(email.trim(), password);
         setAwaitingAuthSync(true);
-      } catch {
-        // Sign-up succeeded but auto-login failed (e.g. email confirmation required)
+      } catch (signInError) {
+        if (__DEV__) {
+          console.log('[Register] Auto-login failed:', signInError);
+        }
+        // Sign-up succeeded but auto-login failed (email confirmation required)
         Alert.alert(
           'Account created',
           'Your account has been created. Please check your email to confirm, then sign in.',
@@ -70,6 +80,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
         );
       }
     } catch (err: unknown) {
+      if (__DEV__) {
+        console.error('[Register] Registration error:', err);
+      }
       const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       Alert.alert('Registration failed', message);
     } finally {

@@ -11,6 +11,7 @@ import {
 import { Image } from 'expo-image';
 import { NewsArticle } from '../types';
 import { resolveArticleSourceName } from '../services/shareService';
+import { formatRelativeTime } from '../services/relativeTime';
 
 interface Props {
   article: NewsArticle;
@@ -31,6 +32,9 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   const likeCount = article.like_count ?? 0;
   const commentCount = article.comment_count ?? 0;
   const [imageFailed, setImageFailed] = useState(false);
+  const [timeLabel, setTimeLabel] = useState<string | null>(() => 
+    formatRelativeTime(article.published_at)
+  );
 
   const translateX = useRef(new Animated.Value(0)).current;
   const latestArticleRef = useRef(article);
@@ -46,6 +50,21 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
   useEffect(() => {
     setImageFailed(false);
   }, [article.image_url]);
+
+  // Update time label every 30 seconds for dynamic relative time
+  useEffect(() => {
+    const updateTimeLabel = () => {
+      const next = formatRelativeTime(article.published_at);
+      setTimeLabel((prev) => (prev === next ? prev : next));
+    };
+
+    // Update immediately
+    updateTimeLabel();
+
+    // Then update every 30 seconds
+    const interval = setInterval(updateTimeLabel, 30_000);
+    return () => clearInterval(interval);
+  }, [article.published_at]);
 
   const imageSource = useMemo(() => (
     article.image_url ? { uri: article.image_url } : null
@@ -150,11 +169,21 @@ function ArticleCard({ article, onPress, onSwipeLeft, onSwipeRight }: Props) {
           {article.title}
         </Text>
 
-        {/* Bottom row: source + icons */}
+        {/* Bottom row: source + time + icons */}
         <View style={styles.bottomRow}>
-          <Text style={styles.sourceName} numberOfLines={1}>
-            {sourceName}
-          </Text>
+          <View style={styles.sourceTimeRow}>
+            <Text style={styles.sourceName} numberOfLines={1}>
+              {sourceName}
+            </Text>
+            {timeLabel ? (
+              <>
+                <Text style={styles.dotSeparator}>•</Text>
+                <Text style={styles.timeText} numberOfLines={1}>
+                  {timeLabel}
+                </Text>
+              </>
+            ) : null}
+          </View>
 
           <View style={styles.iconsRow}>
             <View style={styles.iconItem}>
@@ -187,7 +216,8 @@ const areArticleCardPropsEqual = (prev: Props, next: Props): boolean => {
     && previous.source_name === current.source_name
     && previous.sources?.name === current.sources?.name
     && previous.like_count === current.like_count
-    && previous.comment_count === current.comment_count;
+    && previous.comment_count === current.comment_count
+    && previous.published_at === current.published_at;
 };
 
 export default React.memo(ArticleCard, areArticleCardPropsEqual);
@@ -250,12 +280,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  sourceName: {
+  sourceTimeRow: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  sourceName: {
     fontSize: 12,
     color: '#888',
     fontWeight: '500',
-    marginRight: 8,
+    flexShrink: 1,
+  },
+  dotSeparator: {
+    fontSize: 10,
+    color: '#ccc',
+    marginHorizontal: 6,
+  },
+  timeText: {
+    fontSize: 11,
+    color: '#aaa',
+    fontWeight: '400',
+    flexShrink: 0,
   },
   iconsRow: {
     flexDirection: 'row',

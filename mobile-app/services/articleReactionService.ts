@@ -115,6 +115,9 @@ export async function toggleArticleReaction(
       }
       return null;
     }
+    if (__DEV__) {
+      console.error('[ArticleReaction] Error checking existing reaction:', existingError);
+    }
     throw existingError;
   }
 
@@ -122,11 +125,16 @@ export async function toggleArticleReaction(
     const { error: insertError } = await supabaseAuth
       .from('article_reactions')
       .insert({ article_id: articleId, user_id: user.id, reaction_type: reaction });
-    if (insertError) throw insertError;
+    if (insertError) {
+      if (__DEV__) {
+        console.error('[ArticleReaction] Insert error:', insertError);
+      }
+      throw insertError;
+    }
     if (reaction === 'like') {
-      await upsertLegacyLike(articleId, user.id);
+      await upsertLegacyLike(articleId, user.id).catch(() => {});
     } else {
-      await deleteLegacyLike(articleId, user.id);
+      await deleteLegacyLike(articleId, user.id).catch(() => {});
     }
     return reaction;
   }
@@ -136,9 +144,14 @@ export async function toggleArticleReaction(
       .from('article_reactions')
       .delete()
       .eq('id', existing.id);
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+      if (__DEV__) {
+        console.error('[ArticleReaction] Delete error:', deleteError);
+      }
+      throw deleteError;
+    }
     if (existing.reaction_type === 'like') {
-      await deleteLegacyLike(articleId, user.id);
+      await deleteLegacyLike(articleId, user.id).catch(() => {});
     }
     return null;
   }
@@ -147,11 +160,16 @@ export async function toggleArticleReaction(
     .from('article_reactions')
     .update({ reaction_type: reaction })
     .eq('id', existing.id);
-  if (updateError) throw updateError;
+  if (updateError) {
+    if (__DEV__) {
+      console.error('[ArticleReaction] Update error:', updateError);
+    }
+    throw updateError;
+  }
   if (reaction === 'like') {
-    await upsertLegacyLike(articleId, user.id);
+    await upsertLegacyLike(articleId, user.id).catch(() => {});
   } else {
-    await deleteLegacyLike(articleId, user.id);
+    await deleteLegacyLike(articleId, user.id).catch(() => {});
   }
   return reaction;
 }

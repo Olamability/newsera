@@ -46,8 +46,10 @@ function formatTimestamp(dateStr: string | null): string {
 
 const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
   const [imageFailed, setImageFailed] = useState(false);
+  const [timestamp, setTimestamp] = useState<string>(() => 
+    formatTimestamp(article.published_at)
+  );
   const sourceName = resolveArticleSourceName(article);
-  const timestamp = formatTimestamp(article.published_at);
   const imageSource = useMemo(() => (
     article.image_url ? { uri: article.image_url } : null
   ), [article.image_url]);
@@ -55,6 +57,21 @@ const HeadlineCard: React.FC<Props> = ({ article, onPress }) => {
   useEffect(() => {
     setImageFailed(false);
   }, [article.image_url]);
+
+  // Update timestamp every 30 seconds for dynamic relative time
+  useEffect(() => {
+    const updateTimestamp = () => {
+      const next = formatTimestamp(article.published_at);
+      setTimestamp((prev) => (prev === next ? prev : next));
+    };
+
+    // Update immediately
+    updateTimestamp();
+
+    // Then update every 30 seconds
+    const interval = setInterval(updateTimestamp, 30_000);
+    return () => clearInterval(interval);
+  }, [article.published_at]);
 
   const handlePress = useCallback(() => {
     onPress(article);

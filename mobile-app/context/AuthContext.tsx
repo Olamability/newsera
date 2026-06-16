@@ -81,9 +81,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
-    const { data, error } = await supabaseAuth.auth.signUp({ email, password });
-    if (error) throw error;
-    applySession(data.session ?? null);
+    const { data, error } = await supabaseAuth.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: undefined, // Disable email confirmation redirect for mobile
+      }
+    });
+    if (error) {
+      if (__DEV__) {
+        console.error('[Auth] Sign up error:', error);
+      }
+      throw error;
+    }
+    // Only apply session if email confirmation is NOT required
+    // If email confirmation is required, data.session will be null
+    if (data.session) {
+      applySession(data.session);
+    } else {
+      applySession(null);
+    }
   };
 
   const signOut = async (): Promise<void> => {

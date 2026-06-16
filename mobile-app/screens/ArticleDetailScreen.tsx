@@ -48,6 +48,7 @@ import { useAuth } from '../context/AuthContext';
 import { buildArticleShareContent, resolveArticleSourceName } from '../services/shareService';
 import { sanitizeArticleContent } from '../services/articleUtils';
 import { InteractionAuthRequiredError } from '../services/interactionErrors';
+import { openArticleUrl } from '../services/outboundClickService';
 import {
   subscribeToArticleCommentEvents,
   subscribeToArticleReactionEvents,
@@ -770,7 +771,10 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [handleBookmark, handleReport, handleShare]);
 
   const handleReadFull = useCallback(async () => {
-    // Track click — non-blocking; link opens regardless of tracking result
+    // ── Step 1: Internal engagement tracking (personalization / trending) ──────
+    // This logs to `article_clicks`, which drives the trending score and the
+    // user interest personalisation engine. It is fully separate from the new
+    // outbound click tracking below.
     try {
       // Prefer authenticated user ID; fall back to device ID for guest users
       const trackingId = user?.id ?? (await getDeviceId());
@@ -800,15 +804,34 @@ const ArticleDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           });
         }
       }
-    } catch (_) {
-      // tracking failure must never block navigation
-    }
 
-    const supported = await Linking.canOpenURL(article.url);
-    if (supported) {
-      await Linking.openURL(article.url);
-    } else {
-      Alert.alert('Error', 'Unable to open this URL.');
+      // ── Step 2: Outbound click tracking + UTM injection + browser open ──────
+      // openArticleUrl does three things atomically:
+      //   a) Appends ?utm_source=newsera&utm_medium=aggregator&utm_campaign=feed
+      //   b) Logs to `article_outbound_clicks` (fire-and-forget, never blocks)
+      //   c) Opens the browser with the UTM-tagged URL
+      await openArticleUrl({
+        rawUrl: article.url,
+        articleId: article.id,
+        sourceId: article.source_id,
+        userId: user?.id ?? null,
+        deviceId: trackingId,
+      });
+    } catch (_) {
+      // If internal tracking throws before openArticleUrl, fall back to a
+      // plain open so the user always reaches the publisher's site.
+      try {
+        const deviceId = await getDeviceId();
+        await openArticleUrl({
+          rawUrl: article.url,
+          articleId: article.id,
+          sourceId: article.source_id,
+          userId: user?.id ?? null,
+          deviceId,
+        });
+      } catch {
+        // absolute last resort — tracking failure must never strand the user
+      }
     }
   }, [user, article.id, article.source_id, article.category_id, article.url]);
 

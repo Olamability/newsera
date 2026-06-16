@@ -1,0 +1,222 @@
+# NewsEra Traffic Attribution Architecture
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        NEWSERA TRAFFIC DISTRIBUTION PLATFORM                  ║
+║                      "Google News Model" - Traffic → Publishers               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: RSS INGESTION (rss-engine)                                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Publisher RSS Feed (publisher.com/rss)                                      │
+│           ↓                                                                   │
+│  NewsEra Ingestion Worker                                                    │
+│           ↓                                                                   │
+│  Parse: title, snippet, url, source_id, category_id                         │
+│           ↓                                                                   │
+│  Store in: articles table                                                    │
+│           ↓                                                                   │
+│  ✅ Original publisher URL preserved                                         │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: MOBILE APP DISPLAY (mobile-app)                                     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  User opens NewsEra app                                                      │
+│           ↓                                                                   │
+│  Sees article feed (title, snippet, image)                                   │
+│           ↓                                                                   │
+│  Taps article → ArticleDetailScreen                                          │
+│           ↓                                                                   │
+│  Shows:                                                                       │
+│    • Full title                                                               │
+│    • Featured image                                                           │
+│    • Short snippet (MAX_PREVIEW_CHARS = 1400)                                │
+│    • Source name + logo                                                       │
+│    • ⭐ "Read Full Article" button (primary CTA)                             │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: OUTBOUND CLICK TRACKING (outboundClickService.ts)                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  User taps "Read Full Article"                                               │
+│           ↓                                                                   │
+│  openArticleUrl() is called with:                                            │
+│    • rawUrl: https://publisher.com/article-123                               │
+│    • articleId: uuid                                                          │
+│    • sourceId: uuid                                                           │
+│    • userId: uuid | null (guest users = null)                                │
+│    • deviceId: uuid (always present)                                         │
+│           ↓                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐            │
+│  │ A. Build UTM-tagged URL                                      │            │
+│  │    buildTrackedUrl(rawUrl)                                   │            │
+│  │    Result: https://publisher.com/article-123                 │            │
+│  │            ?utm_source=newsera                                │            │
+│  │            &utm_medium=aggregator                             │            │
+│  │            &utm_campaign=feed                                 │            │
+│  └─────────────────────────────────────────────────────────────┘            │
+│           ↓                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐            │
+│  │ B. Log click to Supabase (fire-and-forget)                   │            │
+│  │    INSERT INTO article_outbound_clicks (                     │            │
+│  │      article_id,                                              │            │
+│  │      source_id,                                               │            │
+│  │      user_id,                                                 │            │
+│  │      device_id,                                               │            │
+│  │      clicked_at,                                              │            │
+│  │      device_type,                                             │            │
+│  │      utm_url                                                  │            │
+│  │    )                                                          │            │
+│  │    ✅ NEVER awaited - never blocks navigation                │            │
+│  └─────────────────────────────────────────────────────────────┘            │
+│           ↓                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐            │
+│  │ C. Open in-app browser                                       │            │
+│  │    InAppBrowser.open(trackedUrl)                             │            │
+│  │                                                               │            │
+│  │    iOS: SFSafariViewController                               │            │
+│  │    Android: Chrome Custom Tabs                               │            │
+│  │                                                               │            │
+│  │    Benefits:                                                  │            │
+│  │    • Real browser session (cookies work)                     │            │
+│  │    • Publisher analytics track correctly                     │            │
+│  │    • Ads load and generate revenue                           │            │
+│  │    • User stays "inside" NewsEra app                         │            │
+│  └─────────────────────────────────────────────────────────────┘            │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: PUBLISHER WEBSITE                                                    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  User lands on:                                                               │
+│    https://publisher.com/article-123?utm_source=newsera&...                  │
+│           ↓                                                                   │
+│  Publisher sees:                                                              │
+│    • Full article content                                                     │
+│    • Their own ads (100% revenue to them)                                    │
+│    • Their own branding                                                       │
+│    • Their own recommendations                                                │
+│           ↓                                                                   │
+│  Google Analytics 4 records:                                                  │
+│    • Source: newsera                                                          │
+│    • Medium: aggregator                                                       │
+│    • Campaign: feed                                                           │
+│    • User session                                                             │
+│    • Page views                                                               │
+│    • Conversions                                                              │
+│    • Revenue (if e-commerce enabled)                                         │
+│           ↓                                                                   │
+│  ✅ Publisher gets FULL credit and FULL revenue                              │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: ADMIN ANALYTICS (admin-panel)                                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Admin opens: /publisher-traffic                                             │
+│           ↓                                                                   │
+│  Queries: publisher_traffic_summary view                                     │
+│           ↓                                                                   │
+│  Shows:                                                                       │
+│    ┌────────────────────────────────────────────────────────┐               │
+│    │ Summary Cards                                           │               │
+│    │ • Total clicks today: 1,234                             │               │
+│    │ • Total clicks this month: 45,678                       │               │
+│    │ • Total clicks all time: 567,890                        │               │
+│    └────────────────────────────────────────────────────────┘               │
+│           ↓                                                                   │
+│    ┌────────────────────────────────────────────────────────┐               │
+│    │ Publisher Breakdown Table                               │               │
+│    │ ┌──┬────────────┬──────┬────────┬──────────┐           │               │
+│    │ │# │ Publisher  │Today │ Month  │ All Time │           │               │
+│    │ ├──┼────────────┼──────┼────────┼──────────┤           │               │
+│    │ │1 │ BBC News   │ 234  │ 12,456 │ 123,456  │           │               │
+│    │ │2 │ CNN        │ 189  │ 10,234 │  98,765  │           │               │
+│    │ │3 │ TechCrunch │ 156  │  8,901 │  87,654  │           │               │
+│    │ └──┴────────────┴──────┴────────┴──────────┘           │               │
+│    └────────────────────────────────────────────────────────┘               │
+│           ↓                                                                   │
+│  ✅ Admin can report: "NewsEra sent you X clicks this month"                │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                            DATABASE SCHEMA                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────┐
+│ TABLE: article_outbound_clicks                                 │
+├────────────────────────────────────────────────────────────────┤
+│ id              uuid         PRIMARY KEY                       │
+│ article_id      uuid         → articles(id)                    │
+│ source_id       uuid         → sources(id)                     │
+│ user_id         uuid         → auth.users(id)  [nullable]     │
+│ device_id       text         NOT NULL                          │
+│ clicked_at      timestamptz  DEFAULT now()                     │
+│ device_type     text         ('ios' | 'android' | 'web')      │
+│ utm_url         text         NOT NULL (full URL with UTM)     │
+├────────────────────────────────────────────────────────────────┤
+│ INDEXES:                                                        │
+│ • idx_aoc_article_id (article_id)                              │
+│ • idx_aoc_source_id (source_id)                                │
+│ • idx_aoc_clicked_at (clicked_at DESC)                         │
+│ • idx_aoc_user_id (user_id)                                    │
+│ • idx_aoc_dedup (article_id, device_id, clicked_at)           │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ VIEW: publisher_traffic_summary                                │
+├────────────────────────────────────────────────────────────────┤
+│ SELECT                                                          │
+│   s.id AS source_id,                                           │
+│   s.name AS source_name,                                       │
+│   s.website_url AS source_website,                             │
+│   COUNT(aoc.id) AS total_outbound_clicks,                      │
+│   COUNT(*) FILTER (WHERE clicked_at >= this_month)             │
+│     AS clicks_this_month,                                      │
+│   COUNT(*) FILTER (WHERE clicked_at >= today)                  │
+│     AS clicks_today,                                           │
+│   COUNT(DISTINCT aoc.device_id) AS unique_devices,             │
+│   MAX(aoc.clicked_at) AS last_click_at                         │
+│ FROM sources s                                                  │
+│ LEFT JOIN article_outbound_clicks aoc ON aoc.source_id = s.id │
+│ GROUP BY s.id                                                   │
+│ ORDER BY clicks_this_month DESC                                │
+└────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        KEY DIFFERENTIATORS                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+❌ Traditional News Aggregator          ✅ NewsEra (Traffic Distributor)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Scrapes full article content          • Shows snippet only (1400 chars max)
+• Keeps user in-app forever             • Sends user to publisher site
+• Publisher loses traffic                • Publisher gains traffic
+• Publisher loses ad revenue             • Publisher keeps 100% ad revenue
+• No attribution                         • Full UTM tracking
+• Success = time-in-app                  • Success = clicks-to-publishers
+• Publishers complain                    • Publishers partner
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                           IMPLEMENTATION STATUS                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ Phase 1: Outbound Click Tracking       COMPLETE
+✅ Phase 2: UTM Parameter Injection        COMPLETE
+✅ Admin Dashboard: Publisher Traffic      COMPLETE (just added)
+✅ In-App Browser Integration             COMPLETE
+✅ Share Tracking (separate UTM)          COMPLETE
+
+🚀 NewsEra is now fully operational as a publisher traffic distribution platform!
+```

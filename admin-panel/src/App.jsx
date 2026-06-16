@@ -8,6 +8,7 @@ import Sources from './pages/Sources'
 import PublisherApplication from './pages/PublisherApplication'
 import Categories from './pages/Categories'
 import Analytics from './pages/Analytics'
+import PublisherTraffic from './pages/PublisherTraffic'
 import Infrastructure from './pages/Infrastructure'
 import ModerationOverview from './pages/moderation/Overview'
 import ReportsQueue from './pages/moderation/Reports'
@@ -85,6 +86,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <Analytics />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/publisher-traffic"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PublisherTraffic />
                 </Layout>
               </ProtectedRoute>
             }
